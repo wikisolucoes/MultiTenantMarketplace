@@ -98,7 +98,7 @@
   }
 
   .form-step.hidden {
-    @apply hidden;
+    display: none;
   }
 
   .step-indicator {
