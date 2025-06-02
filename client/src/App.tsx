@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import Merchant from "@/pages/Merchant";
+import Storefront from "@/pages/Storefront";
 
 function Router() {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/merchant">
         {isAuth && userRole === "merchant" ? <Merchant /> : <Home />}
       </Route>
+      <Route path="/storefront" component={Storefront} />
       <Route component={NotFound} />
     </Switch>
   );

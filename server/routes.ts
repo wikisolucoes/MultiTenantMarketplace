@@ -332,7 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Public APIs for storefront (no authentication required)
-  app.get("/api/public/tenant/:subdomain", async (req: Request, res: Response) => {
+  app.get("/api/public/tenant/:subdomain", async (req, res) => {
     try {
       const { subdomain } = req.params;
       const tenant = await storage.getTenantBySubdomain(subdomain);
@@ -348,7 +348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/public/products/:subdomain", async (req: Request, res: Response) => {
+  app.get("/api/public/products/:subdomain", async (req, res) => {
     try {
       const { subdomain } = req.params;
       const tenant = await storage.getTenantBySubdomain(subdomain);
@@ -365,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/public/orders", async (req: Request, res: Response) => {
+  app.post("/api/public/orders", async (req, res) => {
     try {
       const { 
         customerData, 
@@ -388,12 +388,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantId: tenant.id,
         customerName: customerData.name,
         customerEmail: customerData.email,
-        customerPhone: customerData.phone,
-        customerDocument: customerData.document,
-        shippingAddress: JSON.stringify(shippingAddress),
+        total: totalAmount,
         paymentMethod,
-        totalAmount,
-        shippingCost: shippingCost || "0",
         status: "pending",
         paymentStatus: "pending",
       });

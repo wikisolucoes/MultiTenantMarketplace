@@ -99,28 +99,34 @@ export default function Checkout({ cartItems, products, total, tenant, onOrderCo
         unitPrice: products.find(p => p.id === item.id)?.price || "0",
       }));
 
+      const orderData = {
+        customerData: {
+          name: data.customerName,
+          email: data.customerEmail,
+          phone: data.customerPhone,
+          document: data.customerDocument,
+        },
+        shippingAddress: {
+          zipCode: data.zipCode,
+          street: data.street,
+          number: data.number,
+          complement: data.complement,
+          neighborhood: data.neighborhood,
+          city: data.city,
+          state: data.state,
+        },
+        paymentMethod: data.paymentMethod,
+        items: orderItems,
+        totalAmount: finalTotal.toString(),
+        shippingCost: shippingCost.toString(),
+        subdomain: tenant.subdomain,
+      };
+
       return apiRequest("/api/public/orders", {
         method: "POST",
-        body: {
-          customerData: {
-            name: data.customerName,
-            email: data.customerEmail,
-            phone: data.customerPhone,
-            document: data.customerDocument,
-          },
-          shippingAddress: {
-            zipCode: data.zipCode,
-            street: data.street,
-            number: data.number,
-            complement: data.complement,
-            neighborhood: data.neighborhood,
-            city: data.city,
-            state: data.state,
-          },
-          paymentMethod: data.paymentMethod,
-          items: orderItems,
-          totalAmount: finalTotal.toString(),
-          shippingCost: shippingCost.toString(),
+        body: JSON.stringify(orderData),
+        headers: {
+          "Content-Type": "application/json",
         },
       });
     },
