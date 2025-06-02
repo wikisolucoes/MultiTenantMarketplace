@@ -331,6 +331,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public APIs for storefront (no authentication required)
+  app.get("/api/public/tenant/:subdomain", async (req: Request, res: Response) => {
+    try {
+      const { subdomain } = req.params;
+      const tenant = await storage.getTenantBySubdomain(subdomain);
+      
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+      
+      res.json(tenant);
+    } catch (error: any) {
+      console.error("Public tenant fetch error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/public/products/:subdomain", async (req: Request, res: Response) => {
+    try {
+      const { subdomain } = req.params;
+      const tenant = await storage.getTenantBySubdomain(subdomain);
+      
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+      
+      const products = await storage.getProductsByTenantId(tenant.id);
+      res.json(products);
+    } catch (error: any) {
+      console.error("Public products fetch error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/public/orders", async (req: Request, res: Response) => {
+    try {
+      const { 
+        customerData, 
+        shippingAddress, 
+        paymentMethod, 
+        items, 
+        totalAmount, 
+        shippingCost,
+        subdomain 
+      } = req.body;
+      
+      const tenant = await storage.getTenantBySubdomain(subdomain || 'demo');
+      
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+
+      // Create order
+      const order = await storage.createOrder({
+        tenantId: tenant.id,
+        customerName: customerData.name,
+        customerEmail: customerData.email,
+        customerPhone: customerData.phone,
+        customerDocument: customerData.document,
+        shippingAddress: JSON.stringify(shippingAddress),
+        paymentMethod,
+        totalAmount,
+        shippingCost: shippingCost || "0",
+        status: "pending",
+        paymentStatus: "pending",
+      });
+
+      res.json({ 
+        orderId: order.id,
+        status: "created",
+        paymentInstructions: {
+          method: paymentMethod,
+          amount: totalAmount,
+          message: "Instruções de pagamento enviadas por email"
+        }
+      });
+    } catch (error: any) {
+      console.error("Public order creation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Webhook routes
   app.post("/api/webhooks/celcoin", async (req, res) => {
     try {

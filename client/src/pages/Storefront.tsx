@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Route, Switch } from "wouter";
-import StorefrontHeader from "@/components/storefront/StorefrontHeader";
-import StorefrontFooter from "@/components/storefront/StorefrontFooter";
-import StorefrontHome from "@/components/storefront/StorefrontHome";
-import ProductCatalog from "@/components/storefront/ProductCatalog";
-import ProductDetail from "@/components/storefront/ProductDetail";
-import Cart from "@/components/storefront/Cart";
-import Checkout from "@/components/storefront/Checkout";
-import About from "@/components/storefront/About";
-import Contact from "@/components/storefront/Contact";
-import Privacy from "@/components/storefront/Privacy";
-import { Tenant, Product } from "@/types/api";
+import StorefrontHeader from "../components/storefront/StorefrontHeader";
+import StorefrontFooter from "../components/storefront/StorefrontFooter";
+import StorefrontHome from "../components/storefront/StorefrontHome";
+import ProductCatalog from "../components/storefront/ProductCatalog";
+import ProductDetail from "../components/storefront/ProductDetail";
+import Cart from "../components/storefront/Cart";
+import Checkout from "../components/storefront/Checkout";
+import About from "../components/storefront/About";
+import Contact from "../components/storefront/Contact";
+import Privacy from "../components/storefront/Privacy";
+import { Tenant, Product } from "../types/api";
 
 export default function Storefront() {
   const [subdomain, setSubdomain] = useState<string>("");
@@ -116,7 +116,7 @@ export default function Storefront() {
       
       <main className="min-h-screen">
         <Switch>
-          <Route path="/" exact>
+          <Route path="/">
             <StorefrontHome 
               tenant={tenant} 
               products={products || []} 
@@ -125,7 +125,7 @@ export default function Storefront() {
             />
           </Route>
           
-          <Route path="/produtos" exact>
+          <Route path="/produtos">
             <ProductCatalog 
               tenant={tenant}
               products={products || []} 
