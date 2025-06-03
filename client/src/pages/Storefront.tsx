@@ -15,28 +15,10 @@ import { Tenant, Product } from "../types/api";
 
 export default function Storefront() {
   const [location] = useLocation();
-  const [subdomain, setSubdomain] = useState<string>("");
+  const [subdomain] = useState<string>("demo"); // Always use demo for development
   const [cartItems, setCartItems] = useState<
     Array<{ id: number; quantity: number }>
   >([]);
-
-  useEffect(() => {
-    const currentPath = location;
-    console.log("Current path:", currentPath);
-
-    // Parse the URL structure: /storefront/demo/produtos
-    const match = currentPath.match(/^\/storefront\/([^\/]+)/);
-    
-    if (match && match[1]) {
-      const extractedSubdomain = match[1];
-      console.log("Extracted subdomain from URL:", extractedSubdomain);
-      setSubdomain(extractedSubdomain);
-    } else {
-      // Fallback for development environment
-      console.log("No subdomain in URL, using 'demo' for development");
-      setSubdomain("demo");
-    }
-  }, [location]);
 
   const {
     data: tenant,
@@ -128,28 +110,27 @@ export default function Storefront() {
 
   // Determine which page to render based on current location
   const getCurrentPage = () => {
-    let path = location;
-    console.log("Original location:", path);
+    const path = location;
+    console.log("Current location for routing:", path);
     
-    // Parse path structure: /storefront/demo/produtos
-    // Remove /storefront first
-    if (path.startsWith('/storefront')) {
-      path = path.substring('/storefront'.length);
+    // Direct path matching
+    if (path.includes('/produtos')) {
+      console.log("Routing to produtos page");
+    } else if (path.includes('/sobre')) {
+      console.log("Routing to sobre page");
+    } else if (path.includes('/contato')) {
+      console.log("Routing to contato page");
+    } else if (path.includes('/carrinho')) {
+      console.log("Routing to carrinho page");
+    } else if (path.includes('/checkout')) {
+      console.log("Routing to checkout page");
+    } else if (path.includes('/privacidade')) {
+      console.log("Routing to privacidade page");
+    } else {
+      console.log("Routing to home page");
     }
     
-    // Remove subdomain if it exists (e.g., /demo/produtos -> /produtos)
-    if (subdomain && path.startsWith('/' + subdomain)) {
-      path = path.substring(('/' + subdomain).length);
-    }
-    
-    // Default to home if no path
-    if (!path || path === '/') {
-      path = '/';
-    }
-    
-    console.log("Final processed path for routing:", path);
-    
-    if (path.startsWith('/produtos')) {
+    if (path.includes('/produtos')) {
       return (
         <ProductCatalog
           tenant={tenant}
@@ -160,8 +141,9 @@ export default function Storefront() {
       );
     }
     
-    if (path.startsWith('/produto/')) {
-      const productId = parseInt(path.split('/')[2]);
+    if (path.includes('/produto/')) {
+      const matches = path.match(/\/produto\/(\d+)/);
+      const productId = matches ? parseInt(matches[1]) : 1;
       return (
         <ProductDetail
           productId={productId}
@@ -172,7 +154,7 @@ export default function Storefront() {
       );
     }
     
-    if (path === '/carrinho') {
+    if (path.includes('/carrinho')) {
       return (
         <Cart
           cartItems={cartItems}
@@ -184,7 +166,7 @@ export default function Storefront() {
       );
     }
     
-    if (path === '/checkout') {
+    if (path.includes('/checkout')) {
       return (
         <Checkout
           cartItems={cartItems}
@@ -196,15 +178,15 @@ export default function Storefront() {
       );
     }
     
-    if (path === '/sobre') {
+    if (path.includes('/sobre')) {
       return <About tenant={tenant} />;
     }
     
-    if (path === '/contato') {
+    if (path.includes('/contato')) {
       return <Contact tenant={tenant} />;
     }
     
-    if (path === '/privacidade') {
+    if (path.includes('/privacidade')) {
       return <Privacy tenant={tenant} />;
     }
     
