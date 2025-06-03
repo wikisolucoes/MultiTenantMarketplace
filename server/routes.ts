@@ -314,7 +314,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/tenant/withdrawals", withdrawalLimiter, authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+  // Integrated Withdrawal with Celcoin Cash-Out
+  app.post("/api/tenant/withdrawals", 
+    withdrawalLimiter, 
+    financialOperationLimiter,
+    ...financialSecurityStack,
+    authenticateToken, 
+    requireTenant, 
+    enforceTenantIsolation, 
+    async (req: TenantRequest & SecureRequest, res) => {
     try {
       const { amount, bankAccountId } = req.body;
 
@@ -322,20 +330,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Valor e conta bancária são obrigatórios" });
       }
 
-      const result = await WithdrawalService.processWithdrawal(
-        req.tenantId,
-        parseFloat(amount),
-        parseInt(bankAccountId)
-      );
+      // Get bank account details
+      const bankAccounts = await storage.getBankAccountsByUserId(req.user!.id);
+      const bankAccount = bankAccounts.find(acc => acc.id === parseInt(bankAccountId));
 
-      if (!result.success) {
-        return res.status(400).json({ message: result.error });
+      if (!bankAccount) {
+        return res.status(404).json({ message: "Conta bancária não encontrada" });
       }
 
-      res.json({ message: "Saque solicitado com sucesso", withdrawalId: result.withdrawalId });
+      // Create ledger context for security audit
+      const ledgerContext: LedgerContext = {
+        tenantId: req.tenantId,
+        userId: req.user?.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || '',
+        sessionId: req.sessionId,
+      };
+
+      // Process secure Celcoin cash-out
+      const celcoinResult = await CelcoinIntegrationService.processCashOut({
+        tenantId: req.tenantId,
+        amount: amount.toString(),
+        bankAccount: {
+          bank: bankAccount.bank,
+          agency: bankAccount.agency,
+          account: bankAccount.account,
+        },
+        description: `Saque para ${bankAccount.bank} - Agência: ${bankAccount.agency}`,
+        metadata: {
+          bankAccountId,
+          riskScore: req.riskScore,
+          deviceFingerprint: req.deviceFingerprint,
+        }
+      }, ledgerContext);
+
+      if (!celcoinResult.success) {
+        return res.status(400).json({ 
+          message: celcoinResult.message,
+          transactionId: celcoinResult.transactionId 
+        });
+      }
+
+      // Create withdrawal record in our system
+      const withdrawal = await storage.createWithdrawal({
+        tenantId: req.tenantId,
+        amount: parseFloat(amount),
+        bankAccountId: parseInt(bankAccountId),
+        status: "processing",
+        celcoinTransactionId: celcoinResult.celcoinTransactionId || "",
+      });
+
+      res.json({ 
+        message: "Saque processado com Celcoin com sucesso",
+        withdrawalId: withdrawal.id,
+        transactionId: celcoinResult.transactionId,
+        celcoinTransactionId: celcoinResult.celcoinTransactionId,
+        amount: amount,
+        status: celcoinResult.status,
+        ledgerEntryId: celcoinResult.ledgerEntryId
+      });
+
     } catch (error) {
-      console.error("Withdrawal error:", error);
-      res.status(500).json({ message: "Erro ao processar saque" });
+      console.error("Integrated withdrawal error:", error);
+      res.status(500).json({ message: "Erro ao processar saque com Celcoin" });
     }
   });
 
@@ -373,6 +430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Integrated Checkout with Celcoin Cash-In
   app.post("/api/public/orders", async (req, res) => {
     try {
       const { 
@@ -391,7 +449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Tenant not found" });
       }
 
-      // Create order
+      // Create order first
       const order = await storage.createOrder({
         tenantId: tenant.id,
         customerName: customerData.name,
@@ -402,17 +460,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus: "pending",
       });
 
-      res.json({ 
-        orderId: order.id,
-        status: "created",
-        paymentInstructions: {
-          method: paymentMethod,
-          amount: totalAmount,
-          message: "Instruções de pagamento enviadas por email"
+      // If payment method requires immediate processing (PIX, Credit Card)
+      if (paymentMethod === "pix" || paymentMethod === "credit_card") {
+        // Create ledger context for the transaction
+        const ledgerContext: LedgerContext = {
+          tenantId: tenant.id,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent') || '',
+          orderId: order.id,
+        };
+
+        // Process Celcoin cash-in for immediate payment methods
+        const celcoinResult = await CelcoinIntegrationService.processCashIn({
+          tenantId: tenant.id,
+          amount: totalAmount.toString(),
+          paymentMethod: paymentMethod as "pix" | "credit_card",
+          customerData: {
+            name: customerData.name,
+            email: customerData.email,
+            document: customerData.document || "",
+          },
+          metadata: {
+            orderId: order.id,
+            items,
+            shippingAddress,
+          }
+        }, ledgerContext);
+
+        if (celcoinResult.success) {
+          // Update order with Celcoin transaction ID
+          await storage.updateOrderStatus(
+            order.id, 
+            "confirmed", 
+            celcoinResult.status === "confirmed" ? "paid" : "processing"
+          );
+
+          res.json({ 
+            orderId: order.id,
+            status: "confirmed",
+            paymentStatus: celcoinResult.status,
+            transactionId: celcoinResult.transactionId,
+            celcoinTransactionId: celcoinResult.celcoinTransactionId,
+            paymentInstructions: {
+              method: paymentMethod,
+              amount: totalAmount,
+              status: celcoinResult.status,
+              message: paymentMethod === "pix" 
+                ? "Pagamento PIX processado com sucesso"
+                : "Pagamento no cartão processado com sucesso"
+            }
+          });
+        } else {
+          res.status(400).json({ 
+            error: "Payment processing failed",
+            orderId: order.id,
+            details: celcoinResult.message 
+          });
         }
-      });
+      } else {
+        // For boleto or other methods, return order without immediate processing
+        res.json({ 
+          orderId: order.id,
+          status: "created",
+          paymentInstructions: {
+            method: paymentMethod,
+            amount: totalAmount,
+            message: "Instruções de pagamento enviadas por email"
+          }
+        });
+      }
     } catch (error: any) {
-      console.error("Public order creation error:", error);
+      console.error("Integrated checkout error:", error);
       res.status(500).json({ error: error.message });
     }
   });
