@@ -485,6 +485,19 @@ export type Transaction = typeof transactions.$inferSelect;
 export type LoginData = z.infer<typeof loginSchema>;
 export type TenantRegistrationData = z.infer<typeof tenantRegistrationSchema>;
 
+// Ledger types
+export type LedgerEntry = typeof ledgerEntries.$inferSelect;
+export type InsertLedgerEntry = z.infer<typeof insertLedgerEntrySchema>;
+export type BalanceSnapshot = typeof balanceSnapshots.$inferSelect;
+export type InsertBalanceSnapshot = z.infer<typeof insertBalanceSnapshotSchema>;
+export type CelcoinTransactionLog = typeof celcoinTransactionLog.$inferSelect;
+export type InsertCelcoinTransactionLog = z.infer<typeof insertCelcoinTransactionLogSchema>;
+export type SecurityAuditLog = typeof securityAuditLog.$inferSelect;
+export type InsertSecurityAuditLog = z.infer<typeof insertSecurityAuditLogSchema>;
+export type ReconciliationRecord = typeof reconciliationRecords.$inferSelect;
+export type InsertReconciliationRecord = z.infer<typeof insertReconciliationRecordSchema>;
+export type ApiRateLimit = typeof apiRateLimits.$inferSelect;
+
 // Customer tables for storefront functionality
 export const customers = pgTable("customers", {
   id: serial("id").primaryKey(),
