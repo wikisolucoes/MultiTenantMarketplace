@@ -11,7 +11,7 @@ import Admin from "@/pages/Admin";
 import Merchant from "@/pages/Merchant";
 import Storefront from "@/pages/Storefront";
 
-function Router() {
+function AppRouter() {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
   const [userRole, setUserRole] = useState<string | null>(null);
 
@@ -31,8 +31,7 @@ function Router() {
       <Route path="/merchant">
         {isAuth && userRole === "merchant" ? <Merchant /> : <Home />}
       </Route>
-      <Route path="/storefront/:subdomain*" component={Storefront} />
-      <Route path="/storefront" component={Storefront} />
+      <Route path="/storefront*" component={Storefront} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -43,7 +42,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <AppRouter />
       </TooltipProvider>
     </QueryClientProvider>
   );
