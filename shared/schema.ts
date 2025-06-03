@@ -96,7 +96,135 @@ export const withdrawals = pgTable("withdrawals", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Transactions table for financial tracking
+// Financial Ledger System for Celcoin Operations
+export const ledgerEntries = pgTable("ledger_entries", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  entryType: text("entry_type", { 
+    enum: ["debit", "credit"] 
+  }).notNull(),
+  transactionType: text("transaction_type", { 
+    enum: ["sale", "withdrawal", "fee", "refund", "chargeback", "adjustment", "cash_in", "cash_out"] 
+  }).notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  runningBalance: decimal("running_balance", { precision: 15, scale: 2 }).notNull(),
+  referenceId: varchar("reference_id", { length: 100 }), // External transaction ID
+  orderId: integer("order_id").references(() => orders.id),
+  withdrawalId: integer("withdrawal_id").references(() => withdrawals.id),
+  celcoinTransactionId: varchar("celcoin_transaction_id", { length: 100 }),
+  description: text("description").notNull(),
+  status: text("status", { 
+    enum: ["pending", "confirmed", "failed", "reversed"] 
+  }).notNull().default("pending"),
+  metadata: jsonb("metadata"), // Additional transaction data
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  sessionId: varchar("session_id", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  confirmedAt: timestamp("confirmed_at"),
+  reversedAt: timestamp("reversed_at"),
+});
+
+// Account Balance Snapshots for audit trail
+export const balanceSnapshots = pgTable("balance_snapshots", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  balance: decimal("balance", { precision: 15, scale: 2 }).notNull(),
+  pendingBalance: decimal("pending_balance", { precision: 15, scale: 2 }).notNull(),
+  lastLedgerEntryId: integer("last_ledger_entry_id").references(() => ledgerEntries.id),
+  snapshotType: text("snapshot_type", { 
+    enum: ["daily", "transaction", "reconciliation", "manual"] 
+  }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Celcoin Transaction Log for API interactions
+export const celcoinTransactionLog = pgTable("celcoin_transaction_log", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  externalTransactionId: varchar("external_transaction_id", { length: 100 }).notNull(),
+  operationType: text("operation_type", { 
+    enum: ["payment", "withdrawal", "balance_check", "account_creation", "webhook"] 
+  }).notNull(),
+  requestPayload: jsonb("request_payload").notNull(),
+  responsePayload: jsonb("response_payload"),
+  httpStatus: integer("http_status"),
+  celcoinStatus: varchar("celcoin_status", { length: 50 }),
+  amount: decimal("amount", { precision: 15, scale: 2 }),
+  fee: decimal("fee", { precision: 15, scale: 2 }),
+  netAmount: decimal("net_amount", { precision: 15, scale: 2 }),
+  errorCode: varchar("error_code", { length: 50 }),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0),
+  isSuccessful: boolean("is_successful").default(false),
+  webhookReceived: boolean("webhook_received").default(false),
+  webhookTimestamp: timestamp("webhook_timestamp"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Security Audit Log
+export const securityAuditLog = pgTable("security_audit_log", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id),
+  userId: integer("user_id").references(() => users.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  resource: varchar("resource", { length: 100 }).notNull(),
+  resourceId: varchar("resource_id", { length: 100 }),
+  oldValues: jsonb("old_values"),
+  newValues: jsonb("new_values"),
+  ipAddress: varchar("ip_address", { length: 45 }).notNull(),
+  userAgent: text("user_agent"),
+  sessionId: varchar("session_id", { length: 100 }),
+  success: boolean("success").notNull(),
+  failureReason: text("failure_reason"),
+  riskScore: integer("risk_score"), // 1-100 risk assessment
+  geoLocation: jsonb("geo_location"),
+  deviceFingerprint: varchar("device_fingerprint", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Financial Reconciliation Records
+export const reconciliationRecords = pgTable("reconciliation_records", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  reconciliationType: text("reconciliation_type", { 
+    enum: ["daily", "weekly", "monthly", "manual"] 
+  }).notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  systemBalance: decimal("system_balance", { precision: 15, scale: 2 }).notNull(),
+  celcoinBalance: decimal("celcoin_balance", { precision: 15, scale: 2 }).notNull(),
+  difference: decimal("difference", { precision: 15, scale: 2 }).notNull(),
+  transactionCount: integer("transaction_count").notNull(),
+  discrepancies: jsonb("discrepancies"),
+  status: text("status", { 
+    enum: ["pending", "reconciled", "discrepancy_found", "resolved"] 
+  }).notNull().default("pending"),
+  resolvedBy: integer("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Rate Limiting for API calls
+export const apiRateLimits = pgTable("api_rate_limits", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  endpoint: varchar("endpoint", { length: 100 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }).notNull(),
+  requestCount: integer("request_count").default(0),
+  windowStart: timestamp("window_start").defaultNow().notNull(),
+  isBlocked: boolean("is_blocked").default(false),
+  blockedUntil: timestamp("blocked_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Legacy transactions table (deprecated in favor of ledger)
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
@@ -170,6 +298,69 @@ export const withdrawalsRelations = relations(withdrawals, ({ one }) => ({
   }),
 }));
 
+// Ledger relations
+export const ledgerEntriesRelations = relations(ledgerEntries, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [ledgerEntries.tenantId],
+    references: [tenants.id],
+  }),
+  order: one(orders, {
+    fields: [ledgerEntries.orderId],
+    references: [orders.id],
+  }),
+  withdrawal: one(withdrawals, {
+    fields: [ledgerEntries.withdrawalId],
+    references: [withdrawals.id],
+  }),
+}));
+
+export const balanceSnapshotsRelations = relations(balanceSnapshots, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [balanceSnapshots.tenantId],
+    references: [tenants.id],
+  }),
+  lastLedgerEntry: one(ledgerEntries, {
+    fields: [balanceSnapshots.lastLedgerEntryId],
+    references: [ledgerEntries.id],
+  }),
+}));
+
+export const celcoinTransactionLogRelations = relations(celcoinTransactionLog, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [celcoinTransactionLog.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const securityAuditLogRelations = relations(securityAuditLog, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [securityAuditLog.tenantId],
+    references: [tenants.id],
+  }),
+  user: one(users, {
+    fields: [securityAuditLog.userId],
+    references: [users.id],
+  }),
+}));
+
+export const reconciliationRecordsRelations = relations(reconciliationRecords, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [reconciliationRecords.tenantId],
+    references: [tenants.id],
+  }),
+  resolvedBy: one(users, {
+    fields: [reconciliationRecords.resolvedBy],
+    references: [users.id],
+  }),
+}));
+
+export const apiRateLimitsRelations = relations(apiRateLimits, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [apiRateLimits.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
 export const transactionsRelations = relations(transactions, ({ one }) => ({
   tenant: one(tenants, {
     fields: [transactions.tenantId],
@@ -217,6 +408,36 @@ export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
   createdAt: true,
   updatedAt: true,
   status: true,
+});
+
+// Ledger insert schemas
+export const insertLedgerEntrySchema = createInsertSchema(ledgerEntries).omit({
+  id: true,
+  createdAt: true,
+  confirmedAt: true,
+  reversedAt: true,
+});
+
+export const insertBalanceSnapshotSchema = createInsertSchema(balanceSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCelcoinTransactionLogSchema = createInsertSchema(celcoinTransactionLog).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSecurityAuditLogSchema = createInsertSchema(securityAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertReconciliationRecordSchema = createInsertSchema(reconciliationRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 // Login schema
