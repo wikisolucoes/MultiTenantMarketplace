@@ -42,7 +42,7 @@ export default function Storefront() {
 
   // Get tenant data by subdomain
   const { data: tenant, isLoading: tenantLoading } = useQuery<Tenant>({
-    queryKey: ["/api/public/tenant", subdomain],
+    queryKey: [`/api/public/tenant/${subdomain}`],
     enabled: !!subdomain,
   });
 
@@ -50,7 +50,7 @@ export default function Storefront() {
 
   // Get products for this tenant
   const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ["/api/public/products", subdomain],
+    queryKey: [`/api/public/products/${subdomain}`],
     enabled: !!subdomain,
   });
 
