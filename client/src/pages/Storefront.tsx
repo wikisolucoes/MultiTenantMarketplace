@@ -128,25 +128,26 @@ export default function Storefront() {
 
   // Determine which page to render based on current location
   const getCurrentPage = () => {
-    // Remove storefront and subdomain from path to get the internal route
     let path = location;
+    console.log("Original location:", path);
     
-    // Remove /storefront prefix
+    // Parse path structure: /storefront/demo/produtos
+    // Remove /storefront first
     if (path.startsWith('/storefront')) {
-      path = path.replace('/storefront', '');
+      path = path.substring('/storefront'.length);
     }
     
-    // Remove subdomain if present (e.g., /demo/produtos -> /produtos)
-    if (path.startsWith('/' + subdomain)) {
-      path = path.replace('/' + subdomain, '');
+    // Remove subdomain if it exists (e.g., /demo/produtos -> /produtos)
+    if (subdomain && path.startsWith('/' + subdomain)) {
+      path = path.substring(('/' + subdomain).length);
     }
     
-    // Ensure path starts with /
-    if (!path.startsWith('/')) {
-      path = '/' + path;
+    // Default to home if no path
+    if (!path || path === '/') {
+      path = '/';
     }
     
-    console.log("Processed path for routing:", path);
+    console.log("Final processed path for routing:", path);
     
     if (path.startsWith('/produtos')) {
       return (

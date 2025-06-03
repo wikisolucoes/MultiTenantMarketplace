@@ -31,7 +31,8 @@ function Router() {
       <Route path="/merchant">
         {isAuth && userRole === "merchant" ? <Merchant /> : <Home />}
       </Route>
-      <Route path="/storefront*" component={Storefront} />
+      <Route path="/storefront/:subdomain*" component={Storefront} />
+      <Route path="/storefront" component={Storefront} />
       <Route component={NotFound} />
     </Switch>
   );
