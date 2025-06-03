@@ -131,7 +131,7 @@ export default function Storefront() {
 
       <main className="min-h-screen">
         <Switch>
-          <Route path="/">
+          <Route path="/storefront">
             <StorefrontHome
               tenant={tenant}
               products={products || []}
@@ -140,7 +140,7 @@ export default function Storefront() {
             />
           </Route>
 
-          <Route path="/produtos">
+          <Route path="/storefront/produtos">
             <ProductCatalog
               tenant={tenant}
               products={products || []}
@@ -149,7 +149,7 @@ export default function Storefront() {
             />
           </Route>
 
-          <Route path="/produto/:id">
+          <Route path="/storefront/produto/:id">
             {(params) => (
               <ProductDetail
                 productId={parseInt(params.id)}
@@ -160,7 +160,7 @@ export default function Storefront() {
             )}
           </Route>
 
-          <Route path="/carrinho">
+          <Route path="/storefront/carrinho">
             <Cart
               cartItems={cartItems}
               products={products || []}
@@ -170,7 +170,7 @@ export default function Storefront() {
             />
           </Route>
 
-          <Route path="/checkout">
+          <Route path="/storefront/checkout">
             <Checkout
               cartItems={cartItems}
               products={products || []}
@@ -180,25 +180,25 @@ export default function Storefront() {
             />
           </Route>
 
-          <Route path="/sobre">
+          <Route path="/storefront/sobre">
             <About tenant={tenant} />
           </Route>
 
-          <Route path="/contato">
+          <Route path="/storefront/contato">
             <Contact tenant={tenant} />
           </Route>
 
-          <Route path="/privacidade">
+          <Route path="/storefront/privacidade">
             <Privacy tenant={tenant} />
           </Route>
 
           <Route>
-            <div className="container mx-auto px-4 py-16 text-center">
-              <h1 className="text-4xl font-bold mb-4">Página não encontrada</h1>
-              <p className="text-muted-foreground">
-                A página que você procura não existe.
-              </p>
-            </div>
+            <StorefrontHome
+              tenant={tenant}
+              products={products || []}
+              onAddToCart={addToCart}
+              isLoading={productsLoading}
+            />
           </Route>
         </Switch>
       </main>
