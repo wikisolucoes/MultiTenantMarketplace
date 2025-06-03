@@ -850,6 +850,369 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =============================================================================
+  // ADVANCED E-COMMERCE FEATURES
+  // =============================================================================
+
+  // CUPONS DE DESCONTO
+  app.get("/api/tenant/coupons", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { CouponService } = await import("./services/coupon");
+      const coupons = await CouponService.getCoupons(req.tenantId);
+      res.json(coupons);
+    } catch (error) {
+      console.error("Error fetching coupons:", error);
+      res.status(500).json({ message: "Failed to fetch coupons" });
+    }
+  });
+
+  app.post("/api/tenant/coupons", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { CouponService } = await import("./services/coupon");
+      const couponData = { ...req.body, tenantId: req.tenantId };
+      const coupon = await CouponService.createCoupon(couponData);
+      res.status(201).json(coupon);
+    } catch (error) {
+      console.error("Error creating coupon:", error);
+      res.status(500).json({ message: "Failed to create coupon" });
+    }
+  });
+
+  app.post("/api/public/validate-coupon/:subdomain", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { code, orderData } = req.body;
+      
+      const tenant = await storage.getTenantBySubdomain(subdomain);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      const { CouponService } = await import("./services/coupon");
+      const result = await CouponService.validateAndApplyCoupon(tenant.id, code, orderData);
+      res.json(result);
+    } catch (error) {
+      console.error("Error validating coupon:", error);
+      res.status(500).json({ message: "Failed to validate coupon" });
+    }
+  });
+
+  // VALES PRESENTES
+  app.get("/api/tenant/gift-cards", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { GiftCardService } = await import("./services/giftcard");
+      const giftCards = await GiftCardService.getGiftCards(req.tenantId);
+      res.json(giftCards);
+    } catch (error) {
+      console.error("Error fetching gift cards:", error);
+      res.status(500).json({ message: "Failed to fetch gift cards" });
+    }
+  });
+
+  app.post("/api/tenant/gift-cards", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { GiftCardService } = await import("./services/giftcard");
+      const giftCardData = { ...req.body, tenantId: req.tenantId };
+      const giftCard = await GiftCardService.createGiftCard(giftCardData);
+      res.status(201).json(giftCard);
+    } catch (error) {
+      console.error("Error creating gift card:", error);
+      res.status(500).json({ message: "Failed to create gift card" });
+    }
+  });
+
+  app.post("/api/public/check-gift-card/:subdomain", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { code } = req.body;
+      
+      const tenant = await storage.getTenantBySubdomain(subdomain);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      const { GiftCardService } = await import("./services/giftcard");
+      const result = await GiftCardService.checkBalance(tenant.id, code);
+      res.json(result);
+    } catch (error) {
+      console.error("Error checking gift card:", error);
+      res.status(500).json({ message: "Failed to check gift card" });
+    }
+  });
+
+  // PROGRAMA DE AFILIADOS
+  app.get("/api/tenant/affiliates", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { AffiliateService } = await import("./services/affiliate");
+      const affiliates = await AffiliateService.getAffiliates(req.tenantId);
+      res.json(affiliates);
+    } catch (error) {
+      console.error("Error fetching affiliates:", error);
+      res.status(500).json({ message: "Failed to fetch affiliates" });
+    }
+  });
+
+  app.post("/api/tenant/affiliates", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { AffiliateService } = await import("./services/affiliate");
+      const affiliateData = { ...req.body, tenantId: req.tenantId };
+      const affiliate = await AffiliateService.createAffiliate(affiliateData);
+      res.status(201).json(affiliate);
+    } catch (error) {
+      console.error("Error creating affiliate:", error);
+      res.status(500).json({ message: "Failed to create affiliate" });
+    }
+  });
+
+  app.get("/api/tenant/affiliate-commissions", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { AffiliateService } = await import("./services/affiliate");
+      const { affiliateId, status } = req.query;
+      const commissions = await AffiliateService.getAffiliateCommissions(
+        req.tenantId, 
+        affiliateId ? parseInt(affiliateId as string) : undefined,
+        status as string
+      );
+      res.json(commissions);
+    } catch (error) {
+      console.error("Error fetching commissions:", error);
+      res.status(500).json({ message: "Failed to fetch commissions" });
+    }
+  });
+
+  // CAMPANHAS DE MARKETING
+  app.get("/api/tenant/marketing-campaigns", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { MarketingService } = await import("./services/marketing");
+      const campaigns = await MarketingService.getCampaigns(req.tenantId);
+      res.json(campaigns);
+    } catch (error) {
+      console.error("Error fetching campaigns:", error);
+      res.status(500).json({ message: "Failed to fetch campaigns" });
+    }
+  });
+
+  app.post("/api/tenant/marketing-campaigns", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { MarketingService } = await import("./services/marketing");
+      const campaignData = { ...req.body, tenantId: req.tenantId };
+      const campaign = await MarketingService.createCampaign(campaignData);
+      res.status(201).json(campaign);
+    } catch (error) {
+      console.error("Error creating campaign:", error);
+      res.status(500).json({ message: "Failed to create campaign" });
+    }
+  });
+
+  app.post("/api/track/pixel/:campaignId", async (req, res) => {
+    try {
+      const { campaignId } = req.params;
+      const { event = 'impression', value } = req.query;
+      
+      const { MarketingService } = await import("./services/marketing");
+      await MarketingService.trackEvent({
+        campaignId: parseInt(campaignId),
+        visitorId: req.ip || 'unknown',
+        event: event as any,
+        value: value ? parseFloat(value as string) : undefined,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+        referrer: req.get('Referer'),
+      });
+
+      // Return 1x1 transparent pixel
+      const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+      res.set({
+        'Content-Type': 'image/gif',
+        'Content-Length': pixel.length,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      res.send(pixel);
+    } catch (error) {
+      console.error("Error tracking pixel:", error);
+      res.status(200).send(); // Always return 200 for tracking pixels
+    }
+  });
+
+  // PONTOS DE FIDELIDADE
+  app.get("/api/tenant/loyalty/customers/:customerId/stats", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { customerId } = req.params;
+      const { LoyaltyService } = await import("./services/loyalty");
+      const stats = await LoyaltyService.getCustomerStats(req.tenantId, parseInt(customerId));
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching loyalty stats:", error);
+      res.status(500).json({ message: "Failed to fetch loyalty stats" });
+    }
+  });
+
+  app.post("/api/tenant/loyalty/award-points", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { customerId, orderId, purchaseAmount } = req.body;
+      const { LoyaltyService } = await import("./services/loyalty");
+      const loyaltyPoint = await LoyaltyService.awardPurchasePoints(
+        req.tenantId,
+        customerId,
+        orderId,
+        purchaseAmount
+      );
+      res.status(201).json(loyaltyPoint);
+    } catch (error) {
+      console.error("Error awarding points:", error);
+      res.status(500).json({ message: "Failed to award points" });
+    }
+  });
+
+  app.post("/api/tenant/loyalty/redeem-points", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { customerId, points, reason } = req.body;
+      const { LoyaltyService } = await import("./services/loyalty");
+      const result = await LoyaltyService.redeemPoints(req.tenantId, customerId, points, reason);
+      res.json(result);
+    } catch (error) {
+      console.error("Error redeeming points:", error);
+      res.status(500).json({ message: "Failed to redeem points" });
+    }
+  });
+
+  // IMPORTAÇÃO CSV
+  app.post("/api/tenant/import/products", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { fileName, csvData } = req.body;
+      const { CSVImportService } = await import("./services/csv-import");
+      const result = await CSVImportService.importProducts(req.tenantId, fileName, csvData);
+      res.json(result);
+    } catch (error) {
+      console.error("Error importing products:", error);
+      res.status(500).json({ message: "Failed to import products" });
+    }
+  });
+
+  app.post("/api/tenant/import/stock", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { fileName, csvData } = req.body;
+      const { CSVImportService } = await import("./services/csv-import");
+      const result = await CSVImportService.updateStock(req.tenantId, fileName, csvData);
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating stock:", error);
+      res.status(500).json({ message: "Failed to update stock" });
+    }
+  });
+
+  app.get("/api/tenant/import/history", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { CSVImportService } = await import("./services/csv-import");
+      const history = await CSVImportService.getImportHistory(req.tenantId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching import history:", error);
+      res.status(500).json({ message: "Failed to fetch import history" });
+    }
+  });
+
+  // MÉTODOS DE ENVIO
+  app.get("/api/tenant/shipping-methods", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { ShippingService } = await import("./services/shipping");
+      const methods = await ShippingService.getShippingMethods(req.tenantId);
+      res.json(methods);
+    } catch (error) {
+      console.error("Error fetching shipping methods:", error);
+      res.status(500).json({ message: "Failed to fetch shipping methods" });
+    }
+  });
+
+  app.post("/api/tenant/shipping-methods", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { ShippingService } = await import("./services/shipping");
+      const methodData = { ...req.body, tenantId: req.tenantId };
+      const method = await ShippingService.createShippingMethod(methodData);
+      res.status(201).json(method);
+    } catch (error) {
+      console.error("Error creating shipping method:", error);
+      res.status(500).json({ message: "Failed to create shipping method" });
+    }
+  });
+
+  app.post("/api/public/calculate-shipping/:subdomain", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const shippingRequest = req.body;
+      
+      const tenant = await storage.getTenantBySubdomain(subdomain);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      const { ShippingService } = await import("./services/shipping");
+      const calculations = await ShippingService.calculateShipping(tenant.id, shippingRequest);
+      res.json(calculations);
+    } catch (error) {
+      console.error("Error calculating shipping:", error);
+      res.status(500).json({ message: "Failed to calculate shipping" });
+    }
+  });
+
+  // RELATÓRIOS E ESTATÍSTICAS
+  app.get("/api/tenant/stats/overview", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { AffiliateService } = await import("./services/affiliate");
+      const { LoyaltyService } = await import("./services/loyalty");
+      const { MarketingService } = await import("./services/marketing");
+
+      const [affiliateStats, loyaltyStats, campaignROI] = await Promise.all([
+        AffiliateService.getEarningsSummary(req.tenantId),
+        LoyaltyService.getTenantLoyaltyStats(req.tenantId),
+        MarketingService.getCampaignROI(req.tenantId),
+      ]);
+
+      res.json({
+        affiliates: affiliateStats,
+        loyalty: loyaltyStats,
+        marketing: campaignROI,
+      });
+    } catch (error) {
+      console.error("Error fetching overview stats:", error);
+      res.status(500).json({ message: "Failed to fetch overview stats" });
+    }
+  });
+
+  // NEWSLETTER E SEGMENTAÇÃO
+  app.post("/api/tenant/newsletter/segments", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { name, description, criteria } = req.body;
+      const { NewsletterService } = await import("./services/marketing");
+      const segment = await NewsletterService.createSegment(req.tenantId, name, description, criteria);
+      res.status(201).json(segment);
+    } catch (error) {
+      console.error("Error creating segment:", error);
+      res.status(500).json({ message: "Failed to create segment" });
+    }
+  });
+
+  app.post("/api/tenant/newsletter/campaigns", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { segmentId, subject, content, htmlContent, scheduledAt } = req.body;
+      const { NewsletterService } = await import("./services/marketing");
+      const campaign = await NewsletterService.createNewsletterCampaign(
+        req.tenantId,
+        segmentId,
+        subject,
+        content,
+        htmlContent,
+        scheduledAt ? new Date(scheduledAt) : undefined
+      );
+      res.status(201).json(campaign);
+    } catch (error) {
+      console.error("Error creating newsletter campaign:", error);
+      res.status(500).json({ message: "Failed to create newsletter campaign" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

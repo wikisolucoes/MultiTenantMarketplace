@@ -10,6 +10,7 @@ import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import Merchant from "@/pages/Merchant";
 import StorefrontSPA from "@/pages/StorefrontSPA";
+import EcommerceAdmin from "@/pages/EcommerceAdmin";
 
 function AppRouter() {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
