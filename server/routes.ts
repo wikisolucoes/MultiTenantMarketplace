@@ -10,6 +10,14 @@ import { ValidationService } from "./services/validation";
 import { WithdrawalService } from "./services/withdrawal";
 import { celcoinService } from "./services/celcoin";
 import { 
+  financialSecurityStack, 
+  financialOperationLimiter,
+  type SecureRequest 
+} from "./middleware/financial-security";
+import { FinancialLedgerService, type LedgerContext } from "./services/ledger";
+import { CelcoinIntegrationService } from "./services/celcoin-integration";
+import { ReconciliationService } from "./services/reconciliation";
+import { 
   loginSchema, 
   tenantRegistrationSchema,
   insertProductSchema,
@@ -409,29 +417,318 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Webhook routes
+  // Secure Financial Operations - Celcoin Cash-In/Cash-Out with Full Ledger Integration
+  
+  // Cash-In (Receive Payment) with Full Security Stack
+  app.post("/api/financial/cash-in", 
+    financialOperationLimiter,
+    ...financialSecurityStack,
+    authenticateToken, 
+    requireTenant, 
+    enforceTenantIsolation, 
+    async (req: TenantRequest & SecureRequest, res) => {
+    try {
+      const { amount, paymentMethod, customerData } = req.body;
+
+      if (!amount || !paymentMethod || !customerData) {
+        return res.status(400).json({ 
+          error: "Amount, payment method, and customer data are required" 
+        });
+      }
+
+      // Create ledger context for security audit
+      const ledgerContext: LedgerContext = {
+        tenantId: req.tenantId,
+        userId: req.user?.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || '',
+        sessionId: req.sessionId,
+      };
+
+      // Process secure cash-in operation
+      const result = await CelcoinIntegrationService.processCashIn({
+        tenantId: req.tenantId,
+        amount,
+        paymentMethod,
+        customerData,
+        metadata: {
+          riskScore: req.riskScore,
+          deviceFingerprint: req.deviceFingerprint,
+        }
+      }, ledgerContext);
+
+      if (!result.success) {
+        return res.status(400).json({ 
+          error: result.message,
+          transactionId: result.transactionId 
+        });
+      }
+
+      res.json({
+        success: true,
+        transactionId: result.transactionId,
+        celcoinTransactionId: result.celcoinTransactionId,
+        amount: result.amount,
+        status: result.status,
+        message: "Cash-in operation initiated successfully"
+      });
+
+    } catch (error) {
+      console.error("Cash-in error:", error);
+      res.status(500).json({ 
+        error: "Failed to process cash-in operation",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Cash-Out (Withdrawal) with Enhanced Security Controls
+  app.post("/api/financial/cash-out", 
+    withdrawalLimiter,
+    financialOperationLimiter,
+    ...financialSecurityStack,
+    authenticateToken, 
+    requireTenant, 
+    enforceTenantIsolation, 
+    async (req: TenantRequest & SecureRequest, res) => {
+    try {
+      const { amount, bankAccount, description } = req.body;
+
+      if (!amount || !bankAccount) {
+        return res.status(400).json({ 
+          error: "Amount and bank account details are required" 
+        });
+      }
+
+      // Create ledger context for security audit
+      const ledgerContext: LedgerContext = {
+        tenantId: req.tenantId,
+        userId: req.user?.id,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || '',
+        sessionId: req.sessionId,
+      };
+
+      // Process secure cash-out operation
+      const result = await CelcoinIntegrationService.processCashOut({
+        tenantId: req.tenantId,
+        amount,
+        bankAccount,
+        description,
+        metadata: {
+          riskScore: req.riskScore,
+          deviceFingerprint: req.deviceFingerprint,
+        }
+      }, ledgerContext);
+
+      if (!result.success) {
+        return res.status(400).json({ 
+          error: result.message,
+          transactionId: result.transactionId 
+        });
+      }
+
+      res.json({
+        success: true,
+        transactionId: result.transactionId,
+        celcoinTransactionId: result.celcoinTransactionId,
+        amount: result.amount,
+        status: result.status,
+        message: "Cash-out operation initiated successfully"
+      });
+
+    } catch (error) {
+      console.error("Cash-out error:", error);
+      res.status(500).json({ 
+        error: "Failed to process cash-out operation",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Financial Ledger - Get Transaction History
+  app.get("/api/financial/ledger", 
+    authenticateToken, 
+    requireTenant, 
+    enforceTenantIsolation, 
+    async (req: TenantRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const entries = await FinancialLedgerService.getLedgerEntries(
+        req.tenantId, 
+        limit, 
+        offset
+      );
+
+      const currentBalance = await FinancialLedgerService.getCurrentBalance(req.tenantId);
+
+      res.json({
+        currentBalance,
+        entries,
+        pagination: {
+          limit,
+          offset,
+          hasMore: entries.length === limit
+        }
+      });
+
+    } catch (error) {
+      console.error("Ledger retrieval error:", error);
+      res.status(500).json({ 
+        error: "Failed to retrieve ledger entries" 
+      });
+    }
+  });
+
+  // Balance Synchronization with Celcoin
+  app.post("/api/financial/sync-balance", 
+    authenticateToken, 
+    requireTenant, 
+    enforceTenantIsolation, 
+    async (req: TenantRequest, res) => {
+    try {
+      const syncResult = await CelcoinIntegrationService.syncBalance(req.tenantId);
+
+      res.json({
+        systemBalance: syncResult.systemBalance,
+        celcoinBalance: syncResult.celcoinBalance,
+        isReconciled: syncResult.isReconciled,
+        difference: (parseFloat(syncResult.systemBalance) - parseFloat(syncResult.celcoinBalance)).toFixed(2)
+      });
+
+    } catch (error) {
+      console.error("Balance sync error:", error);
+      res.status(500).json({ 
+        error: "Failed to synchronize balance with Celcoin" 
+      });
+    }
+  });
+
+  // Financial Reconciliation - Get History
+  app.get("/api/financial/reconciliation", 
+    authenticateToken, 
+    requireTenant, 
+    enforceTenantIsolation, 
+    async (req: TenantRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const reconciliations = await ReconciliationService.getReconciliationHistory(
+        req.tenantId, 
+        limit, 
+        offset
+      );
+
+      res.json(reconciliations);
+
+    } catch (error) {
+      console.error("Reconciliation history error:", error);
+      res.status(500).json({ 
+        error: "Failed to retrieve reconciliation history" 
+      });
+    }
+  });
+
+  // Manual Reconciliation Trigger
+  app.post("/api/financial/reconciliation/manual", 
+    authenticateToken, 
+    requireTenant, 
+    enforceTenantIsolation, 
+    async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate } = req.body;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ 
+          error: "Start date and end date are required" 
+        });
+      }
+
+      const result = await ReconciliationService.performReconciliation(
+        req.tenantId,
+        new Date(startDate),
+        new Date(endDate),
+        "manual"
+      );
+
+      res.json({
+        reconciliationId: result.record.id,
+        isReconciled: result.isReconciled,
+        requiresManualReview: result.requiresManualReview,
+        discrepancies: result.discrepancies,
+        systemBalance: result.record.systemBalance,
+        celcoinBalance: result.record.celcoinBalance,
+        difference: result.record.difference
+      });
+
+    } catch (error) {
+      console.error("Manual reconciliation error:", error);
+      res.status(500).json({ 
+        error: "Failed to perform manual reconciliation" 
+      });
+    }
+  });
+
+  // Admin Routes - Financial Overview and Compliance
+  app.get("/api/admin/financial/overview", 
+    authenticateToken, 
+    requireRole("admin"), 
+    async (req, res) => {
+    try {
+      // Get pending reconciliations requiring manual review
+      const pendingReconciliations = await ReconciliationService.getPendingReconciliations();
+      
+      // Get admin stats with financial data
+      const adminStats = await storage.getAdminStats();
+
+      res.json({
+        adminStats,
+        pendingReconciliations: pendingReconciliations.length,
+        requiresAttention: pendingReconciliations.filter(r => r.status === "discrepancy_found").length
+      });
+
+    } catch (error) {
+      console.error("Admin financial overview error:", error);
+      res.status(500).json({ 
+        error: "Failed to retrieve financial overview" 
+      });
+    }
+  });
+
+  // Enhanced Webhook Handler with Ledger Integration
   app.post("/api/webhooks/celcoin", async (req, res) => {
     try {
       const signature = req.headers["x-celcoin-signature"] as string;
       const payload = JSON.stringify(req.body);
 
       if (!celcoinService.verifyWebhookSignature(payload, signature)) {
-        return res.status(401).json({ message: "Invalid signature" });
+        return res.status(401).json({ message: "Invalid webhook signature" });
       }
 
-      const { transactionId, status, type } = req.body;
+      const { transactionId, status, type, tenantId } = req.body;
 
-      if (type === "withdrawal") {
+      // Enhanced webhook processing with ledger integration
+      if (type === "withdrawal" || type === "cash_out") {
         await WithdrawalService.handleWebhookUpdate(transactionId, status);
-      } else if (type === "payment") {
-        // Handle payment webhook
-        console.log("Payment webhook received:", req.body);
+      } else if (type === "payment" || type === "cash_in") {
+        await CelcoinIntegrationService.handleWebhook(tenantId, req.body, signature);
       }
 
-      res.json({ message: "Webhook processed" });
+      res.json({ 
+        message: "Webhook processed successfully",
+        transactionId,
+        status: "processed"
+      });
+
     } catch (error) {
-      console.error("Webhook error:", error);
-      res.status(500).json({ message: "Webhook processing error" });
+      console.error("Enhanced webhook error:", error);
+      res.status(500).json({ 
+        message: "Webhook processing failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
