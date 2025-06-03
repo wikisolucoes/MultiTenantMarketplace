@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import StorefrontHeader from "../components/storefront/StorefrontHeader";
+import StorefrontHeaderFixed from "../components/storefront/StorefrontHeaderFixed";
 import StorefrontFooter from "../components/storefront/StorefrontFooter";
 import StorefrontHome from "../components/storefront/StorefrontHome";
 import ProductCatalog from "../components/storefront/ProductCatalog";
@@ -23,7 +23,7 @@ export default function StorefrontSPA() {
     isLoading: tenantLoading,
     error: tenantError,
   } = useQuery({
-    queryKey: ["/api/public/tenant", subdomain],
+    queryKey: [`/api/public/tenant/${subdomain}`],
     enabled: !!subdomain,
   });
 
@@ -32,7 +32,7 @@ export default function StorefrontSPA() {
     isLoading: productsLoading,
     error: productsError,
   } = useQuery({
-    queryKey: ["/api/public/products", subdomain],
+    queryKey: [`/api/public/products/${subdomain}`],
     enabled: !!subdomain,
   });
 

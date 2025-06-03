@@ -6,18 +6,20 @@ import { Tenant } from "@/types/api";
 import { Search, ShoppingCart, Menu, X, User, Phone, Mail } from "lucide-react";
 
 interface StorefrontHeaderProps {
-  tenant: Tenant;
-  cartItemsCount: number;
+  tenant: Tenant | null;
+  cartItemCount: number;
+  onNavigate: (page: string) => void;
+  currentPage: string;
 }
 
-export default function StorefrontHeader({ tenant, cartItemsCount }: StorefrontHeaderProps) {
+export default function StorefrontHeader({ tenant, cartItemCount, onNavigate, currentPage }: StorefrontHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/produtos?search=${encodeURIComponent(searchQuery)}`;
+      onNavigate("produtos");
     }
   };
 
