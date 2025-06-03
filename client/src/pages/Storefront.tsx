@@ -21,41 +21,20 @@ export default function Storefront() {
   >([]);
 
   useEffect(() => {
-    // Extract subdomain from URL path or hostname
     const currentPath = location;
     console.log("Current path:", currentPath);
 
-    if (currentPath.startsWith('/storefront/')) {
-      // Extract subdomain from URL path (e.g., /storefront/demo)
-      const pathParts = currentPath.split('/');
-      if (pathParts.length >= 3 && pathParts[2]) {
-        const urlSubdomain = pathParts[2];
-        console.log("Using subdomain from URL path:", urlSubdomain);
-        setSubdomain(urlSubdomain);
-        return;
-      }
-    }
-
-    // Fallback: detect from hostname or use default
-    const hostname = window.location.hostname;
-    console.log("Full URL:", window.location.href);
-    console.log("Hostname:", hostname);
-
-    if (hostname.includes("replit.dev") || hostname === "localhost") {
-      // Development environment - use demo as default
-      console.log("Development environment detected, using 'demo'");
-      setSubdomain("demo");
+    // Parse the URL structure: /storefront/demo/produtos
+    const match = currentPath.match(/^\/storefront\/([^\/]+)/);
+    
+    if (match && match[1]) {
+      const extractedSubdomain = match[1];
+      console.log("Extracted subdomain from URL:", extractedSubdomain);
+      setSubdomain(extractedSubdomain);
     } else {
-      // Production: check if it's a custom domain or extract subdomain
-      if (hostname.includes(".")) {
-        const potentialSubdomain = hostname.split(".")[0];
-        console.log("Potential subdomain from hostname:", potentialSubdomain);
-        setSubdomain(potentialSubdomain);
-      } else {
-        // Custom domain - try to find tenant by domain
-        console.log("Custom domain detected:", hostname);
-        setSubdomain(hostname);
-      }
+      // Fallback for development environment
+      console.log("No subdomain in URL, using 'demo' for development");
+      setSubdomain("demo");
     }
   }, [location]);
 
@@ -149,7 +128,25 @@ export default function Storefront() {
 
   // Determine which page to render based on current location
   const getCurrentPage = () => {
-    const path = location.replace('/storefront', '') || '/';
+    // Remove storefront and subdomain from path to get the internal route
+    let path = location;
+    
+    // Remove /storefront prefix
+    if (path.startsWith('/storefront')) {
+      path = path.replace('/storefront', '');
+    }
+    
+    // Remove subdomain if present (e.g., /demo/produtos -> /produtos)
+    if (path.startsWith('/' + subdomain)) {
+      path = path.replace('/' + subdomain, '');
+    }
+    
+    // Ensure path starts with /
+    if (!path.startsWith('/')) {
+      path = '/' + path;
+    }
+    
+    console.log("Processed path for routing:", path);
     
     if (path.startsWith('/produtos')) {
       return (

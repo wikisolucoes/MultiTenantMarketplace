@@ -49,7 +49,7 @@ export default function StorefrontHeader({ tenant, cartItemsCount }: StorefrontH
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/storefront" className="flex items-center space-x-2 cursor-pointer">
+          <Link href="/storefront/demo" className="flex items-center space-x-2 cursor-pointer">
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-lg">
                 {tenant.name.charAt(0).toUpperCase()}
@@ -88,7 +88,7 @@ export default function StorefrontHeader({ tenant, cartItemsCount }: StorefrontH
               Entrar
             </Button>
             
-            <Link href="/storefront/carrinho">
+            <Link href="/storefront/demo/carrinho">
               <div className="relative">
                 <ShoppingCart className="h-4 w-4" />
                 {cartItemsCount > 0 && (
@@ -138,27 +138,27 @@ export default function StorefrontHeader({ tenant, cartItemsCount }: StorefrontH
           <div className={`${isMenuOpen ? 'block' : 'hidden'} md:block`}>
             <ul className="flex flex-col md:flex-row md:space-x-8 py-4 space-y-2 md:space-y-0">
               <li>
-                <Link href="/storefront" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                <Link href="/storefront/demo" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
                   Home
                 </Link>
               </li>
               <li>
-                <Link href="/storefront/produtos" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                <Link href="/storefront/demo/produtos" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
                   Produtos
                 </Link>
               </li>
               <li>
-                <Link href="/storefront/sobre" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                <Link href="/storefront/demo/sobre" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
                   Sobre
                 </Link>
               </li>
               <li>
-                <Link href="/storefront/contato" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                <Link href="/storefront/demo/contato" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
                   Contato
                 </Link>
               </li>
               <li className="md:hidden">
-                <Link href="/storefront/login" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                <Link href="/storefront/demo/login" className="block px-3 py-2 rounded-md text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
                   Entrar
                 </Link>
               </li>
