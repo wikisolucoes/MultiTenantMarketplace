@@ -24,41 +24,41 @@ export default function Storefront() {
     // For development environment, always use 'demo'
     const hostname = window.location.hostname;
     console.log("Hostname:", hostname);
-    
-    if (hostname.includes('replit.dev') || hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+
+    if (hostname.includes("replit.dev") || hostname === "localhost") {
       console.log("Development environment detected, using 'demo'");
-      setSubdomain('demo');
+      setSubdomain("demo");
     } else {
-      // Production environment - extract subdomain
-      const parts = hostname.split('.');
-      if (parts.length > 2) {
-        console.log("Subdomain found:", parts[0]);
-        setSubdomain(parts[0]);
-      } else {
-        console.log("No subdomain found, using 'demo'");
-        setSubdomain('demo');
-      }
+      // Extract subdomain from hostname
+      const subdomain = hostname.split(".")[0];
+      setSubdomain(subdomain);
     }
   }, []);
 
-  // Get tenant data by subdomain
-  const { data: tenant, isLoading: tenantLoading } = useQuery<Tenant>({
-    queryKey: [`/api/public/tenant/${subdomain}`],
+  const {
+    data: tenant,
+    isLoading: tenantLoading,
+    error: tenantError,
+  } = useQuery<Tenant>({
+    queryKey: ["/api/public/tenant", subdomain],
+    enabled: !!subdomain,
+  });
+
+  const {
+    data: products,
+    isLoading: productsLoading,
+    error: productsError,
+  } = useQuery<Product[]>({
+    queryKey: ["/api/public/products", subdomain],
     enabled: !!subdomain,
   });
 
   console.log("Tenant data:", tenant);
 
-  // Get products for this tenant
-  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: [`/api/public/products/${subdomain}`],
-    enabled: !!subdomain,
-  });
-
   const addToCart = (productId: number, quantity: number = 1) => {
     setCartItems((prev) => {
-      const existing = prev.find((item) => item.id === productId);
-      if (existing) {
+      const existingItem = prev.find((item) => item.id === productId);
+      if (existingItem) {
         return prev.map((item) =>
           item.id === productId
             ? { ...item, quantity: item.quantity + quantity }
@@ -123,6 +123,80 @@ export default function Storefront() {
     );
   }
 
+  // Determine which page to render based on current location
+  const getCurrentPage = () => {
+    const path = location.replace('/storefront', '') || '/';
+    
+    if (path.startsWith('/produtos')) {
+      return (
+        <ProductCatalog
+          tenant={tenant}
+          products={products || []}
+          onAddToCart={addToCart}
+          isLoading={productsLoading}
+        />
+      );
+    }
+    
+    if (path.startsWith('/produto/')) {
+      const productId = parseInt(path.split('/')[2]);
+      return (
+        <ProductDetail
+          productId={productId}
+          products={products || []}
+          onAddToCart={addToCart}
+          isLoading={productsLoading}
+        />
+      );
+    }
+    
+    if (path === '/carrinho') {
+      return (
+        <Cart
+          cartItems={cartItems}
+          products={products || []}
+          onUpdateQuantity={updateCartQuantity}
+          onRemoveItem={removeFromCart}
+          total={getCartTotal()}
+        />
+      );
+    }
+    
+    if (path === '/checkout') {
+      return (
+        <Checkout
+          cartItems={cartItems}
+          products={products || []}
+          total={getCartTotal()}
+          tenant={tenant}
+          onOrderComplete={clearCart}
+        />
+      );
+    }
+    
+    if (path === '/sobre') {
+      return <About tenant={tenant} />;
+    }
+    
+    if (path === '/contato') {
+      return <Contact tenant={tenant} />;
+    }
+    
+    if (path === '/privacidade') {
+      return <Privacy tenant={tenant} />;
+    }
+    
+    // Default to home page
+    return (
+      <StorefrontHome
+        tenant={tenant}
+        products={products || []}
+        onAddToCart={addToCart}
+        isLoading={productsLoading}
+      />
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <StorefrontHeader
@@ -131,7 +205,7 @@ export default function Storefront() {
       />
 
       <main className="min-h-screen">
-        {renderCurrentPage()}
+        {getCurrentPage()}
       </main>
 
       <StorefrontFooter tenant={tenant} />
