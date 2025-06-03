@@ -21,19 +21,43 @@ export default function Storefront() {
   >([]);
 
   useEffect(() => {
-    // For development environment, always use 'demo'
-    const hostname = window.location.hostname;
-    const port = window.location.port;
-    const fullUrl = window.location.href;
-    
-    console.log("Full URL:", fullUrl);
-    console.log("Hostname:", hostname);
-    console.log("Port:", port);
+    // Extract subdomain from URL path or hostname
+    const currentPath = location;
+    console.log("Current path:", currentPath);
 
-    // Always use 'demo' for development/replit environment
-    console.log("Development environment detected, using 'demo'");
-    setSubdomain("demo");
-  }, []);
+    if (currentPath.startsWith('/storefront/')) {
+      // Extract subdomain from URL path (e.g., /storefront/demo)
+      const pathParts = currentPath.split('/');
+      if (pathParts.length >= 3 && pathParts[2]) {
+        const urlSubdomain = pathParts[2];
+        console.log("Using subdomain from URL path:", urlSubdomain);
+        setSubdomain(urlSubdomain);
+        return;
+      }
+    }
+
+    // Fallback: detect from hostname or use default
+    const hostname = window.location.hostname;
+    console.log("Full URL:", window.location.href);
+    console.log("Hostname:", hostname);
+
+    if (hostname.includes("replit.dev") || hostname === "localhost") {
+      // Development environment - use demo as default
+      console.log("Development environment detected, using 'demo'");
+      setSubdomain("demo");
+    } else {
+      // Production: check if it's a custom domain or extract subdomain
+      if (hostname.includes(".")) {
+        const potentialSubdomain = hostname.split(".")[0];
+        console.log("Potential subdomain from hostname:", potentialSubdomain);
+        setSubdomain(potentialSubdomain);
+      } else {
+        // Custom domain - try to find tenant by domain
+        console.log("Custom domain detected:", hostname);
+        setSubdomain(hostname);
+      }
+    }
+  }, [location]);
 
   const {
     data: tenant,
