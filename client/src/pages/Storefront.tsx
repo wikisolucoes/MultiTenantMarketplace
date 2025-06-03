@@ -15,17 +15,22 @@ import { Tenant, Product } from "../types/api";
 
 export default function Storefront() {
   const [subdomain, setSubdomain] = useState<string>("");
-  const [cartItems, setCartItems] = useState<Array<{id: number; quantity: number}>>([]);
+  const [cartItems, setCartItems] = useState<
+    Array<{ id: number; quantity: number }>
+  >([]);
 
   useEffect(() => {
     // Extract subdomain from URL
     const hostname = window.location.hostname;
-    const parts = hostname.split('.');
+    const parts = hostname.split(".");
+    console.log(parts);
     if (parts.length > 2) {
+      console.log("Subdomain found:", parts);
       setSubdomain(parts[0]);
     } else {
+      console.log("No subdomain found, using 'demo'");
       // For development, use 'demo' as default
-      setSubdomain('demo');
+      setSubdomain("demo");
     }
   }, []);
 
@@ -35,6 +40,8 @@ export default function Storefront() {
     enabled: !!subdomain,
   });
 
+  console.log("Tenant data:", tenant);
+
   // Get products for this tenant
   const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
     queryKey: ["/api/public/products", subdomain],
@@ -42,13 +49,13 @@ export default function Storefront() {
   });
 
   const addToCart = (productId: number, quantity: number = 1) => {
-    setCartItems(prev => {
-      const existing = prev.find(item => item.id === productId);
+    setCartItems((prev) => {
+      const existing = prev.find((item) => item.id === productId);
       if (existing) {
-        return prev.map(item => 
-          item.id === productId 
+        return prev.map((item) =>
+          item.id === productId
             ? { ...item, quantity: item.quantity + quantity }
-            : item
+            : item,
         );
       }
       return [...prev, { id: productId, quantity }];
@@ -57,18 +64,18 @@ export default function Storefront() {
 
   const updateCartQuantity = (productId: number, quantity: number) => {
     if (quantity <= 0) {
-      setCartItems(prev => prev.filter(item => item.id !== productId));
+      setCartItems((prev) => prev.filter((item) => item.id !== productId));
     } else {
-      setCartItems(prev => 
-        prev.map(item => 
-          item.id === productId ? { ...item, quantity } : item
-        )
+      setCartItems((prev) =>
+        prev.map((item) =>
+          item.id === productId ? { ...item, quantity } : item,
+        ),
       );
     }
   };
 
   const removeFromCart = (productId: number) => {
-    setCartItems(prev => prev.filter(item => item.id !== productId));
+    setCartItems((prev) => prev.filter((item) => item.id !== productId));
   };
 
   const clearCart = () => {
@@ -78,7 +85,7 @@ export default function Storefront() {
   const getCartTotal = () => {
     if (!products) return 0;
     return cartItems.reduce((total, item) => {
-      const product = products.find(p => p.id === item.id);
+      const product = products.find((p) => p.id === item.id);
       return total + (product ? parseFloat(product.price) * item.quantity : 0);
     }, 0);
   };
@@ -98,7 +105,9 @@ export default function Storefront() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-foreground mb-4">Loja não encontrada</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-4">
+            Loja não encontrada
+          </h1>
           <p className="text-muted-foreground">
             A loja "{subdomain}" não existe ou foi desativada.
           </p>
@@ -109,34 +118,34 @@ export default function Storefront() {
 
   return (
     <div className="min-h-screen bg-background">
-      <StorefrontHeader 
-        tenant={tenant} 
+      <StorefrontHeader
+        tenant={tenant}
         cartItemsCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
       />
-      
+
       <main className="min-h-screen">
         <Switch>
           <Route path="/">
-            <StorefrontHome 
-              tenant={tenant} 
-              products={products || []} 
-              onAddToCart={addToCart}
-              isLoading={productsLoading}
-            />
-          </Route>
-          
-          <Route path="/produtos">
-            <ProductCatalog 
+            <StorefrontHome
               tenant={tenant}
-              products={products || []} 
+              products={products || []}
               onAddToCart={addToCart}
               isLoading={productsLoading}
             />
           </Route>
-          
+
+          <Route path="/produtos">
+            <ProductCatalog
+              tenant={tenant}
+              products={products || []}
+              onAddToCart={addToCart}
+              isLoading={productsLoading}
+            />
+          </Route>
+
           <Route path="/produto/:id">
             {(params) => (
-              <ProductDetail 
+              <ProductDetail
                 productId={parseInt(params.id)}
                 products={products || []}
                 onAddToCart={addToCart}
@@ -144,9 +153,9 @@ export default function Storefront() {
               />
             )}
           </Route>
-          
+
           <Route path="/carrinho">
-            <Cart 
+            <Cart
               cartItems={cartItems}
               products={products || []}
               onUpdateQuantity={updateCartQuantity}
@@ -154,9 +163,9 @@ export default function Storefront() {
               total={getCartTotal()}
             />
           </Route>
-          
+
           <Route path="/checkout">
-            <Checkout 
+            <Checkout
               cartItems={cartItems}
               products={products || []}
               total={getCartTotal()}
@@ -164,28 +173,30 @@ export default function Storefront() {
               onOrderComplete={clearCart}
             />
           </Route>
-          
+
           <Route path="/sobre">
             <About tenant={tenant} />
           </Route>
-          
+
           <Route path="/contato">
             <Contact tenant={tenant} />
           </Route>
-          
+
           <Route path="/privacidade">
             <Privacy tenant={tenant} />
           </Route>
-          
+
           <Route>
             <div className="container mx-auto px-4 py-16 text-center">
               <h1 className="text-4xl font-bold mb-4">Página não encontrada</h1>
-              <p className="text-muted-foreground">A página que você procura não existe.</p>
+              <p className="text-muted-foreground">
+                A página que você procura não existe.
+              </p>
             </div>
           </Route>
         </Switch>
       </main>
-      
+
       <StorefrontFooter tenant={tenant} />
     </div>
   );
