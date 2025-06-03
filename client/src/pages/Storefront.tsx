@@ -20,17 +20,23 @@ export default function Storefront() {
   >([]);
 
   useEffect(() => {
-    // Extract subdomain from URL
+    // For development environment, always use 'demo'
     const hostname = window.location.hostname;
-    const parts = hostname.split(".");
-    console.log(parts);
-    if (parts.length > 2) {
-      console.log("Subdomain found:", parts);
-      setSubdomain(parts[0]);
+    console.log("Hostname:", hostname);
+    
+    if (hostname.includes('replit.dev') || hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+      console.log("Development environment detected, using 'demo'");
+      setSubdomain('demo');
     } else {
-      console.log("No subdomain found, using 'demo'");
-      // For development, use 'demo' as default
-      setSubdomain("demo");
+      // Production environment - extract subdomain
+      const parts = hostname.split('.');
+      if (parts.length > 2) {
+        console.log("Subdomain found:", parts[0]);
+        setSubdomain(parts[0]);
+      } else {
+        console.log("No subdomain found, using 'demo'");
+        setSubdomain('demo');
+      }
     }
   }, []);
 
