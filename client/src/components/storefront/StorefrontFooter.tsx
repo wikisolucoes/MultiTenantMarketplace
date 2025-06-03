@@ -38,23 +38,23 @@ export default function StorefrontFooter({ tenant }: StorefrontFooterProps) {
             <h4 className="text-white font-semibold mb-4">Links Rápidos</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/produtos">
-                  <a className="hover:text-white transition-colors">Produtos</a>
+                <Link href="/storefront/produtos" className="hover:text-white transition-colors">
+                  Produtos
                 </Link>
               </li>
               <li>
-                <Link href="/sobre">
-                  <a className="hover:text-white transition-colors">Sobre Nós</a>
+                <Link href="/storefront/sobre" className="hover:text-white transition-colors">
+                  Sobre Nós
                 </Link>
               </li>
               <li>
-                <Link href="/contato">
-                  <a className="hover:text-white transition-colors">Contato</a>
+                <Link href="/storefront/contato" className="hover:text-white transition-colors">
+                  Contato
                 </Link>
               </li>
               <li>
-                <Link href="/carrinho">
-                  <a className="hover:text-white transition-colors">Meu Carrinho</a>
+                <Link href="/storefront/carrinho" className="hover:text-white transition-colors">
+                  Meu Carrinho
                 </Link>
               </li>
             </ul>
@@ -80,8 +80,8 @@ export default function StorefrontFooter({ tenant }: StorefrontFooterProps) {
                 </a>
               </li>
               <li>
-                <Link href="/privacidade">
-                  <a className="hover:text-white transition-colors">Política de Privacidade</a>
+                <Link href="/storefront/privacidade" className="hover:text-white transition-colors">
+                  Política de Privacidade
                 </Link>
               </li>
             </ul>
