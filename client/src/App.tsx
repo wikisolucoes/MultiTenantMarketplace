@@ -32,6 +32,9 @@ function AppRouter() {
       <Route path="/merchant">
         {isAuth && userRole === "merchant" ? <Merchant /> : <Home />}
       </Route>
+      <Route path="/ecommerce-admin">
+        {isAuth && userRole === "merchant" ? <EcommerceAdmin /> : <Home />}
+      </Route>
       <Route path="/storefront*" component={StorefrontSPA} />
       <Route component={NotFound} />
     </Switch>
