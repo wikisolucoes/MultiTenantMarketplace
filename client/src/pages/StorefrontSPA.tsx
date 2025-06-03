@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import StorefrontHeaderFixed from "../components/storefront/StorefrontHeaderFixed";
 import StorefrontFooter from "../components/storefront/StorefrontFooter";
 import StorefrontHome from "../components/storefront/StorefrontHome";
-import ProductCatalog from "../components/storefront/ProductCatalog";
-import ProductDetail from "../components/storefront/ProductDetail";
+import ProductCatalogAdvanced from "../components/storefront/ProductCatalogAdvanced";
+import ProductDetailAdvanced from "../components/storefront/ProductDetailAdvanced";
 import Cart from "../components/storefront/Cart";
-import Checkout from "../components/storefront/Checkout";
+import CheckoutAdvanced from "../components/storefront/CheckoutAdvanced";
+import CustomerAuth from "../components/storefront/CustomerAuth";
+import CustomerAccount from "../components/storefront/CustomerAccount";
 import About from "../components/storefront/About";
 import Contact from "../components/storefront/Contact";
 import Privacy from "../components/storefront/Privacy";
@@ -16,6 +18,12 @@ export default function StorefrontSPA() {
   const [currentPage, setCurrentPage] = useState<string>("home");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [cartItems, setCartItems] = useState<Array<{ id: number; quantity: number }>>([]);
+  const [wishlist, setWishlist] = useState<Array<number>>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentCustomer, setCurrentCustomer] = useState<any>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [brandFilter, setBrandFilter] = useState<string>("");
+  const [showPromotions, setShowPromotions] = useState(false);
   const subdomain = "demo"; // Fixed for development
 
   const {
@@ -82,10 +90,57 @@ export default function StorefrontSPA() {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
-  const handleNavigation = (page: string, productId?: number) => {
+  const addToWishlist = (productId: number) => {
+    setWishlist(prev => 
+      prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const handleLogin = (email: string, password: string) => {
+    // Mock login - in real app, this would call API
+    setIsAuthenticated(true);
+    setCurrentCustomer({
+      id: 1,
+      firstName: "João",
+      lastName: "Silva",
+      email: email,
+      phone: "(11) 99999-9999",
+      cpf: "123.456.789-00"
+    });
+    setCurrentPage("home");
+  };
+
+  const handleRegister = (userData: any) => {
+    // Mock registration - in real app, this would call API
+    setIsAuthenticated(true);
+    setCurrentCustomer({
+      id: 1,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      email: userData.email,
+      phone: userData.phone,
+      cpf: userData.cpf
+    });
+    setCurrentPage("home");
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setCurrentCustomer(null);
+    setCurrentPage("home");
+  };
+
+  const handleNavigation = (page: string, productId?: number, filters?: any) => {
     setCurrentPage(page);
     if (productId) {
       setSelectedProductId(productId);
+    }
+    if (filters) {
+      setCategoryFilter(filters.category || "");
+      setBrandFilter(filters.brand || "");
+      setShowPromotions(filters.promotion || false);
     }
   };
 
@@ -114,24 +169,39 @@ export default function StorefrontSPA() {
   const renderCurrentPage = () => {
     switch (currentPage) {
       case "produtos":
+      case "categoria":
+      case "marca": 
+      case "promocoes":
         return (
-          <ProductCatalog
+          <ProductCatalogAdvanced
             tenant={tenant}
             products={products || []}
             onAddToCart={addToCart}
             onViewProduct={(productId) => handleNavigation("produto", productId)}
+            onAddToWishlist={addToWishlist}
             isLoading={productsLoading}
+            category={categoryFilter}
+            brand={brandFilter}
+            promotion={showPromotions}
           />
         );
       case "produto":
-        return (
-          <ProductDetail
-            productId={selectedProductId || 1}
-            products={products || []}
+        const selectedProduct = products?.find(p => p.id === selectedProductId);
+        return selectedProduct ? (
+          <ProductDetailAdvanced
+            product={selectedProduct}
+            tenant={tenant}
             onAddToCart={addToCart}
             onBackToCatalog={() => handleNavigation("produtos")}
-            isLoading={productsLoading}
+            onAddToWishlist={addToWishlist}
           />
+        ) : (
+          <div className="container mx-auto px-4 py-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">Produto não encontrado</h2>
+            <button onClick={() => handleNavigation("produtos")} className="text-primary hover:underline">
+              Voltar ao catálogo
+            </button>
+          </div>
         );
       case "carrinho":
         return (
@@ -147,7 +217,7 @@ export default function StorefrontSPA() {
         );
       case "checkout":
         return (
-          <Checkout
+          <CheckoutAdvanced
             cartItems={cartItems}
             products={products || []}
             total={getCartTotal()}
@@ -157,6 +227,29 @@ export default function StorefrontSPA() {
               handleNavigation("home");
             }}
             onBackToCart={() => handleNavigation("carrinho")}
+            isAuthenticated={isAuthenticated}
+            customerData={currentCustomer}
+          />
+        );
+      case "login":
+        return (
+          <CustomerAuth
+            onLogin={handleLogin}
+            onRegister={handleRegister}
+            onBack={() => handleNavigation("home")}
+          />
+        );
+      case "minha-conta":
+        return isAuthenticated && currentCustomer ? (
+          <CustomerAccount
+            onBack={() => handleNavigation("home")}
+            customerData={currentCustomer}
+          />
+        ) : (
+          <CustomerAuth
+            onLogin={handleLogin}
+            onRegister={handleRegister}
+            onBack={() => handleNavigation("home")}
           />
         );
       case "sobre":
