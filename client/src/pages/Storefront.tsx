@@ -23,16 +23,16 @@ export default function Storefront() {
   useEffect(() => {
     // For development environment, always use 'demo'
     const hostname = window.location.hostname;
+    const port = window.location.port;
+    const fullUrl = window.location.href;
+    
+    console.log("Full URL:", fullUrl);
     console.log("Hostname:", hostname);
+    console.log("Port:", port);
 
-    if (hostname.includes("replit.dev") || hostname === "localhost") {
-      console.log("Development environment detected, using 'demo'");
-      setSubdomain("demo");
-    } else {
-      // Extract subdomain from hostname
-      const subdomain = hostname.split(".")[0];
-      setSubdomain(subdomain);
-    }
+    // Always use 'demo' for development/replit environment
+    console.log("Development environment detected, using 'demo'");
+    setSubdomain("demo");
   }, []);
 
   const {
@@ -40,7 +40,7 @@ export default function Storefront() {
     isLoading: tenantLoading,
     error: tenantError,
   } = useQuery<Tenant>({
-    queryKey: ["/api/public/tenant", subdomain],
+    queryKey: [`/api/public/tenant/${subdomain}`],
     enabled: !!subdomain,
   });
 
@@ -49,7 +49,7 @@ export default function Storefront() {
     isLoading: productsLoading,
     error: productsError,
   } = useQuery<Product[]>({
-    queryKey: ["/api/public/products", subdomain],
+    queryKey: [`/api/public/products/${subdomain}`],
     enabled: !!subdomain,
   });
 
