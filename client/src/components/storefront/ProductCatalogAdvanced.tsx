@@ -79,8 +79,8 @@ export default function ProductCatalogAdvanced({
   }, [products]);
 
   // Get unique categories and brands for filters
-  const categories = [...new Set(enhancedProducts.map(p => p.category))];
-  const brands = [...new Set(enhancedProducts.map(p => p.brand))];
+  const categories = Array.from(new Set(enhancedProducts.map(p => p.category)));
+  const brands = Array.from(new Set(enhancedProducts.map(p => p.brand)));
 
   // Filter products based on current filters
   const filteredProducts = useMemo(() => {
