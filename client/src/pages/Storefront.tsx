@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Route, Switch } from "wouter";
+import { useLocation } from "wouter";
 import StorefrontHeader from "../components/storefront/StorefrontHeader";
 import StorefrontFooter from "../components/storefront/StorefrontFooter";
 import StorefrontHome from "../components/storefront/StorefrontHome";
@@ -14,6 +14,7 @@ import Privacy from "../components/storefront/Privacy";
 import { Tenant, Product } from "../types/api";
 
 export default function Storefront() {
+  const [location] = useLocation();
   const [subdomain, setSubdomain] = useState<string>("");
   const [cartItems, setCartItems] = useState<
     Array<{ id: number; quantity: number }>
@@ -130,77 +131,7 @@ export default function Storefront() {
       />
 
       <main className="min-h-screen">
-        <Switch>
-          <Route path="/storefront">
-            <StorefrontHome
-              tenant={tenant}
-              products={products || []}
-              onAddToCart={addToCart}
-              isLoading={productsLoading}
-            />
-          </Route>
-
-          <Route path="/storefront/produtos">
-            <ProductCatalog
-              tenant={tenant}
-              products={products || []}
-              onAddToCart={addToCart}
-              isLoading={productsLoading}
-            />
-          </Route>
-
-          <Route path="/storefront/produto/:id">
-            {(params) => (
-              <ProductDetail
-                productId={parseInt(params.id)}
-                products={products || []}
-                onAddToCart={addToCart}
-                isLoading={productsLoading}
-              />
-            )}
-          </Route>
-
-          <Route path="/storefront/carrinho">
-            <Cart
-              cartItems={cartItems}
-              products={products || []}
-              onUpdateQuantity={updateCartQuantity}
-              onRemoveItem={removeFromCart}
-              total={getCartTotal()}
-            />
-          </Route>
-
-          <Route path="/storefront/checkout">
-            <Checkout
-              cartItems={cartItems}
-              products={products || []}
-              total={getCartTotal()}
-              tenant={tenant}
-              onOrderComplete={clearCart}
-            />
-          </Route>
-
-          <Route path="/storefront/sobre">
-            <About tenant={tenant} />
-          </Route>
-
-          <Route path="/storefront/contato">
-            <Contact tenant={tenant} />
-          </Route>
-
-          <Route path="/storefront/privacidade">
-            <Privacy tenant={tenant} />
-          </Route>
-
-          <Route>
-            <StorefrontHome
-              tenant={tenant}
-              products={products || []}
-              onAddToCart={addToCart}
-              isLoading={productsLoading}
-            />
-          </Route>
-        </Switch>
+        {renderCurrentPage()}
       </main>
 
       <StorefrontFooter tenant={tenant} />
