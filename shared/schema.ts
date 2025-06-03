@@ -836,3 +836,499 @@ export type ProductBrand = typeof productBrands.$inferSelect;
 export type InsertProductBrand = z.infer<typeof insertProductBrandSchema>;
 export type ProductImage = typeof productImages.$inferSelect;
 export type ProductSpecification = typeof productSpecifications.$inferSelect;
+
+// Advanced E-commerce Features
+
+// Coupons and Discount System
+export const coupons = pgTable("coupons", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  type: text("type", { enum: ["percentage", "fixed_amount", "free_shipping"] }).notNull(),
+  value: decimal("value", { precision: 10, scale: 2 }).notNull(),
+  minimumOrder: decimal("minimum_order", { precision: 10, scale: 2 }),
+  maxDiscount: decimal("max_discount", { precision: 10, scale: 2 }),
+  usageLimit: integer("usage_limit"),
+  usageCount: integer("usage_count").default(0),
+  userLimit: integer("user_limit").default(1),
+  validFrom: timestamp("valid_from").notNull(),
+  validUntil: timestamp("valid_until").notNull(),
+  isActive: boolean("is_active").default(true),
+  applicableProducts: jsonb("applicable_products"), // Array of product IDs
+  applicableCategories: jsonb("applicable_categories"), // Array of category IDs
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Gift Cards System
+export const giftCards = pgTable("gift_cards", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  code: varchar("code", { length: 50 }).unique().notNull(),
+  initialValue: decimal("initial_value", { precision: 10, scale: 2 }).notNull(),
+  currentBalance: decimal("current_balance", { precision: 10, scale: 2 }).notNull(),
+  purchaserEmail: varchar("purchaser_email", { length: 255 }),
+  recipientEmail: varchar("recipient_email", { length: 255 }),
+  recipientName: varchar("recipient_name", { length: 255 }),
+  message: text("message"),
+  validUntil: timestamp("valid_until"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  usedAt: timestamp("used_at"),
+});
+
+// Affiliate Program
+export const affiliates = pgTable("affiliates", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  userId: integer("user_id").references(() => users.id),
+  affiliateCode: varchar("affiliate_code", { length: 50 }).unique().notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
+  totalEarnings: decimal("total_earnings", { precision: 15, scale: 2 }).default("0"),
+  paidEarnings: decimal("paid_earnings", { precision: 15, scale: 2 }).default("0"),
+  pendingEarnings: decimal("pending_earnings", { precision: 15, scale: 2 }).default("0"),
+  totalSales: integer("total_sales").default(0),
+  isActive: boolean("is_active").default(true),
+  bankAccount: jsonb("bank_account"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Affiliate Commissions
+export const affiliateCommissions = pgTable("affiliate_commissions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  affiliateId: integer("affiliate_id").references(() => affiliates.id).notNull(),
+  orderId: integer("order_id").references(() => customerOrders.id).notNull(),
+  saleAmount: decimal("sale_amount", { precision: 10, scale: 2 }).notNull(),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).notNull(),
+  commissionAmount: decimal("commission_amount", { precision: 10, scale: 2 }).notNull(),
+  status: text("status", { enum: ["pending", "approved", "paid", "cancelled"] }).default("pending"),
+  approvedAt: timestamp("approved_at"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Marketing Campaigns
+export const marketingCampaigns = pgTable("marketing_campaigns", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  type: text("type", { enum: ["email", "social", "display", "affiliate", "referral"] }).notNull(),
+  utmSource: varchar("utm_source", { length: 100 }),
+  utmMedium: varchar("utm_medium", { length: 100 }),
+  utmCampaign: varchar("utm_campaign", { length: 100 }),
+  utmTerm: varchar("utm_term", { length: 100 }),
+  utmContent: varchar("utm_content", { length: 100 }),
+  targetAudience: jsonb("target_audience"),
+  budget: decimal("budget", { precision: 10, scale: 2 }),
+  spent: decimal("spent", { precision: 10, scale: 2 }).default("0"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  isActive: boolean("is_active").default(true),
+  impressions: integer("impressions").default(0),
+  clicks: integer("clicks").default(0),
+  conversions: integer("conversions").default(0),
+  revenue: decimal("revenue", { precision: 15, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Campaign Analytics
+export const campaignAnalytics = pgTable("campaign_analytics", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  campaignId: integer("campaign_id").references(() => marketingCampaigns.id).notNull(),
+  orderId: integer("order_id").references(() => customerOrders.id),
+  visitorId: varchar("visitor_id", { length: 100 }),
+  event: text("event", { enum: ["impression", "click", "conversion", "purchase"] }).notNull(),
+  value: decimal("value", { precision: 10, scale: 2 }),
+  metadata: jsonb("metadata"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  referrer: text("referrer"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Newsletter Segments
+export const newsletterSegments = pgTable("newsletter_segments", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  criteria: jsonb("criteria").notNull(),
+  customerCount: integer("customer_count").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Newsletter Campaigns
+export const newsletterCampaigns = pgTable("newsletter_campaigns", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  segmentId: integer("segment_id").references(() => newsletterSegments.id),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  htmlContent: text("html_content"),
+  scheduledAt: timestamp("scheduled_at"),
+  sentAt: timestamp("sent_at"),
+  recipientCount: integer("recipient_count").default(0),
+  openCount: integer("open_count").default(0),
+  clickCount: integer("click_count").default(0),
+  unsubscribeCount: integer("unsubscribe_count").default(0),
+  status: text("status", { enum: ["draft", "scheduled", "sending", "sent", "paused"] }).default("draft"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Loyalty Points System
+export const loyaltyPoints = pgTable("loyalty_points", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  points: integer("points").notNull(),
+  type: text("type", { enum: ["earned", "redeemed", "expired", "bonus"] }).notNull(),
+  reason: varchar("reason", { length: 255 }).notNull(),
+  orderId: integer("order_id").references(() => customerOrders.id),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Product Promotions
+export const productPromotions = pgTable("product_promotions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  type: text("type", { enum: ["percentage", "fixed_amount", "buy_x_get_y", "quantity_discount"] }).notNull(),
+  value: decimal("value", { precision: 10, scale: 2 }).notNull(),
+  productIds: jsonb("product_ids").notNull(),
+  categoryIds: jsonb("category_ids"),
+  minimumQuantity: integer("minimum_quantity").default(1),
+  maximumQuantity: integer("maximum_quantity"),
+  stackable: boolean("stackable").default(false),
+  validFrom: timestamp("valid_from").notNull(),
+  validUntil: timestamp("valid_until").notNull(),
+  isActive: boolean("is_active").default(true),
+  usageLimit: integer("usage_limit"),
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Shipping Methods
+export const shippingMethods = pgTable("shipping_methods", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: text("type", { enum: ["fixed", "free", "weight_based", "item_based", "store_pickup", "melhor_envio"] }).notNull(),
+  cost: decimal("cost", { precision: 10, scale: 2 }),
+  freeThreshold: decimal("free_threshold", { precision: 10, scale: 2 }),
+  weightRates: jsonb("weight_rates"),
+  itemRates: jsonb("item_rates"),
+  estimatedDays: integer("estimated_days"),
+  isActive: boolean("is_active").default(true),
+  regions: jsonb("regions"), // Geographic regions where this method applies
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// SEO Management
+export const seoSettings = pgTable("seo_settings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  entityType: text("entity_type", { enum: ["product", "category", "page", "brand"] }).notNull(),
+  entityId: integer("entity_id").notNull(),
+  title: varchar("title", { length: 255 }),
+  description: text("description"),
+  keywords: text("keywords"),
+  canonicalUrl: text("canonical_url"),
+  ogTitle: varchar("og_title", { length: 255 }),
+  ogDescription: text("og_description"),
+  ogImage: text("og_image"),
+  structuredData: jsonb("structured_data"),
+  customHead: text("custom_head"),
+  isIndexable: boolean("is_indexable").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Product Imports/Updates
+export const productImports = pgTable("product_imports", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileSize: integer("file_size"),
+  type: text("type", { enum: ["products", "stock", "prices"] }).notNull(),
+  status: text("status", { enum: ["processing", "completed", "failed", "partial"] }).default("processing"),
+  totalRows: integer("total_rows"),
+  processedRows: integer("processed_rows").default(0),
+  successRows: integer("success_rows").default(0),
+  errorRows: integer("error_rows").default(0),
+  errors: jsonb("errors"),
+  results: jsonb("results"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Customer Segments for Marketing
+export const customerSegments = pgTable("customer_segments", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  rules: jsonb("rules").notNull(), // Segmentation rules
+  customerCount: integer("customer_count").default(0),
+  lastCalculated: timestamp("last_calculated"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Product Comparisons
+export const productComparisons = pgTable("product_comparisons", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  customerId: integer("customer_id").references(() => customers.id),
+  sessionId: varchar("session_id", { length: 100 }),
+  productIds: jsonb("product_ids").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Return/Refund System
+export const returns = pgTable("returns", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  orderId: integer("order_id").references(() => customerOrders.id).notNull(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  returnNumber: varchar("return_number", { length: 50 }).unique().notNull(),
+  items: jsonb("items").notNull(), // Array of returned items with quantities
+  reason: text("reason").notNull(),
+  status: text("status", { enum: ["requested", "approved", "processing", "completed", "rejected"] }).default("requested"),
+  refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }),
+  refundMethod: text("refund_method", { enum: ["original_payment", "store_credit", "gift_card"] }),
+  trackingNumber: varchar("tracking_number", { length: 100 }),
+  notes: text("notes"),
+  approvedAt: timestamp("approved_at"),
+  processedAt: timestamp("processed_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Digital Product Downloads
+export const digitalDownloads = pgTable("digital_downloads", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  orderId: integer("order_id").references(() => customerOrders.id).notNull(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  downloadLimit: integer("download_limit").default(5),
+  downloadCount: integer("download_count").default(0),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastDownloadedAt: timestamp("last_downloaded_at"),
+});
+
+// Relations for advanced features
+export const couponsRelations = relations(coupons, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [coupons.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const giftCardsRelations = relations(giftCards, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [giftCards.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const affiliatesRelations = relations(affiliates, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [affiliates.tenantId],
+    references: [tenants.id],
+  }),
+  user: one(users, {
+    fields: [affiliates.userId],
+    references: [users.id],
+  }),
+  commissions: many(affiliateCommissions),
+}));
+
+export const affiliateCommissionsRelations = relations(affiliateCommissions, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [affiliateCommissions.tenantId],
+    references: [tenants.id],
+  }),
+  affiliate: one(affiliates, {
+    fields: [affiliateCommissions.affiliateId],
+    references: [affiliates.id],
+  }),
+  order: one(customerOrders, {
+    fields: [affiliateCommissions.orderId],
+    references: [customerOrders.id],
+  }),
+}));
+
+export const marketingCampaignsRelations = relations(marketingCampaigns, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [marketingCampaigns.tenantId],
+    references: [tenants.id],
+  }),
+  analytics: many(campaignAnalytics),
+}));
+
+export const campaignAnalyticsRelations = relations(campaignAnalytics, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [campaignAnalytics.tenantId],
+    references: [tenants.id],
+  }),
+  campaign: one(marketingCampaigns, {
+    fields: [campaignAnalytics.campaignId],
+    references: [marketingCampaigns.id],
+  }),
+  order: one(customerOrders, {
+    fields: [campaignAnalytics.orderId],
+    references: [customerOrders.id],
+  }),
+}));
+
+export const loyaltyPointsRelations = relations(loyaltyPoints, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [loyaltyPoints.tenantId],
+    references: [tenants.id],
+  }),
+  customer: one(customers, {
+    fields: [loyaltyPoints.customerId],
+    references: [customers.id],
+  }),
+  order: one(customerOrders, {
+    fields: [loyaltyPoints.orderId],
+    references: [customerOrders.id],
+  }),
+}));
+
+export const productPromotionsRelations = relations(productPromotions, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [productPromotions.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const shippingMethodsRelations = relations(shippingMethods, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [shippingMethods.tenantId],
+    references: [tenants.id],
+  }),
+}));
+
+export const returnsRelations = relations(returns, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [returns.tenantId],
+    references: [tenants.id],
+  }),
+  order: one(customerOrders, {
+    fields: [returns.orderId],
+    references: [customerOrders.id],
+  }),
+  customer: one(customers, {
+    fields: [returns.customerId],
+    references: [customers.id],
+  }),
+}));
+
+export const digitalDownloadsRelations = relations(digitalDownloads, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [digitalDownloads.tenantId],
+    references: [tenants.id],
+  }),
+  product: one(products, {
+    fields: [digitalDownloads.productId],
+    references: [products.id],
+  }),
+  order: one(customerOrders, {
+    fields: [digitalDownloads.orderId],
+    references: [customerOrders.id],
+  }),
+  customer: one(customers, {
+    fields: [digitalDownloads.customerId],
+    references: [customers.id],
+  }),
+}));
+
+// Insert schemas for advanced features
+export const insertCouponSchema = createInsertSchema(coupons).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertGiftCardSchema = createInsertSchema(giftCards).omit({
+  id: true,
+  createdAt: true,
+  usedAt: true,
+});
+
+export const insertAffiliateSchema = createInsertSchema(affiliates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProductPromotionSchema = createInsertSchema(productPromotions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertShippingMethodSchema = createInsertSchema(shippingMethods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertReturnSchema = createInsertSchema(returns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types for advanced features
+export type Coupon = typeof coupons.$inferSelect;
+export type InsertCoupon = z.infer<typeof insertCouponSchema>;
+export type GiftCard = typeof giftCards.$inferSelect;
+export type InsertGiftCard = z.infer<typeof insertGiftCardSchema>;
+export type Affiliate = typeof affiliates.$inferSelect;
+export type InsertAffiliate = z.infer<typeof insertAffiliateSchema>;
+export type AffiliateCommission = typeof affiliateCommissions.$inferSelect;
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
+export type CampaignAnalytics = typeof campaignAnalytics.$inferSelect;
+export type LoyaltyPoint = typeof loyaltyPoints.$inferSelect;
+export type ProductPromotion = typeof productPromotions.$inferSelect;
+export type InsertProductPromotion = z.infer<typeof insertProductPromotionSchema>;
+export type ShippingMethod = typeof shippingMethods.$inferSelect;
+export type InsertShippingMethod = z.infer<typeof insertShippingMethodSchema>;
+export type SeoSetting = typeof seoSettings.$inferSelect;
+export type ProductImport = typeof productImports.$inferSelect;
+export type Return = typeof returns.$inferSelect;
+export type InsertReturn = z.infer<typeof insertReturnSchema>;
+export type DigitalDownload = typeof digitalDownloads.$inferSelect;
