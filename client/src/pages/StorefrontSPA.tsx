@@ -181,7 +181,7 @@ export default function StorefrontSPA() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <StorefrontHeader
+      <StorefrontHeaderFixed
         tenant={tenant}
         cartItemCount={getCartItemCount()}
         onNavigate={handleNavigation}
