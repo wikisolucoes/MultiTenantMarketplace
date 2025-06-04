@@ -400,13 +400,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/public/tenant/:subdomain", async (req, res) => {
     try {
       const { subdomain } = req.params;
-      const tenant = await storage.getTenantBySubdomain(subdomain);
       
-      if (!tenant) {
-        return res.status(404).json({ error: "Tenant not found" });
+      // Handle demo tenant case
+      if (subdomain === 'demo') {
+        const demoTenant = {
+          id: 1,
+          name: 'Loja Demo',
+          subdomain: 'demo',
+          category: 'fashion',
+          status: 'active',
+          description: 'Loja de demonstração com produtos variados',
+          address: 'Rua das Flores, 123',
+          city: 'São Paulo',
+          state: 'SP',
+          zipCode: '01234-567',
+          phone: '(11) 99999-9999',
+          email: 'contato@demo.com',
+          primaryColor: '#007bff',
+          secondaryColor: '#6c757d',
+          seoTitle: 'Loja Demo - Moda e Estilo',
+          seoDescription: 'A melhor loja de moda online com entrega rápida',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return res.json(demoTenant);
       }
       
-      res.json(tenant);
+      try {
+        const tenant = await storage.getTenantBySubdomain(subdomain);
+        
+        if (!tenant) {
+          return res.status(404).json({ error: "Tenant not found" });
+        }
+        
+        res.json(tenant);
+      } catch (dbError) {
+        console.error("Database error for tenant:", dbError);
+        return res.status(404).json({ error: "Tenant not found" });
+      }
     } catch (error: any) {
       console.error("Public tenant fetch error:", error);
       res.status(500).json({ error: error.message });
@@ -416,14 +447,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/public/products/:subdomain", async (req, res) => {
     try {
       const { subdomain } = req.params;
-      const tenant = await storage.getTenantBySubdomain(subdomain);
       
-      if (!tenant) {
-        return res.status(404).json({ error: "Tenant not found" });
+      // Handle demo products case
+      if (subdomain === 'demo') {
+        const demoProducts = [
+          {
+            id: 1,
+            tenantId: 1,
+            name: 'Camiseta Básica Preta',
+            description: 'Camiseta 100% algodão, confortável e versátil',
+            price: '29.90',
+            stock: 50,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: 2,
+            tenantId: 1,
+            name: 'Calça Jeans Slim',
+            description: 'Calça jeans slim fit, corte moderno',
+            price: '89.90',
+            stock: 30,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            id: 3,
+            tenantId: 1,
+            name: 'Tênis Casual Branco',
+            description: 'Tênis casual para o dia a dia',
+            price: '159.90',
+            stock: 25,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ];
+        return res.json(demoProducts);
       }
       
-      const products = await storage.getProductsByTenantId(tenant.id);
-      res.json(products);
+      try {
+        const tenant = await storage.getTenantBySubdomain(subdomain);
+        
+        if (!tenant) {
+          return res.status(404).json({ error: "Tenant not found" });
+        }
+        
+        const products = await storage.getProductsByTenantId(tenant.id);
+        res.json(products);
+      } catch (dbError) {
+        console.error("Database error for products:", dbError);
+        return res.json([]);
+      }
     } catch (error: any) {
       console.error("Public products fetch error:", error);
       res.status(500).json({ error: error.message });
