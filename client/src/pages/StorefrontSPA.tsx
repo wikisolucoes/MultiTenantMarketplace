@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useRoute } from "wouter";
 import StorefrontHeaderFixed from "../components/storefront/StorefrontHeaderFixed";
 import StorefrontFooter from "../components/storefront/StorefrontFooter";
 import StorefrontHome from "../components/storefront/StorefrontHome";
@@ -16,6 +17,13 @@ import CookieConsent from "../components/CookieConsent";
 import { Tenant, Product } from "../types/api";
 
 export default function StorefrontSPA() {
+  const [match, params] = useRoute("/storefront/:subdomain*");
+  
+  // Don't render if route doesn't match
+  if (!match) {
+    return null;
+  }
+  
   const [currentPage, setCurrentPage] = useState<string>("home");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [cartItems, setCartItems] = useState<Array<{ id: number; quantity: number }>>([]);
@@ -25,7 +33,7 @@ export default function StorefrontSPA() {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [brandFilter, setBrandFilter] = useState<string>("");
   const [showPromotions, setShowPromotions] = useState(false);
-  const subdomain = "demo"; // Fixed for development
+  const subdomain = (params as any)?.subdomain || "demo";
 
   const {
     data: tenant,
