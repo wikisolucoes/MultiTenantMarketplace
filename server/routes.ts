@@ -430,6 +430,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // LGPD Cookie Consent API
+  app.post("/api/cookie-consent", async (req, res) => {
+    try {
+      const { tenantId, consentGiven, consentTypes, ipAddress, userAgent } = req.body;
+      
+      // Get client IP if not provided
+      const clientIp = ipAddress || req.ip || req.connection.remoteAddress || '127.0.0.1';
+      
+      // Get session ID from cookies
+      const sessionId = req.cookies?.session_id;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session not found" });
+      }
+      
+      await SessionManager.saveCookieConsent(sessionId, tenantId, {
+        consentGiven,
+        consentTypes,
+        ipAddress: clientIp,
+        userAgent: userAgent || req.headers['user-agent'] || ''
+      });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Cookie consent error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Plugin Subscription Management API
+  app.get("/api/plugins", async (req, res) => {
+    try {
+      const plugins = await storage.getAllPlugins();
+      res.json(plugins);
+    } catch (error: any) {
+      console.error("Plugins fetch error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tenant/:tenantId/plugin-subscriptions", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      const subscriptions = await storage.getTenantPluginSubscriptions(parseInt(tenantId));
+      res.json(subscriptions);
+    } catch (error: any) {
+      console.error("Plugin subscriptions fetch error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tenant/:tenantId/subscribe-plugin", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      const { pluginId, billingPeriod } = req.body;
+      
+      const subscription = await storage.createPluginSubscription({
+        tenantId: parseInt(tenantId),
+        pluginId: parseInt(pluginId),
+        billingPeriod: billingPeriod || 'monthly',
+        isActive: true,
+        startDate: new Date(),
+        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      });
+      
+      res.json(subscription);
+    } catch (error: any) {
+      console.error("Plugin subscription error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/tenant/:tenantId/unsubscribe-plugin/:pluginId", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId, pluginId } = req.params;
+      
+      await storage.cancelPluginSubscription(parseInt(tenantId), parseInt(pluginId));
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Plugin unsubscription error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Session management API
+  app.get("/api/session", async (req, res) => {
+    try {
+      const sessionId = req.cookies?.session_id;
+      
+      if (!sessionId) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      
+      // This will be handled by session middleware
+      res.json({ sessionId });
+    } catch (error: any) {
+      console.error("Session fetch error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Integrated Checkout with Celcoin Cash-In
   app.post("/api/public/orders", async (req, res) => {
     try {

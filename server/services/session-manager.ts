@@ -1,8 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { db } from '../db';
-import { userSessions, cookieConsents } from '@shared/schema';
-import { eq, and, gt } from 'drizzle-orm';
 
 export interface SessionData {
   sessionId: string;
@@ -116,7 +113,11 @@ export class SessionManager {
     await db
       .update(userSessions)
       .set({ isActive: false })
-      .where(gt(new Date(), userSessions.expiresAt));
+      .where(
+        and(
+          eq(userSessions.isActive, true)
+        )
+      );
   }
 
   private static setSessionCookie(res: Response, sessionId: string): void {
