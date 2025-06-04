@@ -81,6 +81,16 @@ export interface IStorage {
     platformRevenue: string;
     activeStores: number;
   }>;
+
+  // Plugin Management
+  getAllPlugins(): Promise<Plugin[]>;
+  getPlugin(id: number): Promise<Plugin | undefined>;
+  createPlugin(plugin: InsertPlugin): Promise<Plugin>;
+
+  // Plugin Subscription Management
+  getTenantPluginSubscriptions(tenantId: number): Promise<TenantPluginSubscription[]>;
+  createPluginSubscription(subscription: InsertTenantPluginSubscription): Promise<TenantPluginSubscription>;
+  cancelPluginSubscription(tenantId: number, pluginId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {

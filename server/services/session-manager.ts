@@ -12,57 +12,52 @@ export interface SessionData {
 export class SessionManager {
   private static COOKIE_NAME = 'session_id';
   private static SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
+  private static sessions: Map<string, SessionData & { expiresAt: Date; lastActivity: Date }> = new Map();
 
   static async getOrCreateSession(req: Request, res: Response): Promise<SessionData> {
     let sessionId = req.cookies?.[this.COOKIE_NAME];
     
-    if (!sessionId) {
-      // Create new session
-      sessionId = uuidv4();
-      this.setSessionCookie(res, sessionId);
+    // Helper function to create new session
+    const createNewSession = () => {
+      const newSessionId = uuidv4();
+      this.setSessionCookie(res, newSessionId);
       
-      const expiresAt = new Date(Date.now() + this.SESSION_DURATION);
-      
-      await db.insert(userSessions).values({
-        sessionId,
-        tenantId: req.params.subdomain ? await this.getTenantIdFromSubdomain(req.params.subdomain) : undefined,
-        ipAddress: this.getClientIP(req),
-        userAgent: req.headers['user-agent'] || '',
+      const sessionData = {
+        sessionId: newSessionId,
+        tenantId: undefined,
         cartData: {},
         userData: {},
         cookieConsent: {},
-        expiresAt,
+        expiresAt: new Date(Date.now() + this.SESSION_DURATION),
         lastActivity: new Date(),
-      });
-
-      return { sessionId };
+      };
+      
+      this.sessions.set(newSessionId, sessionData);
+      return { sessionId: newSessionId };
+    };
+    
+    if (!sessionId) {
+      return createNewSession();
     }
 
     // Check if session exists and is valid
-    const [session] = await db
-      .select()
-      .from(userSessions)
-      .where(
-        and(
-          eq(userSessions.sessionId, sessionId),
-          eq(userSessions.isActive, true)
-        )
-      );
+    const session = this.sessions.get(sessionId);
 
-    if (!session) {
+    if (!session || session.expiresAt < new Date()) {
       // Session expired or invalid, create new one
-      return this.getOrCreateSession(req, res);
+      if (sessionId) {
+        this.sessions.delete(sessionId);
+      }
+      return createNewSession();
     }
 
     // Update last activity
-    await db
-      .update(userSessions)
-      .set({ lastActivity: new Date() })
-      .where(eq(userSessions.sessionId, sessionId));
+    session.lastActivity = new Date();
+    this.sessions.set(sessionId, session);
 
     return {
       sessionId: session.sessionId,
-      tenantId: session.tenantId || undefined,
+      tenantId: session.tenantId,
       cartData: session.cartData,
       userData: session.userData,
       cookieConsent: session.cookieConsent,
@@ -70,21 +65,17 @@ export class SessionManager {
   }
 
   static async updateSessionData(sessionId: string, data: Partial<SessionData>): Promise<void> {
-    const updateData: any = {};
+    const session = this.sessions.get(sessionId);
     
-    if (data.cartData !== undefined) updateData.cartData = data.cartData;
-    if (data.userData !== undefined) updateData.userData = data.userData;
-    if (data.cookieConsent !== undefined) updateData.cookieConsent = data.cookieConsent;
-    if (data.tenantId !== undefined) updateData.tenantId = data.tenantId;
+    if (!session) return;
 
-    if (Object.keys(updateData).length > 0) {
-      updateData.lastActivity = new Date();
-      
-      await db
-        .update(userSessions)
-        .set(updateData)
-        .where(eq(userSessions.sessionId, sessionId));
-    }
+    if (data.cartData !== undefined) session.cartData = data.cartData;
+    if (data.userData !== undefined) session.userData = data.userData;
+    if (data.cookieConsent !== undefined) session.cookieConsent = data.cookieConsent;
+    if (data.tenantId !== undefined) session.tenantId = data.tenantId;
+
+    session.lastActivity = new Date();
+    this.sessions.set(sessionId, session);
   }
 
   static async saveCookieConsent(sessionId: string, tenantId: number, consent: {
@@ -93,31 +84,19 @@ export class SessionManager {
     ipAddress: string;
     userAgent: string;
   }): Promise<void> {
-    await db.insert(cookieConsents).values({
-      sessionId,
-      tenantId,
-      consentGiven: consent.consentGiven,
-      consentTypes: consent.consentTypes,
-      ipAddress: consent.ipAddress,
-      userAgent: consent.userAgent,
-      consentDate: new Date(),
-    });
-
-    // Update session with consent data
+    // Store consent data in session for now
     await this.updateSessionData(sessionId, {
       cookieConsent: consent.consentTypes,
     });
   }
 
   static async cleanupExpiredSessions(): Promise<void> {
-    await db
-      .update(userSessions)
-      .set({ isActive: false })
-      .where(
-        and(
-          eq(userSessions.isActive, true)
-        )
-      );
+    const now = new Date();
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (session.expiresAt < now) {
+        this.sessions.delete(sessionId);
+      }
+    }
   }
 
   private static setSessionCookie(res: Response, sessionId: string): void {
