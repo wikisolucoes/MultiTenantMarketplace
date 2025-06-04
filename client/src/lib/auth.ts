@@ -5,6 +5,8 @@ export const USER_KEY = "wikistore_user";
 
 export function setAuthToken(token: string): void {
   localStorage.setItem(AUTH_TOKEN_KEY, token);
+  // Trigger auth change event for same-tab updates
+  window.dispatchEvent(new Event('authChange'));
 }
 
 export function getAuthToken(): string | null {

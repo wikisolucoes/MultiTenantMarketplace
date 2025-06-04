@@ -19,10 +19,33 @@ function AppRouter() {
   const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsAuth(isAuthenticated());
-    if (isAdmin()) setUserRole("admin");
-    else if (isMerchant()) setUserRole("merchant");
-    else setUserRole(null);
+    const checkAuth = () => {
+      setIsAuth(isAuthenticated());
+      if (isAdmin()) setUserRole("admin");
+      else if (isMerchant()) setUserRole("merchant");
+      else setUserRole(null);
+    };
+
+    checkAuth();
+    
+    // Listen for storage changes to detect login/logout
+    const handleStorageChange = () => {
+      checkAuth();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Custom event for same-tab changes
+    const handleAuthChange = () => {
+      checkAuth();
+    };
+    
+    window.addEventListener('authChange', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('authChange', handleAuthChange);
+    };
   }, []);
 
   return (
