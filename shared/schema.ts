@@ -10,6 +10,24 @@ export const tenants = pgTable("tenants", {
   subdomain: varchar("subdomain", { length: 50 }).notNull().unique(),
   category: text("category").notNull(),
   status: text("status", { enum: ["active", "suspended", "pending"] }).notNull().default("pending"),
+  // Tax configuration for NF-e
+  cnpj: text("cnpj"),
+  corporateName: text("corporate_name"),
+  fantasyName: text("fantasy_name"),
+  stateRegistration: text("state_registration"),
+  cityRegistration: text("city_registration"),
+  taxRegime: text("tax_regime", { enum: ["simples_nacional", "lucro_presumido", "lucro_real"] }),
+  address: text("address"),
+  addressNumber: text("address_number"),
+  addressComplement: text("address_complement"),
+  neighborhood: text("neighborhood"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  // LGPD compliance
+  privacyPolicy: text("privacy_policy"),
+  termsOfService: text("terms_of_service"),
+  cookiePolicy: text("cookie_policy"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -62,6 +80,22 @@ export const products = pgTable("products", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   stock: integer("stock").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  // Tax configuration for NF-e
+  ncm: text("ncm"), // Nomenclatura Comum do Mercosul
+  cest: text("cest"), // Código Especificador da Substituição Tributária
+  cfop: text("cfop"), // Código Fiscal de Operações e Prestações
+  icmsOrigin: text("icms_origin", { enum: ["0", "1", "2", "3", "4", "5", "6", "7", "8"] }),
+  icmsCst: text("icms_cst"), // Código de Situação Tributária do ICMS
+  icmsRate: decimal("icms_rate", { precision: 5, scale: 2 }),
+  ipiCst: text("ipi_cst"), // Código de Situação Tributária do IPI
+  ipiRate: decimal("ipi_rate", { precision: 5, scale: 2 }),
+  pisCst: text("pis_cst"), // Código de Situação Tributária do PIS
+  pisRate: decimal("pis_rate", { precision: 5, scale: 2 }),
+  cofinsCst: text("cofins_cst"), // Código de Situação Tributária do COFINS
+  cofinsRate: decimal("cofins_rate", { precision: 5, scale: 2 }),
+  productUnit: text("product_unit").default("UN"), // Unidade do produto
+  grossWeight: decimal("gross_weight", { precision: 10, scale: 3 }), // Peso bruto em kg
+  netWeight: decimal("net_weight", { precision: 10, scale: 3 }), // Peso líquido em kg
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -234,6 +268,148 @@ export const transactions = pgTable("transactions", {
   description: text("description").notNull(),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Plugin/Module system tables
+export const plugins = pgTable("plugins", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description").notNull(),
+  category: text("category", { enum: ["nfe", "integration", "import", "analytics", "marketing"] }).notNull(),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  features: jsonb("features").notNull(), // Array of features this plugin provides
+  requirements: jsonb("requirements"), // Technical requirements
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const tenantPluginSubscriptions = pgTable("tenant_plugin_subscriptions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
+  status: text("status", { enum: ["active", "cancelled", "suspended", "trial"] }).notNull().default("trial"),
+  subscribedAt: timestamp("subscribed_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  autoRenew: boolean("auto_renew").notNull().default(true),
+  lastBillingDate: timestamp("last_billing_date"),
+  nextBillingDate: timestamp("next_billing_date"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  cancellationReason: text("cancellation_reason"),
+  settings: jsonb("settings"), // Plugin-specific configuration
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User sessions and LGPD compliance
+export const userSessions = pgTable("user_sessions", {
+  id: serial("id").primaryKey(),
+  sessionId: text("session_id").notNull().unique(),
+  tenantId: integer("tenant_id").references(() => tenants.id),
+  ipAddress: varchar("ip_address", { length: 45 }).notNull(),
+  userAgent: text("user_agent"),
+  cartData: jsonb("cart_data"), // Shopping cart contents
+  userData: jsonb("user_data"), // Form data, preferences, etc
+  cookieConsent: jsonb("cookie_consent"), // Cookie consent preferences
+  lastActivity: timestamp("last_activity").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const cookieConsents = pgTable("cookie_consents", {
+  id: serial("id").primaryKey(),
+  sessionId: text("session_id").references(() => userSessions.sessionId).notNull(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  consentGiven: boolean("consent_given").notNull(),
+  consentTypes: jsonb("consent_types").notNull(), // { necessary: true, analytics: false, marketing: true }
+  consentDate: timestamp("consent_date").defaultNow().notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }).notNull(),
+  userAgent: text("user_agent"),
+  withdrawnAt: timestamp("withdrawn_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// NF-e (Electronic Invoice) tables
+export const nfeConfigurations = pgTable("nfe_configurations", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull().unique(),
+  certificatePath: text("certificate_path"), // Path to A1 certificate
+  certificatePassword: text("certificate_password"), // Encrypted certificate password
+  environment: text("environment", { enum: ["homologacao", "producao"] }).notNull().default("homologacao"),
+  serie: integer("serie").notNull().default(1), // Serie da NF-e
+  lastNfeNumber: integer("last_nfe_number").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const nfeDocuments = pgTable("nfe_documents", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  nfeNumber: integer("nfe_number").notNull(),
+  serie: integer("serie").notNull(),
+  accessKey: text("access_key").notNull().unique(), // Chave de acesso
+  status: text("status", { enum: ["draft", "sent", "authorized", "cancelled", "rejected"] }).notNull().default("draft"),
+  xmlContent: text("xml_content"), // Generated XML
+  danfeUrl: text("danfe_url"), // URL for DANFE PDF
+  protocolNumber: text("protocol_number"), // Protocolo de autorização
+  authorizationDate: timestamp("authorization_date"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// XML Import for purchase invoices
+export const xmlImports = pgTable("xml_imports", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  fileName: text("file_name").notNull(),
+  accessKey: text("access_key").notNull(),
+  supplierCnpj: text("supplier_cnpj").notNull(),
+  supplierName: text("supplier_name").notNull(),
+  invoiceNumber: text("invoice_number").notNull(),
+  invoiceDate: timestamp("invoice_date").notNull(),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }).notNull(),
+  status: text("status", { enum: ["pending", "processed", "error", "ignored"] }).notNull().default("pending"),
+  processedAt: timestamp("processed_at"),
+  errorMessage: text("error_message"),
+  xmlContent: text("xml_content").notNull(),
+  productsData: jsonb("products_data"), // Extracted products data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Marketplace integrations
+export const marketplaceIntegrations = pgTable("marketplace_integrations", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  marketplace: text("marketplace", { enum: ["mercado_livre", "shopee", "amazon", "instagram", "google_shopping"] }).notNull(),
+  isActive: boolean("is_active").notNull().default(false),
+  credentials: jsonb("credentials"), // Encrypted API credentials
+  settings: jsonb("settings"), // Integration-specific settings
+  lastSync: timestamp("last_sync"),
+  syncStatus: text("sync_status", { enum: ["success", "error", "in_progress"] }),
+  syncError: text("sync_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const marketplaceProducts = pgTable("marketplace_products", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  integrationId: integer("integration_id").references(() => marketplaceIntegrations.id).notNull(),
+  externalId: text("external_id").notNull(), // Product ID on marketplace
+  externalUrl: text("external_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastSync: timestamp("last_sync"),
+  syncStatus: text("sync_status", { enum: ["success", "error", "pending"] }).notNull().default("pending"),
+  syncError: text("sync_error"),
+  marketplaceData: jsonb("marketplace_data"), // Marketplace-specific data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Relations
@@ -440,6 +616,58 @@ export const insertReconciliationRecordSchema = createInsertSchema(reconciliatio
   updatedAt: true,
 });
 
+// New insert schemas for plugin system and LGPD compliance
+export const insertPluginSchema = createInsertSchema(plugins).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTenantPluginSubscriptionSchema = createInsertSchema(tenantPluginSubscriptions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserSessionSchema = createInsertSchema(userSessions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCookieConsentSchema = createInsertSchema(cookieConsents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNfeConfigurationSchema = createInsertSchema(nfeConfigurations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNfeDocumentSchema = createInsertSchema(nfeDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertXmlImportSchema = createInsertSchema(xmlImports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMarketplaceIntegrationSchema = createInsertSchema(marketplaceIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertMarketplaceProductSchema = createInsertSchema(marketplaceProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Login schema
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -497,6 +725,26 @@ export type InsertSecurityAuditLog = z.infer<typeof insertSecurityAuditLogSchema
 export type ReconciliationRecord = typeof reconciliationRecords.$inferSelect;
 export type InsertReconciliationRecord = z.infer<typeof insertReconciliationRecordSchema>;
 export type ApiRateLimit = typeof apiRateLimits.$inferSelect;
+
+// New types for plugin system and LGPD compliance
+export type Plugin = typeof plugins.$inferSelect;
+export type InsertPlugin = z.infer<typeof insertPluginSchema>;
+export type TenantPluginSubscription = typeof tenantPluginSubscriptions.$inferSelect;
+export type InsertTenantPluginSubscription = z.infer<typeof insertTenantPluginSubscriptionSchema>;
+export type UserSession = typeof userSessions.$inferSelect;
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+export type CookieConsent = typeof cookieConsents.$inferSelect;
+export type InsertCookieConsent = z.infer<typeof insertCookieConsentSchema>;
+export type NfeConfiguration = typeof nfeConfigurations.$inferSelect;
+export type InsertNfeConfiguration = z.infer<typeof insertNfeConfigurationSchema>;
+export type NfeDocument = typeof nfeDocuments.$inferSelect;
+export type InsertNfeDocument = z.infer<typeof insertNfeDocumentSchema>;
+export type XmlImport = typeof xmlImports.$inferSelect;
+export type InsertXmlImport = z.infer<typeof insertXmlImportSchema>;
+export type MarketplaceIntegration = typeof marketplaceIntegrations.$inferSelect;
+export type InsertMarketplaceIntegration = z.infer<typeof insertMarketplaceIntegrationSchema>;
+export type MarketplaceProduct = typeof marketplaceProducts.$inferSelect;
+export type InsertMarketplaceProduct = z.infer<typeof insertMarketplaceProductSchema>;
 
 // Customer tables for storefront functionality
 export const customers = pgTable("customers", {
