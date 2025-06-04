@@ -19,6 +19,8 @@ import {
   type Order
 } from "@shared/schema";
 import { storage } from "./storage";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -658,27 +660,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { subdomain } = req.params;
       
-      // For demo, always use tenant ID 5 or create it if it doesn't exist
+      // For demo, return hardcoded demo tenant data
       if (subdomain === "demo") {
-        let tenant = await storage.getTenant(5);
-        
-        if (!tenant) {
-          // Create demo tenant if it doesn't exist
-          tenant = await storage.createTenant({
-            name: "Loja Demo",
-            subdomain: "demo",
-            isActive: true
-          });
-        }
-        
-        res.json(tenant);
+        res.json({
+          id: 1,
+          name: "Loja Demo",
+          subdomain: "demo"
+        });
       } else {
-        // For other subdomains, try to find by domain
-        const tenant = await storage.getTenantByDomain(subdomain);
-        if (!tenant) {
-          return res.status(404).json({ message: "Tenant not found" });
-        }
-        res.json(tenant);
+        return res.status(404).json({ message: "Tenant not found" });
       }
     } catch (error) {
       console.error("Error fetching public tenant:", error);
@@ -692,7 +682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let tenantId: number;
       
       if (subdomain === "demo") {
-        tenantId = 5; // Demo tenant ID
+        tenantId = 1; // Demo tenant ID
       } else {
         const tenant = await storage.getTenantByDomain(subdomain);
         if (!tenant) {
