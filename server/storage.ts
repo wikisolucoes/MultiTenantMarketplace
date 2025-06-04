@@ -1,26 +1,34 @@
 import { 
   tenants, 
   users, 
-  bankAccounts,
-  celcoinAccounts,
+  brands,
+  productCategories,
   products,
+  productImages,
+  productSpecifications,
+  productPromotions,
+  bulkPricingRules,
   orders,
-  withdrawals,
-  transactions,
   type Tenant, 
   type User, 
   type InsertUser,
   type InsertTenant,
-  type BankAccount,
-  type InsertBankAccount,
-  type CelcoinAccount,
+  type Brand,
+  type InsertBrand,
+  type ProductCategory,
+  type InsertProductCategory,
   type Product,
   type InsertProduct,
+  type ProductImage,
+  type InsertProductImage,
+  type ProductSpecification,
+  type InsertProductSpecification,
+  type ProductPromotion,
+  type InsertProductPromotion,
+  type BulkPricingRule,
+  type InsertBulkPricingRule,
   type Order,
   type InsertOrder,
-  type Withdrawal,
-  type InsertWithdrawal,
-  type Transaction,
   type TenantRegistrationData
 } from "@shared/schema";
 import { db } from "./db";
@@ -34,68 +42,63 @@ export interface IStorage {
   
   // Tenant management
   getTenant(id: number): Promise<Tenant | undefined>;
-  getTenantBySubdomain(subdomain: string): Promise<Tenant | undefined>;
+  getTenantByDomain(domain: string): Promise<Tenant | undefined>;
   createTenant(tenant: InsertTenant): Promise<Tenant>;
   getAllTenants(): Promise<Tenant[]>;
   
   // Tenant registration (complete flow)
-  registerTenant(data: TenantRegistrationData): Promise<{ tenant: Tenant; user: User; bankAccount: BankAccount; celcoinAccount: CelcoinAccount }>;
+  registerTenant(data: TenantRegistrationData): Promise<{ tenant: Tenant; user: User }>;
   
-  // Bank accounts
-  createBankAccount(bankAccount: InsertBankAccount): Promise<BankAccount>;
-  getBankAccountsByUserId(userId: number): Promise<BankAccount[]>;
+  // Brands (tenant-scoped)
+  getBrandsByTenantId(tenantId: number): Promise<Brand[]>;
+  createBrand(brand: InsertBrand): Promise<Brand>;
+  updateBrand(id: number, tenantId: number, brand: Partial<InsertBrand>): Promise<Brand>;
+  deleteBrand(id: number, tenantId: number): Promise<void>;
   
-  // Celcoin accounts
-  createCelcoinAccount(tenantId: number, celcoinAccountId: string): Promise<CelcoinAccount>;
-  getCelcoinAccountByTenantId(tenantId: number): Promise<CelcoinAccount | undefined>;
-  updateCelcoinBalance(tenantId: number, balance: string): Promise<void>;
+  // Product Categories (tenant-scoped)
+  getCategoriesByTenantId(tenantId: number): Promise<ProductCategory[]>;
+  createCategory(category: InsertProductCategory): Promise<ProductCategory>;
+  updateCategory(id: number, tenantId: number, category: Partial<InsertProductCategory>): Promise<ProductCategory>;
+  deleteCategory(id: number, tenantId: number): Promise<void>;
   
-  // Products (tenant-scoped)
+  // Products (tenant-scoped with advanced features)
   getProductsByTenantId(tenantId: number): Promise<Product[]>;
+  getProductWithDetails(id: number, tenantId: number): Promise<Product & { 
+    brand?: Brand;
+    category?: ProductCategory;
+    images: ProductImage[];
+    specifications: ProductSpecification[];
+    bulkPricingRules: BulkPricingRule[];
+  } | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: number, tenantId: number, product: Partial<InsertProduct>): Promise<Product>;
+  deleteProduct(id: number, tenantId: number): Promise<void>;
+  
+  // Product Images
+  createProductImage(image: InsertProductImage): Promise<ProductImage>;
+  updateProductImages(productId: number, images: InsertProductImage[]): Promise<ProductImage[]>;
+  deleteProductImage(id: number): Promise<void>;
+  
+  // Product Specifications
+  createProductSpecification(spec: InsertProductSpecification): Promise<ProductSpecification>;
+  updateProductSpecifications(productId: number, specs: InsertProductSpecification[]): Promise<ProductSpecification[]>;
+  deleteProductSpecification(id: number): Promise<void>;
+  
+  // Bulk Pricing Rules
+  createBulkPricingRule(rule: InsertBulkPricingRule): Promise<BulkPricingRule>;
+  updateBulkPricingRules(productId: number, rules: InsertBulkPricingRule[]): Promise<BulkPricingRule[]>;
+  deleteBulkPricingRule(id: number): Promise<void>;
+  
+  // Product Promotions
+  getPromotionsByTenantId(tenantId: number): Promise<ProductPromotion[]>;
+  createPromotion(promotion: InsertProductPromotion): Promise<ProductPromotion>;
+  updatePromotion(id: number, tenantId: number, promotion: Partial<InsertProductPromotion>): Promise<ProductPromotion>;
+  deletePromotion(id: number, tenantId: number): Promise<void>;
   
   // Orders (tenant-scoped)
   getOrdersByTenantId(tenantId: number): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
-  updateOrderStatus(id: number, status: string, paymentStatus?: string): Promise<Order>;
-  
-  // Withdrawals (tenant-scoped)
-  getWithdrawalsByTenantId(tenantId: number): Promise<Withdrawal[]>;
-  createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal>;
-  updateWithdrawalStatus(id: number, status: string, celcoinTransactionId?: string, errorMessage?: string): Promise<Withdrawal>;
-  
-  // Financial stats
-  getTenantFinancialStats(tenantId: number): Promise<{
-    availableBalance: string;
-    pendingBalance: string;
-    monthlyWithdrawals: string;
-    dailyWithdrawals: string;
-    grossSales: string;
-    netRevenue: string;
-  }>;
-  
-  // Admin stats
-  getAdminStats(): Promise<{
-    totalStores: number;
-    transactionVolume: string;
-    platformRevenue: string;
-    activeStores: number;
-  }>;
-
-  // Plugin Management
-  getAllPlugins(): Promise<Plugin[]>;
-  getPlugin(id: number): Promise<Plugin | undefined>;
-  createPlugin(plugin: InsertPlugin): Promise<Plugin>;
-
-  // Plugin Subscription Management
-  getTenantPluginSubscriptions(tenantId: number): Promise<TenantPluginSubscription[]>;
-  createPluginSubscription(subscription: InsertTenantPluginSubscription): Promise<TenantPluginSubscription>;
-  cancelPluginSubscription(tenantId: number, subscriptionId: number): Promise<void>;
-
-  // Tax Configuration Management
-  getNfeConfiguration(tenantId: number): Promise<any>;
-  updateNfeConfiguration(tenantId: number, config: any): Promise<any>;
-  updateProductTaxConfig(productId: number, tenantId: number, taxConfig: any): Promise<Product>;
+  updateOrderStatus(id: number, status: string): Promise<Order>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -122,8 +125,8 @@ export class DatabaseStorage implements IStorage {
     return tenant || undefined;
   }
 
-  async getTenantBySubdomain(subdomain: string): Promise<Tenant | undefined> {
-    const [tenant] = await db.select().from(tenants).where(eq(tenants.subdomain, subdomain));
+  async getTenantByDomain(domain: string): Promise<Tenant | undefined> {
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.domain, domain));
     return tenant || undefined;
   }
 
@@ -139,16 +142,15 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(tenants).orderBy(desc(tenants.createdAt));
   }
 
-  async registerTenant(data: TenantRegistrationData): Promise<{ tenant: Tenant; user: User; bankAccount: BankAccount; celcoinAccount: CelcoinAccount }> {
+  async registerTenant(data: TenantRegistrationData): Promise<{ tenant: Tenant; user: User }> {
     return await db.transaction(async (tx) => {
       // Create tenant
       const [tenant] = await tx
         .insert(tenants)
         .values({
-          name: data.storeName,
-          subdomain: data.subdomain,
-          category: data.category,
-          status: "active"
+          name: data.tenantName,
+          domain: data.domain,
+          isActive: true
         })
         .returning();
 
@@ -156,343 +158,215 @@ export class DatabaseStorage implements IStorage {
       const [user] = await tx
         .insert(users)
         .values({
-          email: data.email,
-          password: data.password, // Will be hashed in the route handler
-          fullName: data.fullName,
-          document: data.document,
-          documentType: data.documentType,
-          phone: data.phone,
+          email: data.adminEmail,
+          password: data.adminPassword, // Will be hashed in the route handler
+          fullName: data.adminFullName,
+          document: data.adminDocument,
+          documentType: data.adminDocumentType,
+          phone: data.adminPhone,
           role: "merchant",
           tenantId: tenant.id
         })
         .returning();
 
-      // Create bank account
-      const [bankAccount] = await tx
-        .insert(bankAccounts)
-        .values({
-          userId: user.id,
-          bank: data.bank,
-          agency: data.agency,
-          account: data.account,
-          accountType: "checking",
-          isDefault: true
-        })
-        .returning();
-
-      // Create Celcoin account (mock ID for now)
-      const celcoinAccountId = `CELCOIN_${tenant.id}_${Date.now()}`;
-      const [celcoinAccount] = await tx
-        .insert(celcoinAccounts)
-        .values({
-          tenantId: tenant.id,
-          celcoinAccountId,
-          status: "active",
-          balance: "0.00"
-        })
-        .returning();
-
-      return { tenant, user, bankAccount, celcoinAccount };
+      return { tenant, user };
     });
   }
 
-  async createBankAccount(insertBankAccount: InsertBankAccount): Promise<BankAccount> {
-    const [bankAccount] = await db
-      .insert(bankAccounts)
-      .values(insertBankAccount)
+  // Brands
+  async getBrandsByTenantId(tenantId: number): Promise<Brand[]> {
+    return await db.select().from(brands).where(eq(brands.tenantId, tenantId)).orderBy(desc(brands.createdAt));
+  }
+
+  async createBrand(brand: InsertBrand): Promise<Brand> {
+    const [newBrand] = await db.insert(brands).values(brand).returning();
+    return newBrand;
+  }
+
+  async updateBrand(id: number, tenantId: number, brand: Partial<InsertBrand>): Promise<Brand> {
+    const [updatedBrand] = await db
+      .update(brands)
+      .set({ ...brand, updatedAt: new Date() })
+      .where(and(eq(brands.id, id), eq(brands.tenantId, tenantId)))
       .returning();
-    return bankAccount;
+    return updatedBrand;
   }
 
-  async getBankAccountsByUserId(userId: number): Promise<BankAccount[]> {
-    return await db.select().from(bankAccounts).where(eq(bankAccounts.userId, userId));
+  async deleteBrand(id: number, tenantId: number): Promise<void> {
+    await db.delete(brands).where(and(eq(brands.id, id), eq(brands.tenantId, tenantId)));
   }
 
-  async createCelcoinAccount(tenantId: number, celcoinAccountId: string): Promise<CelcoinAccount> {
-    const [celcoinAccount] = await db
-      .insert(celcoinAccounts)
-      .values({
-        tenantId,
-        celcoinAccountId,
-        status: "active",
-        balance: "0.00"
-      })
+  // Product Categories
+  async getCategoriesByTenantId(tenantId: number): Promise<ProductCategory[]> {
+    return await db.select().from(productCategories).where(eq(productCategories.tenantId, tenantId)).orderBy(desc(productCategories.createdAt));
+  }
+
+  async createCategory(category: InsertProductCategory): Promise<ProductCategory> {
+    const [newCategory] = await db.insert(productCategories).values(category).returning();
+    return newCategory;
+  }
+
+  async updateCategory(id: number, tenantId: number, category: Partial<InsertProductCategory>): Promise<ProductCategory> {
+    const [updatedCategory] = await db
+      .update(productCategories)
+      .set({ ...category, updatedAt: new Date() })
+      .where(and(eq(productCategories.id, id), eq(productCategories.tenantId, tenantId)))
       .returning();
-    return celcoinAccount;
+    return updatedCategory;
   }
 
-  async getCelcoinAccountByTenantId(tenantId: number): Promise<CelcoinAccount | undefined> {
-    const [celcoinAccount] = await db.select().from(celcoinAccounts).where(eq(celcoinAccounts.tenantId, tenantId));
-    return celcoinAccount || undefined;
+  async deleteCategory(id: number, tenantId: number): Promise<void> {
+    await db.delete(productCategories).where(and(eq(productCategories.id, id), eq(productCategories.tenantId, tenantId)));
   }
 
-  async updateCelcoinBalance(tenantId: number, balance: string): Promise<void> {
-    await db
-      .update(celcoinAccounts)
-      .set({ balance, updatedAt: new Date() })
-      .where(eq(celcoinAccounts.tenantId, tenantId));
-  }
-
+  // Products with advanced features
   async getProductsByTenantId(tenantId: number): Promise<Product[]> {
-    return await db.select().from(products).where(eq(products.tenantId, tenantId));
+    return await db.select().from(products).where(eq(products.tenantId, tenantId)).orderBy(desc(products.createdAt));
   }
 
-  async createProduct(insertProduct: InsertProduct): Promise<Product> {
-    const [product] = await db
-      .insert(products)
-      .values(insertProduct)
+  async getProductWithDetails(id: number, tenantId: number): Promise<Product & { 
+    brand?: Brand;
+    category?: ProductCategory;
+    images: ProductImage[];
+    specifications: ProductSpecification[];
+    bulkPricingRules: BulkPricingRule[];
+  } | undefined> {
+    // Get the product
+    const [product] = await db.select().from(products).where(and(eq(products.id, id), eq(products.tenantId, tenantId)));
+    if (!product) return undefined;
+
+    // Get related data
+    const [brand] = product.brandId ? await db.select().from(brands).where(eq(brands.id, product.brandId)) : [undefined];
+    const [category] = product.categoryId ? await db.select().from(productCategories).where(eq(productCategories.id, product.categoryId)) : [undefined];
+    const images = await db.select().from(productImages).where(eq(productImages.productId, id));
+    const specifications = await db.select().from(productSpecifications).where(eq(productSpecifications.productId, id));
+    const bulkPricingRules = await db.select().from(bulkPricingRules).where(eq(bulkPricingRules.productId, id));
+
+    return {
+      ...product,
+      brand,
+      category,
+      images,
+      specifications,
+      bulkPricingRules
+    };
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const [newProduct] = await db.insert(products).values(product).returning();
+    return newProduct;
+  }
+
+  async updateProduct(id: number, tenantId: number, product: Partial<InsertProduct>): Promise<Product> {
+    const [updatedProduct] = await db
+      .update(products)
+      .set({ ...product, updatedAt: new Date() })
+      .where(and(eq(products.id, id), eq(products.tenantId, tenantId)))
       .returning();
-    return product;
+    return updatedProduct;
   }
 
+  async deleteProduct(id: number, tenantId: number): Promise<void> {
+    await db.delete(products).where(and(eq(products.id, id), eq(products.tenantId, tenantId)));
+  }
+
+  // Product Images
+  async createProductImage(image: InsertProductImage): Promise<ProductImage> {
+    const [newImage] = await db.insert(productImages).values(image).returning();
+    return newImage;
+  }
+
+  async updateProductImages(productId: number, images: InsertProductImage[]): Promise<ProductImage[]> {
+    // Delete existing images and insert new ones
+    await db.delete(productImages).where(eq(productImages.productId, productId));
+    if (images.length === 0) return [];
+    
+    const newImages = await db.insert(productImages).values(images).returning();
+    return newImages;
+  }
+
+  async deleteProductImage(id: number): Promise<void> {
+    await db.delete(productImages).where(eq(productImages.id, id));
+  }
+
+  // Product Specifications
+  async createProductSpecification(spec: InsertProductSpecification): Promise<ProductSpecification> {
+    const [newSpec] = await db.insert(productSpecifications).values(spec).returning();
+    return newSpec;
+  }
+
+  async updateProductSpecifications(productId: number, specs: InsertProductSpecification[]): Promise<ProductSpecification[]> {
+    // Delete existing specs and insert new ones
+    await db.delete(productSpecifications).where(eq(productSpecifications.productId, productId));
+    if (specs.length === 0) return [];
+    
+    const newSpecs = await db.insert(productSpecifications).values(specs).returning();
+    return newSpecs;
+  }
+
+  async deleteProductSpecification(id: number): Promise<void> {
+    await db.delete(productSpecifications).where(eq(productSpecifications.id, id));
+  }
+
+  // Bulk Pricing Rules
+  async createBulkPricingRule(rule: InsertBulkPricingRule): Promise<BulkPricingRule> {
+    const [newRule] = await db.insert(bulkPricingRules).values(rule).returning();
+    return newRule;
+  }
+
+  async updateBulkPricingRules(productId: number, rules: InsertBulkPricingRule[]): Promise<BulkPricingRule[]> {
+    // Delete existing rules and insert new ones
+    await db.delete(bulkPricingRules).where(eq(bulkPricingRules.productId, productId));
+    if (rules.length === 0) return [];
+    
+    const newRules = await db.insert(bulkPricingRules).values(rules).returning();
+    return newRules;
+  }
+
+  async deleteBulkPricingRule(id: number): Promise<void> {
+    await db.delete(bulkPricingRules).where(eq(bulkPricingRules.id, id));
+  }
+
+  // Product Promotions
+  async getPromotionsByTenantId(tenantId: number): Promise<ProductPromotion[]> {
+    return await db.select().from(productPromotions).where(eq(productPromotions.tenantId, tenantId)).orderBy(desc(productPromotions.createdAt));
+  }
+
+  async createPromotion(promotion: InsertProductPromotion): Promise<ProductPromotion> {
+    const [newPromotion] = await db.insert(productPromotions).values(promotion).returning();
+    return newPromotion;
+  }
+
+  async updatePromotion(id: number, tenantId: number, promotion: Partial<InsertProductPromotion>): Promise<ProductPromotion> {
+    const [updatedPromotion] = await db
+      .update(productPromotions)
+      .set({ ...promotion, updatedAt: new Date() })
+      .where(and(eq(productPromotions.id, id), eq(productPromotions.tenantId, tenantId)))
+      .returning();
+    return updatedPromotion;
+  }
+
+  async deletePromotion(id: number, tenantId: number): Promise<void> {
+    await db.delete(productPromotions).where(and(eq(productPromotions.id, id), eq(productPromotions.tenantId, tenantId)));
+  }
+
+  // Orders
   async getOrdersByTenantId(tenantId: number): Promise<Order[]> {
     return await db.select().from(orders).where(eq(orders.tenantId, tenantId)).orderBy(desc(orders.createdAt));
   }
 
-  async createOrder(insertOrder: InsertOrder): Promise<Order> {
-    const [order] = await db
-      .insert(orders)
-      .values(insertOrder)
-      .returning();
-    return order;
+  async createOrder(order: InsertOrder): Promise<Order> {
+    const [newOrder] = await db.insert(orders).values(order).returning();
+    return newOrder;
   }
 
-  async updateOrderStatus(id: number, status: string, paymentStatus?: string): Promise<Order> {
-    const updateData: any = { status, updatedAt: new Date() };
-    if (paymentStatus) {
-      updateData.paymentStatus = paymentStatus;
-    }
-    
-    const [order] = await db
+  async updateOrderStatus(id: number, status: string): Promise<Order> {
+    const [updatedOrder] = await db
       .update(orders)
-      .set(updateData)
+      .set({ status, updatedAt: new Date() })
       .where(eq(orders.id, id))
       .returning();
-    return order;
-  }
-
-  async getWithdrawalsByTenantId(tenantId: number): Promise<Withdrawal[]> {
-    return await db.select().from(withdrawals).where(eq(withdrawals.tenantId, tenantId)).orderBy(desc(withdrawals.createdAt));
-  }
-
-  async createWithdrawal(insertWithdrawal: InsertWithdrawal): Promise<Withdrawal> {
-    const [withdrawal] = await db
-      .insert(withdrawals)
-      .values(insertWithdrawal)
-      .returning();
-    return withdrawal;
-  }
-
-  async updateWithdrawalStatus(id: number, status: string, celcoinTransactionId?: string, errorMessage?: string): Promise<Withdrawal> {
-    const updateData: any = { status, updatedAt: new Date() };
-    if (celcoinTransactionId) {
-      updateData.celcoinTransactionId = celcoinTransactionId;
-    }
-    if (errorMessage) {
-      updateData.errorMessage = errorMessage;
-    }
-    
-    const [withdrawal] = await db
-      .update(withdrawals)
-      .set(updateData)
-      .where(eq(withdrawals.id, id))
-      .returning();
-    return withdrawal;
-  }
-
-  async getTenantFinancialStats(tenantId: number): Promise<{
-    availableBalance: string;
-    pendingBalance: string;
-    monthlyWithdrawals: string;
-    dailyWithdrawals: string;
-    grossSales: string;
-    netRevenue: string;
-  }> {
-    const celcoinAccount = await this.getCelcoinAccountByTenantId(tenantId);
-    const today = new Date();
-    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-    // Get monthly withdrawals
-    const monthlyWithdrawalsResult = await db
-      .select({ total: sum(withdrawals.amount) })
-      .from(withdrawals)
-      .where(
-        and(
-          eq(withdrawals.tenantId, tenantId),
-          eq(withdrawals.status, "completed")
-        )
-      );
-
-    // Get daily withdrawals
-    const dailyWithdrawalsResult = await db
-      .select({ total: sum(withdrawals.amount) })
-      .from(withdrawals)
-      .where(
-        and(
-          eq(withdrawals.tenantId, tenantId),
-          eq(withdrawals.status, "completed")
-        )
-      );
-
-    // Get gross sales (this month)
-    const grossSalesResult = await db
-      .select({ total: sum(orders.total) })
-      .from(orders)
-      .where(
-        and(
-          eq(orders.tenantId, tenantId),
-          eq(orders.paymentStatus, "paid")
-        )
-      );
-
-    return {
-      availableBalance: celcoinAccount?.balance || "0.00",
-      pendingBalance: "0.00", // Would be calculated from pending orders
-      monthlyWithdrawals: monthlyWithdrawalsResult[0]?.total || "0.00",
-      dailyWithdrawals: dailyWithdrawalsResult[0]?.total || "0.00",
-      grossSales: grossSalesResult[0]?.total || "0.00",
-      netRevenue: grossSalesResult[0]?.total || "0.00", // Simplified
-    };
-  }
-
-  async getAdminStats(): Promise<{
-    totalStores: number;
-    transactionVolume: string;
-    platformRevenue: string;
-    activeStores: number;
-  }> {
-    const totalStoresResult = await db.select({ count: count() }).from(tenants);
-    const activeStoresResult = await db.select({ count: count() }).from(tenants).where(eq(tenants.status, "active"));
-    const transactionVolumeResult = await db.select({ total: sum(orders.total) }).from(orders).where(eq(orders.paymentStatus, "paid"));
-
-    const totalStores = totalStoresResult[0]?.count || 0;
-    const activeStores = activeStoresResult[0]?.count || 0;
-    const transactionVolume = transactionVolumeResult[0]?.total || "0.00";
-    
-    // Platform revenue is 2% of transaction volume
-    const platformRevenue = (parseFloat(transactionVolume) * 0.02).toFixed(2);
-
-    return {
-      totalStores,
-      transactionVolume,
-      platformRevenue,
-      activeStores,
-    };
-  }
-
-  // Plugin Management Implementation
-  async getAllPlugins(): Promise<Plugin[]> {
-    const result = await db.select().from(plugins).where(eq(plugins.isActive, true));
-    return result;
-  }
-
-  async getPlugin(id: number): Promise<Plugin | undefined> {
-    const [plugin] = await db.select().from(plugins).where(eq(plugins.id, id));
-    return plugin;
-  }
-
-  async createPlugin(insertPlugin: InsertPlugin): Promise<Plugin> {
-    const [plugin] = await db
-      .insert(plugins)
-      .values(insertPlugin)
-      .returning();
-    return plugin;
-  }
-
-  // Plugin Subscription Management Implementation
-  async getTenantPluginSubscriptions(tenantId: number): Promise<TenantPluginSubscription[]> {
-    const result = await db
-      .select()
-      .from(tenantPluginSubscriptions)
-      .leftJoin(plugins, eq(tenantPluginSubscriptions.pluginId, plugins.id))
-      .where(eq(tenantPluginSubscriptions.tenantId, tenantId));
-    
-    return result.map(row => ({
-      ...row.tenant_plugin_subscriptions,
-      plugin: row.plugins!
-    }));
-  }
-
-  async createPluginSubscription(subscription: InsertTenantPluginSubscription): Promise<TenantPluginSubscription> {
-    const [newSubscription] = await db
-      .insert(tenantPluginSubscriptions)
-      .values(subscription)
-      .returning();
-    
-    // Get the subscription with plugin details
-    const [result] = await db
-      .select()
-      .from(tenantPluginSubscriptions)
-      .leftJoin(plugins, eq(tenantPluginSubscriptions.pluginId, plugins.id))
-      .where(eq(tenantPluginSubscriptions.id, newSubscription.id));
-    
-    return {
-      ...result.tenant_plugin_subscriptions,
-      plugin: result.plugins!
-    };
-  }
-
-  async cancelPluginSubscription(tenantId: number, subscriptionId: number): Promise<void> {
-    await db
-      .update(tenantPluginSubscriptions)
-      .set({ 
-        status: 'cancelled',
-        cancelledAt: new Date(),
-        updatedAt: new Date()
-      })
-      .where(
-        and(
-          eq(tenantPluginSubscriptions.id, subscriptionId),
-          eq(tenantPluginSubscriptions.tenantId, tenantId)
-        )
-      );
-  }
-
-  // Tax Configuration Management Implementation
-  async getNfeConfiguration(tenantId: number): Promise<any> {
-    const result = await db.query.nfeConfigurations.findFirst({
-      where: eq(nfeConfigurations.tenantId, tenantId)
-    });
-    return result;
-  }
-
-  async updateNfeConfiguration(tenantId: number, config: any): Promise<any> {
-    const [result] = await db
-      .insert(nfeConfigurations)
-      .values({
-        tenantId,
-        ...config,
-        updatedAt: new Date()
-      })
-      .onConflictDoUpdate({
-        target: nfeConfigurations.tenantId,
-        set: {
-          ...config,
-          updatedAt: new Date()
-        }
-      })
-      .returning();
-    
-    return result;
-  }
-
-  async updateProductTaxConfig(productId: number, tenantId: number, taxConfig: any): Promise<Product> {
-    const [product] = await db
-      .update(products)
-      .set({
-        ...taxConfig,
-        updatedAt: new Date()
-      })
-      .where(
-        and(
-          eq(products.id, productId),
-          eq(products.tenantId, tenantId)
-        )
-      )
-      .returning();
-    
-    return product;
+    return updatedOrder;
   }
 }
 

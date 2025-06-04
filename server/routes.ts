@@ -1,1486 +1,370 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import bcrypt from "bcrypt";
-import rateLimit from "express-rate-limit";
-import { z } from "zod";
-import { storage } from "./storage";
-import { authenticateToken, generateToken, requireRole, requireTenant, type AuthRequest } from "./middleware/auth";
-import { enforceTenantIsolation, type TenantRequest } from "./middleware/tenant";
-import { ValidationService } from "./services/validation";
-import { WithdrawalService } from "./services/withdrawal";
-import { celcoinService } from "./services/celcoin";
 import { 
-  financialSecurityStack, 
-  financialOperationLimiter,
-  type SecureRequest 
-} from "./middleware/financial-security";
-import { FinancialLedgerService, type LedgerContext } from "./services/ledger";
-import { CelcoinIntegrationService } from "./services/celcoin-integration";
-import { ReconciliationService } from "./services/reconciliation";
-import { 
+  insertUserSchema, 
+  insertTenantSchema,
+  insertProductSchema,
+  insertBrandSchema,
+  insertProductCategorySchema,
+  insertOrderSchema,
   loginSchema, 
   tenantRegistrationSchema,
-  insertProductSchema,
-  insertOrderSchema,
-  type LoginData,
-  type TenantRegistrationData 
+  type User,
+  type Tenant,
+  type Product,
+  type Brand,
+  type ProductCategory,
+  type Order
 } from "@shared/schema";
-import { SessionManager } from "./services/session-manager";
-
-// Rate limiting
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
-  message: { message: "Muitas tentativas de login. Tente novamente em 15 minutos." },
-});
-
-const withdrawalLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // 10 withdrawals per hour
-  message: { message: "Limite de saques por hora excedido." },
-});
+import { storage } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  
-  // Auth routes
-  app.post("/api/auth/login", async (req, res) => {
+  // Authentication routes
+  app.post("/api/login", async (req, res) => {
     try {
-      const { email, password }: LoginData = loginSchema.parse(req.body);
+      const { email, password } = loginSchema.parse(req.body);
       
       const user = await storage.getUserByEmail(email);
-      if (!user || !user.isActive) {
-        return res.status(401).json({ message: "Credenciais inválidas" });
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ message: "Credenciais inválidas" });
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const token = generateToken({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        tenantId: user.tenantId || undefined,
-      });
-
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          fullName: user.fullName,
-          role: user.role,
-          tenantId: user.tenantId,
-        },
-      });
+      res.json({ user: { ...user, password: undefined } });
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
-      }
-      console.error("Login error:", error);
-      res.status(500).json({ message: "Erro interno do servidor" });
+      res.status(400).json({ message: "Invalid request data" });
     }
   });
 
-  app.post("/api/auth/register-tenant", async (req, res) => {
+  // Tenant registration
+  app.post("/api/register-tenant", async (req, res) => {
     try {
-      const data: TenantRegistrationData = tenantRegistrationSchema.parse(req.body);
-
-      // Validate document
-      const documentValid = ValidationService.validateDocument(data.document, data.documentType);
-      if (!documentValid) {
-        return res.status(400).json({ message: "CPF/CNPJ inválido" });
-      }
-
-      // Check if subdomain is available
-      const existingTenant = await storage.getTenantBySubdomain(data.subdomain);
+      const data = tenantRegistrationSchema.parse(req.body);
+      
+      // Check if domain is available
+      const existingTenant = await storage.getTenantByDomain(data.domain);
       if (existingTenant) {
-        return res.status(400).json({ message: "Subdomínio já está em uso" });
+        return res.status(409).json({ message: "Domain already exists" });
       }
 
       // Check if email is available
-      const existingUser = await storage.getUserByEmail(data.email);
+      const existingUser = await storage.getUserByEmail(data.adminEmail);
       if (existingUser) {
-        return res.status(400).json({ message: "E-mail já está em uso" });
+        return res.status(409).json({ message: "Email already exists" });
       }
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(data.password, 10);
+      const hashedPassword = await bcrypt.hash(data.adminPassword, 10);
       
-      // Create tenant, user, bank account, and Celcoin account
-      const result = await storage.registerTenant({
+      // Create tenant and user
+      const { tenant, user } = await storage.registerTenant({
         ...data,
-        password: hashedPassword,
-      });
-
-      // Create Celcoin account via API
-      try {
-        await celcoinService.createAccount({
-          document: data.document,
-          fullName: data.fullName,
-          email: data.email,
-          phone: data.phone,
-          bankAccount: {
-            bank: data.bank,
-            agency: data.agency,
-            account: data.account,
-          },
-        });
-      } catch (celcoinError) {
-        console.error("Celcoin account creation error:", celcoinError);
-        // Continue with registration even if Celcoin fails
-      }
-
-      // Generate token
-      const token = generateToken({
-        id: result.user.id,
-        email: result.user.email,
-        role: result.user.role,
-        tenantId: result.tenant.id,
+        adminPassword: hashedPassword
       });
 
       res.status(201).json({
-        token,
-        tenant: result.tenant,
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          fullName: result.user.fullName,
-          role: result.user.role,
-          tenantId: result.tenant.id,
-        },
+        tenant,
+        user: { ...user, password: undefined }
       });
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
-      }
-      console.error("Tenant registration error:", error);
-      res.status(500).json({ message: "Erro interno do servidor" });
+      console.error("Registration error:", error);
+      res.status(400).json({ message: "Invalid request data" });
     }
   });
 
-  // Validation routes
-  app.post("/api/validation/document", async (req, res) => {
-    try {
-      const { document, type } = req.body;
-      
-      if (!document || !type) {
-        return res.status(400).json({ message: "Documento e tipo são obrigatórios" });
-      }
-
-      const result = await ValidationService.validateDocumentWithReceita(document, type);
-      res.json(result);
-    } catch (error) {
-      console.error("Document validation error:", error);
-      res.status(500).json({ message: "Erro na validação do documento" });
-    }
-  });
-
-  // Protected routes
-  app.get("/api/auth/me", authenticateToken, async (req: AuthRequest, res) => {
-    const user = await storage.getUser(req.user!.id);
-    if (!user) {
-      return res.status(404).json({ message: "Usuário não encontrado" });
-    }
-
-    res.json({
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      role: user.role,
-      tenantId: user.tenantId,
-    });
-  });
-
-  // Admin routes
-  app.get("/api/admin/stats", authenticateToken, requireRole("admin"), async (req, res) => {
-    try {
-      const stats = await storage.getAdminStats();
-      res.json(stats);
-    } catch (error) {
-      console.error("Admin stats error:", error);
-      res.status(500).json({ message: "Erro ao buscar estatísticas" });
-    }
-  });
-
-  app.get("/api/admin/tenants", authenticateToken, requireRole("admin"), async (req, res) => {
+  // Tenant routes
+  app.get("/api/tenants", async (req, res) => {
     try {
       const tenants = await storage.getAllTenants();
       res.json(tenants);
     } catch (error) {
-      console.error("Get tenants error:", error);
-      res.status(500).json({ message: "Erro ao buscar lojistas" });
+      res.status(500).json({ message: "Failed to fetch tenants" });
     }
   });
 
-  // Tenant-scoped routes
-  app.get("/api/tenant/financial-stats", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+  // Brand management
+  app.get("/api/brands/:tenantId", async (req, res) => {
     try {
-      const stats = await storage.getTenantFinancialStats(req.tenantId);
-      res.json(stats);
+      const tenantId = parseInt(req.params.tenantId);
+      const brands = await storage.getBrandsByTenantId(tenantId);
+      res.json(brands);
     } catch (error) {
-      console.error("Financial stats error:", error);
-      res.status(500).json({ message: "Erro ao buscar dados financeiros" });
+      res.status(500).json({ message: "Failed to fetch brands" });
     }
   });
 
-  app.get("/api/tenant/products", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+  app.post("/api/brands", async (req, res) => {
     try {
-      const products = await storage.getProductsByTenantId(req.tenantId);
+      const brandData = insertBrandSchema.parse(req.body);
+      const brand = await storage.createBrand(brandData);
+      res.status(201).json(brand);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid brand data" });
+    }
+  });
+
+  app.put("/api/brands/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantId, ...brandData } = req.body;
+      const brand = await storage.updateBrand(id, tenantId, brandData);
+      res.json(brand);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update brand" });
+    }
+  });
+
+  app.delete("/api/brands/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantId } = req.body;
+      await storage.deleteBrand(id, tenantId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ message: "Failed to delete brand" });
+    }
+  });
+
+  // Category management
+  app.get("/api/categories/:tenantId", async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      const categories = await storage.getCategoriesByTenantId(tenantId);
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  app.post("/api/categories", async (req, res) => {
+    try {
+      const categoryData = insertProductCategorySchema.parse(req.body);
+      const category = await storage.createCategory(categoryData);
+      res.status(201).json(category);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid category data" });
+    }
+  });
+
+  app.put("/api/categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantId, ...categoryData } = req.body;
+      const category = await storage.updateCategory(id, tenantId, categoryData);
+      res.json(category);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantId } = req.body;
+      await storage.deleteCategory(id, tenantId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ message: "Failed to delete category" });
+    }
+  });
+
+  // Product management with advanced features
+  app.get("/api/products/:tenantId", async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      const products = await storage.getProductsByTenantId(tenantId);
       res.json(products);
     } catch (error) {
-      console.error("Get products error:", error);
-      res.status(500).json({ message: "Erro ao buscar produtos" });
+      res.status(500).json({ message: "Failed to fetch products" });
     }
   });
 
-  app.post("/api/tenant/products", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+  app.get("/api/products/:tenantId/:id", async (req, res) => {
     try {
-      const productData = insertProductSchema.parse({
-        ...req.body,
-        tenantId: req.tenantId,
-      });
-
-      const product = await storage.createProduct(productData);
-      res.status(201).json(product);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
+      const id = parseInt(req.params.id);
+      const tenantId = parseInt(req.params.tenantId);
+      const product = await storage.getProductWithDetails(id, tenantId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
       }
-      console.error("Create product error:", error);
-      res.status(500).json({ message: "Erro ao criar produto" });
-    }
-  });
-
-  app.get("/api/tenant/orders", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const orders = await storage.getOrdersByTenantId(req.tenantId);
-      res.json(orders);
-    } catch (error) {
-      console.error("Get orders error:", error);
-      res.status(500).json({ message: "Erro ao buscar pedidos" });
-    }
-  });
-
-  app.post("/api/tenant/orders", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const orderData = insertOrderSchema.parse({
-        ...req.body,
-        tenantId: req.tenantId,
-      });
-
-      const order = await storage.createOrder(orderData);
-
-      // Process payment with Celcoin
-      try {
-        const celcoinAccount = await storage.getCelcoinAccountByTenantId(req.tenantId);
-        if (celcoinAccount) {
-          const paymentResult = await celcoinService.createPayment({
-            accountId: celcoinAccount.celcoinAccountId,
-            amount: order.total,
-            paymentMethod: order.paymentMethod as "pix" | "credit_card" | "boleto",
-            customerData: {
-              name: order.customerName,
-              email: order.customerEmail,
-              document: "00000000000", // Would get from customer data
-            },
-          });
-
-          // Update order with Celcoin transaction ID
-          await storage.updateOrderStatus(order.id, order.status, order.paymentStatus);
-        }
-      } catch (celcoinError) {
-        console.error("Celcoin payment error:", celcoinError);
-        // Continue with order creation even if payment processing fails
-      }
-
-      res.status(201).json(order);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Dados inválidos", errors: error.errors });
-      }
-      console.error("Create order error:", error);
-      res.status(500).json({ message: "Erro ao criar pedido" });
-    }
-  });
-
-  app.get("/api/tenant/withdrawals", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const withdrawals = await storage.getWithdrawalsByTenantId(req.tenantId);
-      res.json(withdrawals);
-    } catch (error) {
-      console.error("Get withdrawals error:", error);
-      res.status(500).json({ message: "Erro ao buscar saques" });
-    }
-  });
-
-  // Integrated Withdrawal with Celcoin Cash-Out
-  app.post("/api/tenant/withdrawals", 
-    withdrawalLimiter, 
-    financialOperationLimiter,
-    ...financialSecurityStack,
-    authenticateToken, 
-    requireTenant, 
-    enforceTenantIsolation, 
-    async (req: TenantRequest & SecureRequest, res) => {
-    try {
-      const { amount, bankAccountId } = req.body;
-
-      if (!amount || !bankAccountId) {
-        return res.status(400).json({ message: "Valor e conta bancária são obrigatórios" });
-      }
-
-      // Get bank account details
-      const bankAccounts = await storage.getBankAccountsByUserId(req.user!.id);
-      const bankAccount = bankAccounts.find(acc => acc.id === parseInt(bankAccountId));
-
-      if (!bankAccount) {
-        return res.status(404).json({ message: "Conta bancária não encontrada" });
-      }
-
-      // Create ledger context for security audit
-      const ledgerContext: LedgerContext = {
-        tenantId: req.tenantId,
-        userId: req.user?.id,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent') || '',
-        sessionId: req.sessionId,
-      };
-
-      // Process secure Celcoin cash-out
-      const celcoinResult = await CelcoinIntegrationService.processCashOut({
-        tenantId: req.tenantId,
-        amount: amount.toString(),
-        bankAccount: {
-          bank: bankAccount.bank,
-          agency: bankAccount.agency,
-          account: bankAccount.account,
-        },
-        description: `Saque para ${bankAccount.bank} - Agência: ${bankAccount.agency}`,
-        metadata: {
-          bankAccountId,
-          riskScore: req.riskScore,
-          deviceFingerprint: req.deviceFingerprint,
-        }
-      }, ledgerContext);
-
-      if (!celcoinResult.success) {
-        return res.status(400).json({ 
-          message: celcoinResult.message,
-          transactionId: celcoinResult.transactionId 
-        });
-      }
-
-      // Create withdrawal record in our system
-      const withdrawal = await storage.createWithdrawal({
-        tenantId: req.tenantId,
-        amount: parseFloat(amount),
-        bankAccountId: parseInt(bankAccountId),
-        status: "processing",
-        celcoinTransactionId: celcoinResult.celcoinTransactionId || "",
-      });
-
-      res.json({ 
-        message: "Saque processado com Celcoin com sucesso",
-        withdrawalId: withdrawal.id,
-        transactionId: celcoinResult.transactionId,
-        celcoinTransactionId: celcoinResult.celcoinTransactionId,
-        amount: amount,
-        status: celcoinResult.status,
-        ledgerEntryId: celcoinResult.ledgerEntryId
-      });
-
-    } catch (error) {
-      console.error("Integrated withdrawal error:", error);
-      res.status(500).json({ message: "Erro ao processar saque com Celcoin" });
-    }
-  });
-
-  // Public APIs for storefront (no authentication required)
-  app.get("/api/public/tenant/:subdomain", async (req, res) => {
-    try {
-      const { subdomain } = req.params;
-      
-      // Handle demo tenant case
-      if (subdomain === 'demo') {
-        const demoTenant = {
-          id: 1,
-          name: 'Loja Demo',
-          subdomain: 'demo',
-          category: 'fashion',
-          status: 'active',
-          description: 'Loja de demonstração com produtos variados',
-          address: 'Rua das Flores, 123',
-          city: 'São Paulo',
-          state: 'SP',
-          zipCode: '01234-567',
-          phone: '(11) 99999-9999',
-          email: 'contato@demo.com',
-          primaryColor: '#007bff',
-          secondaryColor: '#6c757d',
-          seoTitle: 'Loja Demo - Moda e Estilo',
-          seoDescription: 'A melhor loja de moda online com entrega rápida',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        return res.json(demoTenant);
-      }
-      
-      try {
-        const tenant = await storage.getTenantBySubdomain(subdomain);
-        
-        if (!tenant) {
-          return res.status(404).json({ error: "Tenant not found" });
-        }
-        
-        res.json(tenant);
-      } catch (dbError) {
-        console.error("Database error for tenant:", dbError);
-        return res.status(404).json({ error: "Tenant not found" });
-      }
-    } catch (error: any) {
-      console.error("Public tenant fetch error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/public/products/:subdomain", async (req, res) => {
-    try {
-      const { subdomain } = req.params;
-      
-      // Handle demo products case
-      if (subdomain === 'demo') {
-        const demoProducts = [
-          {
-            id: 1,
-            tenantId: 1,
-            name: 'Camiseta Básica Preta',
-            description: 'Camiseta 100% algodão, confortável e versátil',
-            price: '29.90',
-            stock: 50,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: 2,
-            tenantId: 1,
-            name: 'Calça Jeans Slim',
-            description: 'Calça jeans slim fit, corte moderno',
-            price: '89.90',
-            stock: 30,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-          {
-            id: 3,
-            tenantId: 1,
-            name: 'Tênis Casual Branco',
-            description: 'Tênis casual para o dia a dia',
-            price: '159.90',
-            stock: 25,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
-        ];
-        return res.json(demoProducts);
-      }
-      
-      try {
-        const tenant = await storage.getTenantBySubdomain(subdomain);
-        
-        if (!tenant) {
-          return res.status(404).json({ error: "Tenant not found" });
-        }
-        
-        const products = await storage.getProductsByTenantId(tenant.id);
-        res.json(products);
-      } catch (dbError) {
-        console.error("Database error for products:", dbError);
-        return res.json([]);
-      }
-    } catch (error: any) {
-      console.error("Public products fetch error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // LGPD Cookie Consent API
-  app.post("/api/cookie-consent", async (req, res) => {
-    try {
-      const { tenantId, consentGiven, consentTypes, ipAddress, userAgent } = req.body;
-      
-      // Get client IP if not provided
-      const clientIp = ipAddress || req.ip || req.connection.remoteAddress || '127.0.0.1';
-      
-      // Get session ID from cookies
-      const sessionId = req.cookies?.session_id;
-      
-      if (!sessionId) {
-        return res.status(400).json({ error: "Session not found" });
-      }
-      
-      await SessionManager.saveCookieConsent(sessionId, tenantId, {
-        consentGiven,
-        consentTypes,
-        ipAddress: clientIp,
-        userAgent: userAgent || req.headers['user-agent'] || ''
-      });
-      
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error("Cookie consent error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Plugin Subscription Management API
-  app.get("/api/plugins", async (req, res) => {
-    try {
-      const plugins = await storage.getAllPlugins();
-      res.json(plugins);
-    } catch (error: any) {
-      console.error("Plugins fetch error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/tenant/:tenantId/plugin-subscriptions", authenticateToken, async (req: AuthRequest, res) => {
-    try {
-      const { tenantId } = req.params;
-      const subscriptions = await storage.getTenantPluginSubscriptions(parseInt(tenantId));
-      res.json(subscriptions);
-    } catch (error: any) {
-      console.error("Plugin subscriptions fetch error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/tenant/:tenantId/subscribe-plugin", authenticateToken, async (req: AuthRequest, res) => {
-    try {
-      const { tenantId } = req.params;
-      const { pluginId, billingPeriod } = req.body;
-      
-      const subscription = await storage.createPluginSubscription({
-        tenantId: parseInt(tenantId),
-        pluginId: parseInt(pluginId),
-        billingPeriod: billingPeriod || 'monthly',
-        isActive: true,
-        startDate: new Date(),
-        nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-      });
-      
-      res.json(subscription);
-    } catch (error: any) {
-      console.error("Plugin subscription error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.delete("/api/tenant/:tenantId/unsubscribe-plugin/:pluginId", authenticateToken, async (req: AuthRequest, res) => {
-    try {
-      const { tenantId, pluginId } = req.params;
-      
-      await storage.cancelPluginSubscription(parseInt(tenantId), parseInt(pluginId));
-      
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error("Plugin unsubscription error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Session management API
-  app.get("/api/session", async (req, res) => {
-    try {
-      const sessionId = req.cookies?.session_id;
-      
-      if (!sessionId) {
-        return res.status(404).json({ error: "Session not found" });
-      }
-      
-      // This will be handled by session middleware
-      res.json({ sessionId });
-    } catch (error: any) {
-      console.error("Session fetch error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Integrated Checkout with Celcoin Cash-In
-  app.post("/api/public/orders", async (req, res) => {
-    try {
-      const { 
-        customerData, 
-        shippingAddress, 
-        paymentMethod, 
-        items, 
-        totalAmount, 
-        shippingCost,
-        subdomain 
-      } = req.body;
-      
-      const tenant = await storage.getTenantBySubdomain(subdomain || 'demo');
-      
-      if (!tenant) {
-        return res.status(404).json({ error: "Tenant not found" });
-      }
-
-      // Create order first
-      const order = await storage.createOrder({
-        tenantId: tenant.id,
-        customerName: customerData.name,
-        customerEmail: customerData.email,
-        total: totalAmount,
-        paymentMethod,
-        status: "pending",
-        paymentStatus: "pending",
-      });
-
-      // If payment method requires immediate processing (PIX, Credit Card)
-      if (paymentMethod === "pix" || paymentMethod === "credit_card") {
-        // Create ledger context for the transaction
-        const ledgerContext: LedgerContext = {
-          tenantId: tenant.id,
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent') || '',
-          orderId: order.id,
-        };
-
-        // Process Celcoin cash-in for immediate payment methods
-        const celcoinResult = await CelcoinIntegrationService.processCashIn({
-          tenantId: tenant.id,
-          amount: totalAmount.toString(),
-          paymentMethod: paymentMethod as "pix" | "credit_card",
-          customerData: {
-            name: customerData.name,
-            email: customerData.email,
-            document: customerData.document || "",
-          },
-          metadata: {
-            orderId: order.id,
-            items,
-            shippingAddress,
-          }
-        }, ledgerContext);
-
-        if (celcoinResult.success) {
-          // Update order with Celcoin transaction ID
-          await storage.updateOrderStatus(
-            order.id, 
-            "confirmed", 
-            celcoinResult.status === "confirmed" ? "paid" : "processing"
-          );
-
-          res.json({ 
-            orderId: order.id,
-            status: "confirmed",
-            paymentStatus: celcoinResult.status,
-            transactionId: celcoinResult.transactionId,
-            celcoinTransactionId: celcoinResult.celcoinTransactionId,
-            paymentInstructions: {
-              method: paymentMethod,
-              amount: totalAmount,
-              status: celcoinResult.status,
-              message: paymentMethod === "pix" 
-                ? "Pagamento PIX processado com sucesso"
-                : "Pagamento no cartão processado com sucesso"
-            }
-          });
-        } else {
-          res.status(400).json({ 
-            error: "Payment processing failed",
-            orderId: order.id,
-            details: celcoinResult.message 
-          });
-        }
-      } else {
-        // For boleto or other methods, return order without immediate processing
-        res.json({ 
-          orderId: order.id,
-          status: "created",
-          paymentInstructions: {
-            method: paymentMethod,
-            amount: totalAmount,
-            message: "Instruções de pagamento enviadas por email"
-          }
-        });
-      }
-    } catch (error: any) {
-      console.error("Integrated checkout error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Secure Financial Operations - Celcoin Cash-In/Cash-Out with Full Ledger Integration
-  
-  // Cash-In (Receive Payment) with Full Security Stack
-  app.post("/api/financial/cash-in", 
-    financialOperationLimiter,
-    ...financialSecurityStack,
-    authenticateToken, 
-    requireTenant, 
-    enforceTenantIsolation, 
-    async (req: TenantRequest & SecureRequest, res) => {
-    try {
-      const { amount, paymentMethod, customerData } = req.body;
-
-      if (!amount || !paymentMethod || !customerData) {
-        return res.status(400).json({ 
-          error: "Amount, payment method, and customer data are required" 
-        });
-      }
-
-      // Create ledger context for security audit
-      const ledgerContext: LedgerContext = {
-        tenantId: req.tenantId,
-        userId: req.user?.id,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent') || '',
-        sessionId: req.sessionId,
-      };
-
-      // Process secure cash-in operation
-      const result = await CelcoinIntegrationService.processCashIn({
-        tenantId: req.tenantId,
-        amount,
-        paymentMethod,
-        customerData,
-        metadata: {
-          riskScore: req.riskScore,
-          deviceFingerprint: req.deviceFingerprint,
-        }
-      }, ledgerContext);
-
-      if (!result.success) {
-        return res.status(400).json({ 
-          error: result.message,
-          transactionId: result.transactionId 
-        });
-      }
-
-      res.json({
-        success: true,
-        transactionId: result.transactionId,
-        celcoinTransactionId: result.celcoinTransactionId,
-        amount: result.amount,
-        status: result.status,
-        message: "Cash-in operation initiated successfully"
-      });
-
-    } catch (error) {
-      console.error("Cash-in error:", error);
-      res.status(500).json({ 
-        error: "Failed to process cash-in operation",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  // Cash-Out (Withdrawal) with Enhanced Security Controls
-  app.post("/api/financial/cash-out", 
-    withdrawalLimiter,
-    financialOperationLimiter,
-    ...financialSecurityStack,
-    authenticateToken, 
-    requireTenant, 
-    enforceTenantIsolation, 
-    async (req: TenantRequest & SecureRequest, res) => {
-    try {
-      const { amount, bankAccount, description } = req.body;
-
-      if (!amount || !bankAccount) {
-        return res.status(400).json({ 
-          error: "Amount and bank account details are required" 
-        });
-      }
-
-      // Create ledger context for security audit
-      const ledgerContext: LedgerContext = {
-        tenantId: req.tenantId,
-        userId: req.user?.id,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent') || '',
-        sessionId: req.sessionId,
-      };
-
-      // Process secure cash-out operation
-      const result = await CelcoinIntegrationService.processCashOut({
-        tenantId: req.tenantId,
-        amount,
-        bankAccount,
-        description,
-        metadata: {
-          riskScore: req.riskScore,
-          deviceFingerprint: req.deviceFingerprint,
-        }
-      }, ledgerContext);
-
-      if (!result.success) {
-        return res.status(400).json({ 
-          error: result.message,
-          transactionId: result.transactionId 
-        });
-      }
-
-      res.json({
-        success: true,
-        transactionId: result.transactionId,
-        celcoinTransactionId: result.celcoinTransactionId,
-        amount: result.amount,
-        status: result.status,
-        message: "Cash-out operation initiated successfully"
-      });
-
-    } catch (error) {
-      console.error("Cash-out error:", error);
-      res.status(500).json({ 
-        error: "Failed to process cash-out operation",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  // Financial Ledger - Get Transaction History
-  app.get("/api/financial/ledger", 
-    authenticateToken, 
-    requireTenant, 
-    enforceTenantIsolation, 
-    async (req: TenantRequest, res) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 50;
-      const offset = parseInt(req.query.offset as string) || 0;
-
-      const entries = await FinancialLedgerService.getLedgerEntries(
-        req.tenantId, 
-        limit, 
-        offset
-      );
-
-      const currentBalance = await FinancialLedgerService.getCurrentBalance(req.tenantId);
-
-      res.json({
-        currentBalance,
-        entries,
-        pagination: {
-          limit,
-          offset,
-          hasMore: entries.length === limit
-        }
-      });
-
-    } catch (error) {
-      console.error("Ledger retrieval error:", error);
-      res.status(500).json({ 
-        error: "Failed to retrieve ledger entries" 
-      });
-    }
-  });
-
-  // Balance Synchronization with Celcoin
-  app.post("/api/financial/sync-balance", 
-    authenticateToken, 
-    requireTenant, 
-    enforceTenantIsolation, 
-    async (req: TenantRequest, res) => {
-    try {
-      const syncResult = await CelcoinIntegrationService.syncBalance(req.tenantId);
-
-      res.json({
-        systemBalance: syncResult.systemBalance,
-        celcoinBalance: syncResult.celcoinBalance,
-        isReconciled: syncResult.isReconciled,
-        difference: (parseFloat(syncResult.systemBalance) - parseFloat(syncResult.celcoinBalance)).toFixed(2)
-      });
-
-    } catch (error) {
-      console.error("Balance sync error:", error);
-      res.status(500).json({ 
-        error: "Failed to synchronize balance with Celcoin" 
-      });
-    }
-  });
-
-  // Financial Reconciliation - Get History
-  app.get("/api/financial/reconciliation", 
-    authenticateToken, 
-    requireTenant, 
-    enforceTenantIsolation, 
-    async (req: TenantRequest, res) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 20;
-      const offset = parseInt(req.query.offset as string) || 0;
-
-      const reconciliations = await ReconciliationService.getReconciliationHistory(
-        req.tenantId, 
-        limit, 
-        offset
-      );
-
-      res.json(reconciliations);
-
-    } catch (error) {
-      console.error("Reconciliation history error:", error);
-      res.status(500).json({ 
-        error: "Failed to retrieve reconciliation history" 
-      });
-    }
-  });
-
-  // Manual Reconciliation Trigger
-  app.post("/api/financial/reconciliation/manual", 
-    authenticateToken, 
-    requireTenant, 
-    enforceTenantIsolation, 
-    async (req: TenantRequest, res) => {
-    try {
-      const { startDate, endDate } = req.body;
-
-      if (!startDate || !endDate) {
-        return res.status(400).json({ 
-          error: "Start date and end date are required" 
-        });
-      }
-
-      const result = await ReconciliationService.performReconciliation(
-        req.tenantId,
-        new Date(startDate),
-        new Date(endDate),
-        "manual"
-      );
-
-      res.json({
-        reconciliationId: result.record.id,
-        isReconciled: result.isReconciled,
-        requiresManualReview: result.requiresManualReview,
-        discrepancies: result.discrepancies,
-        systemBalance: result.record.systemBalance,
-        celcoinBalance: result.record.celcoinBalance,
-        difference: result.record.difference
-      });
-
-    } catch (error) {
-      console.error("Manual reconciliation error:", error);
-      res.status(500).json({ 
-        error: "Failed to perform manual reconciliation" 
-      });
-    }
-  });
-
-  // Admin Routes - Financial Overview and Compliance
-  app.get("/api/admin/financial/overview", 
-    authenticateToken, 
-    requireRole("admin"), 
-    async (req, res) => {
-    try {
-      // Get pending reconciliations requiring manual review
-      const pendingReconciliations = await ReconciliationService.getPendingReconciliations();
-      
-      // Get admin stats with financial data
-      const adminStats = await storage.getAdminStats();
-
-      res.json({
-        adminStats,
-        pendingReconciliations: pendingReconciliations.length,
-        requiresAttention: pendingReconciliations.filter(r => r.status === "discrepancy_found").length
-      });
-
-    } catch (error) {
-      console.error("Admin financial overview error:", error);
-      res.status(500).json({ 
-        error: "Failed to retrieve financial overview" 
-      });
-    }
-  });
-
-  // Enhanced Webhook Handler with Ledger Integration
-  app.post("/api/webhooks/celcoin", async (req, res) => {
-    try {
-      const signature = req.headers["x-celcoin-signature"] as string;
-      const payload = JSON.stringify(req.body);
-
-      if (!celcoinService.verifyWebhookSignature(payload, signature)) {
-        return res.status(401).json({ message: "Invalid webhook signature" });
-      }
-
-      const { transactionId, status, type, tenantId } = req.body;
-
-      // Enhanced webhook processing with ledger integration
-      if (type === "withdrawal" || type === "cash_out") {
-        await WithdrawalService.handleWebhookUpdate(transactionId, status);
-      } else if (type === "payment" || type === "cash_in") {
-        await CelcoinIntegrationService.handleWebhook(tenantId, req.body, signature);
-      }
-
-      res.json({ 
-        message: "Webhook processed successfully",
-        transactionId,
-        status: "processed"
-      });
-
-    } catch (error) {
-      console.error("Enhanced webhook error:", error);
-      res.status(500).json({ 
-        message: "Webhook processing failed",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
-  // =============================================================================
-  // ADVANCED E-COMMERCE FEATURES
-  // =============================================================================
-
-  // CUPONS DE DESCONTO
-  app.get("/api/tenant/coupons", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { CouponService } = await import("./services/coupon");
-      const coupons = await CouponService.getCoupons(req.tenantId);
-      res.json(coupons);
-    } catch (error) {
-      console.error("Error fetching coupons:", error);
-      res.status(500).json({ message: "Failed to fetch coupons" });
-    }
-  });
-
-  app.post("/api/tenant/coupons", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { CouponService } = await import("./services/coupon");
-      const couponData = { ...req.body, tenantId: req.tenantId };
-      const coupon = await CouponService.createCoupon(couponData);
-      res.status(201).json(coupon);
-    } catch (error) {
-      console.error("Error creating coupon:", error);
-      res.status(500).json({ message: "Failed to create coupon" });
-    }
-  });
-
-  app.post("/api/public/validate-coupon/:subdomain", async (req, res) => {
-    try {
-      const { subdomain } = req.params;
-      const { code, orderData } = req.body;
-      
-      const tenant = await storage.getTenantBySubdomain(subdomain);
-      if (!tenant) {
-        return res.status(404).json({ message: "Tenant not found" });
-      }
-
-      const { CouponService } = await import("./services/coupon");
-      const result = await CouponService.validateAndApplyCoupon(tenant.id, code, orderData);
-      res.json(result);
-    } catch (error) {
-      console.error("Error validating coupon:", error);
-      res.status(500).json({ message: "Failed to validate coupon" });
-    }
-  });
-
-  // VALES PRESENTES
-  app.get("/api/tenant/gift-cards", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { GiftCardService } = await import("./services/giftcard");
-      const giftCards = await GiftCardService.getGiftCards(req.tenantId);
-      res.json(giftCards);
-    } catch (error) {
-      console.error("Error fetching gift cards:", error);
-      res.status(500).json({ message: "Failed to fetch gift cards" });
-    }
-  });
-
-  app.post("/api/tenant/gift-cards", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { GiftCardService } = await import("./services/giftcard");
-      const giftCardData = { ...req.body, tenantId: req.tenantId };
-      const giftCard = await GiftCardService.createGiftCard(giftCardData);
-      res.status(201).json(giftCard);
-    } catch (error) {
-      console.error("Error creating gift card:", error);
-      res.status(500).json({ message: "Failed to create gift card" });
-    }
-  });
-
-  app.post("/api/public/check-gift-card/:subdomain", async (req, res) => {
-    try {
-      const { subdomain } = req.params;
-      const { code } = req.body;
-      
-      const tenant = await storage.getTenantBySubdomain(subdomain);
-      if (!tenant) {
-        return res.status(404).json({ message: "Tenant not found" });
-      }
-
-      const { GiftCardService } = await import("./services/giftcard");
-      const result = await GiftCardService.checkBalance(tenant.id, code);
-      res.json(result);
-    } catch (error) {
-      console.error("Error checking gift card:", error);
-      res.status(500).json({ message: "Failed to check gift card" });
-    }
-  });
-
-  // PROGRAMA DE AFILIADOS
-  app.get("/api/tenant/affiliates", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { AffiliateService } = await import("./services/affiliate");
-      const affiliates = await AffiliateService.getAffiliates(req.tenantId);
-      res.json(affiliates);
-    } catch (error) {
-      console.error("Error fetching affiliates:", error);
-      res.status(500).json({ message: "Failed to fetch affiliates" });
-    }
-  });
-
-  app.post("/api/tenant/affiliates", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { AffiliateService } = await import("./services/affiliate");
-      const affiliateData = { ...req.body, tenantId: req.tenantId };
-      const affiliate = await AffiliateService.createAffiliate(affiliateData);
-      res.status(201).json(affiliate);
-    } catch (error) {
-      console.error("Error creating affiliate:", error);
-      res.status(500).json({ message: "Failed to create affiliate" });
-    }
-  });
-
-  app.get("/api/tenant/affiliate-commissions", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { AffiliateService } = await import("./services/affiliate");
-      const { affiliateId, status } = req.query;
-      const commissions = await AffiliateService.getAffiliateCommissions(
-        req.tenantId, 
-        affiliateId ? parseInt(affiliateId as string) : undefined,
-        status as string
-      );
-      res.json(commissions);
-    } catch (error) {
-      console.error("Error fetching commissions:", error);
-      res.status(500).json({ message: "Failed to fetch commissions" });
-    }
-  });
-
-  // CAMPANHAS DE MARKETING
-  app.get("/api/tenant/marketing-campaigns", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { MarketingService } = await import("./services/marketing");
-      const campaigns = await MarketingService.getCampaigns(req.tenantId);
-      res.json(campaigns);
-    } catch (error) {
-      console.error("Error fetching campaigns:", error);
-      res.status(500).json({ message: "Failed to fetch campaigns" });
-    }
-  });
-
-  app.post("/api/tenant/marketing-campaigns", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { MarketingService } = await import("./services/marketing");
-      const campaignData = { ...req.body, tenantId: req.tenantId };
-      const campaign = await MarketingService.createCampaign(campaignData);
-      res.status(201).json(campaign);
-    } catch (error) {
-      console.error("Error creating campaign:", error);
-      res.status(500).json({ message: "Failed to create campaign" });
-    }
-  });
-
-  app.post("/api/track/pixel/:campaignId", async (req, res) => {
-    try {
-      const { campaignId } = req.params;
-      const { event = 'impression', value } = req.query;
-      
-      const { MarketingService } = await import("./services/marketing");
-      await MarketingService.trackEvent({
-        campaignId: parseInt(campaignId),
-        visitorId: req.ip || 'unknown',
-        event: event as any,
-        value: value ? parseFloat(value as string) : undefined,
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent'),
-        referrer: req.get('Referer'),
-      });
-
-      // Return 1x1 transparent pixel
-      const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
-      res.set({
-        'Content-Type': 'image/gif',
-        'Content-Length': pixel.length,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      res.send(pixel);
-    } catch (error) {
-      console.error("Error tracking pixel:", error);
-      res.status(200).send(); // Always return 200 for tracking pixels
-    }
-  });
-
-  // PONTOS DE FIDELIDADE
-  app.get("/api/tenant/loyalty/customers/:customerId/stats", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { customerId } = req.params;
-      const { LoyaltyService } = await import("./services/loyalty");
-      const stats = await LoyaltyService.getCustomerStats(req.tenantId, parseInt(customerId));
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching loyalty stats:", error);
-      res.status(500).json({ message: "Failed to fetch loyalty stats" });
-    }
-  });
-
-  app.post("/api/tenant/loyalty/award-points", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { customerId, orderId, purchaseAmount } = req.body;
-      const { LoyaltyService } = await import("./services/loyalty");
-      const loyaltyPoint = await LoyaltyService.awardPurchasePoints(
-        req.tenantId,
-        customerId,
-        orderId,
-        purchaseAmount
-      );
-      res.status(201).json(loyaltyPoint);
-    } catch (error) {
-      console.error("Error awarding points:", error);
-      res.status(500).json({ message: "Failed to award points" });
-    }
-  });
-
-  app.post("/api/tenant/loyalty/redeem-points", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { customerId, points, reason } = req.body;
-      const { LoyaltyService } = await import("./services/loyalty");
-      const result = await LoyaltyService.redeemPoints(req.tenantId, customerId, points, reason);
-      res.json(result);
-    } catch (error) {
-      console.error("Error redeeming points:", error);
-      res.status(500).json({ message: "Failed to redeem points" });
-    }
-  });
-
-  // IMPORTAÇÃO CSV
-  app.post("/api/tenant/import/products", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { fileName, csvData } = req.body;
-      const { CSVImportService } = await import("./services/csv-import");
-      const result = await CSVImportService.importProducts(req.tenantId, fileName, csvData);
-      res.json(result);
-    } catch (error) {
-      console.error("Error importing products:", error);
-      res.status(500).json({ message: "Failed to import products" });
-    }
-  });
-
-  app.post("/api/tenant/import/stock", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { fileName, csvData } = req.body;
-      const { CSVImportService } = await import("./services/csv-import");
-      const result = await CSVImportService.updateStock(req.tenantId, fileName, csvData);
-      res.json(result);
-    } catch (error) {
-      console.error("Error updating stock:", error);
-      res.status(500).json({ message: "Failed to update stock" });
-    }
-  });
-
-  app.get("/api/tenant/import/history", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { CSVImportService } = await import("./services/csv-import");
-      const history = await CSVImportService.getImportHistory(req.tenantId);
-      res.json(history);
-    } catch (error) {
-      console.error("Error fetching import history:", error);
-      res.status(500).json({ message: "Failed to fetch import history" });
-    }
-  });
-
-  // MÉTODOS DE ENVIO
-  app.get("/api/tenant/shipping-methods", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { ShippingService } = await import("./services/shipping");
-      const methods = await ShippingService.getShippingMethods(req.tenantId);
-      res.json(methods);
-    } catch (error) {
-      console.error("Error fetching shipping methods:", error);
-      res.status(500).json({ message: "Failed to fetch shipping methods" });
-    }
-  });
-
-  app.post("/api/tenant/shipping-methods", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { ShippingService } = await import("./services/shipping");
-      const methodData = { ...req.body, tenantId: req.tenantId };
-      const method = await ShippingService.createShippingMethod(methodData);
-      res.status(201).json(method);
-    } catch (error) {
-      console.error("Error creating shipping method:", error);
-      res.status(500).json({ message: "Failed to create shipping method" });
-    }
-  });
-
-  app.post("/api/public/calculate-shipping/:subdomain", async (req, res) => {
-    try {
-      const { subdomain } = req.params;
-      const shippingRequest = req.body;
-      
-      const tenant = await storage.getTenantBySubdomain(subdomain);
-      if (!tenant) {
-        return res.status(404).json({ message: "Tenant not found" });
-      }
-
-      const { ShippingService } = await import("./services/shipping");
-      const calculations = await ShippingService.calculateShipping(tenant.id, shippingRequest);
-      res.json(calculations);
-    } catch (error) {
-      console.error("Error calculating shipping:", error);
-      res.status(500).json({ message: "Failed to calculate shipping" });
-    }
-  });
-
-  // RELATÓRIOS E ESTATÍSTICAS
-  app.get("/api/tenant/stats/overview", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { AffiliateService } = await import("./services/affiliate");
-      const { LoyaltyService } = await import("./services/loyalty");
-      const { MarketingService } = await import("./services/marketing");
-
-      const [affiliateStats, loyaltyStats, campaignROI] = await Promise.all([
-        AffiliateService.getEarningsSummary(req.tenantId),
-        LoyaltyService.getTenantLoyaltyStats(req.tenantId),
-        MarketingService.getCampaignROI(req.tenantId),
-      ]);
-
-      res.json({
-        affiliates: affiliateStats,
-        loyalty: loyaltyStats,
-        marketing: campaignROI,
-      });
-    } catch (error) {
-      console.error("Error fetching overview stats:", error);
-      res.status(500).json({ message: "Failed to fetch overview stats" });
-    }
-  });
-
-  // NEWSLETTER E SEGMENTAÇÃO
-  app.post("/api/tenant/newsletter/segments", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { name, description, criteria } = req.body;
-      const { NewsletterService } = await import("./services/marketing");
-      const segment = await NewsletterService.createSegment(req.tenantId, name, description, criteria);
-      res.status(201).json(segment);
-    } catch (error) {
-      console.error("Error creating segment:", error);
-      res.status(500).json({ message: "Failed to create segment" });
-    }
-  });
-
-  app.post("/api/tenant/newsletter/campaigns", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { segmentId, subject, content, htmlContent, scheduledAt } = req.body;
-      const { NewsletterService } = await import("./services/marketing");
-      const campaign = await NewsletterService.createNewsletterCampaign(
-        req.tenantId,
-        segmentId,
-        subject,
-        content,
-        htmlContent,
-        scheduledAt ? new Date(scheduledAt) : undefined
-      );
-      res.status(201).json(campaign);
-    } catch (error) {
-      console.error("Error creating newsletter campaign:", error);
-      res.status(500).json({ message: "Failed to create newsletter campaign" });
-    }
-  });
-
-  // Plugin Management Routes
-  app.get("/api/plugins", async (req, res) => {
-    try {
-      const plugins = await storage.getAllPlugins();
-      res.json(plugins);
-    } catch (error) {
-      console.error("Error fetching plugins:", error);
-      res.status(500).json({ message: "Failed to fetch plugins" });
-    }
-  });
-
-  app.get("/api/tenant/plugin-subscriptions", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const subscriptions = await storage.getTenantPluginSubscriptions(req.tenantId);
-      res.json(subscriptions);
-    } catch (error) {
-      console.error("Error fetching plugin subscriptions:", error);
-      res.status(500).json({ message: "Failed to fetch plugin subscriptions" });
-    }
-  });
-
-  app.post("/api/tenant/subscribe-plugin", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const { pluginId, billingCycle } = req.body;
-      
-      const subscription = await storage.createPluginSubscription({
-        tenantId: req.tenantId,
-        pluginId,
-        billingCycle: billingCycle || 'monthly',
-        subscribedAt: new Date(),
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000),
-        status: 'trial',
-      });
-      
-      res.json(subscription);
-    } catch (error) {
-      console.error("Error subscribing to plugin:", error);
-      res.status(500).json({ message: "Failed to subscribe to plugin" });
-    }
-  });
-
-  app.delete("/api/tenant/plugin-subscriptions/:subscriptionId", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const subscriptionId = parseInt(req.params.subscriptionId);
-      await storage.cancelPluginSubscription(req.tenantId, subscriptionId);
-      res.json({ message: "Plugin subscription cancelled" });
-    } catch (error) {
-      console.error("Error cancelling plugin subscription:", error);
-      res.status(500).json({ message: "Failed to cancel plugin subscription" });
-    }
-  });
-
-  // Tax Configuration Routes
-  app.get("/api/tenant/nfe-config", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const config = await storage.getNfeConfiguration(req.tenantId);
-      res.json(config || {
-        tenantId: req.tenantId,
-        environment: 'homologacao',
-        serie: 1,
-        nextNumber: 1,
-        isActive: false,
-      });
-    } catch (error) {
-      console.error("Error fetching NF-e config:", error);
-      res.status(500).json({ message: "Failed to fetch NF-e configuration" });
-    }
-  });
-
-  app.put("/api/tenant/nfe-config", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const config = await storage.updateNfeConfiguration(req.tenantId, req.body);
-      res.json(config);
-    } catch (error) {
-      console.error("Error updating NF-e config:", error);
-      res.status(500).json({ message: "Failed to update NF-e configuration" });
-    }
-  });
-
-  app.put("/api/tenant/products/:productId", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
-    try {
-      const productId = parseInt(req.params.productId);
-      const product = await storage.updateProductTaxConfig(productId, req.tenantId, req.body);
       res.json(product);
     } catch (error) {
-      console.error("Error updating product tax config:", error);
-      res.status(500).json({ message: "Failed to update product tax configuration" });
+      res.status(500).json({ message: "Failed to fetch product" });
+    }
+  });
+
+  app.post("/api/products", async (req, res) => {
+    try {
+      const { images, specifications, bulkPricingRules, ...productData } = req.body;
+      const validatedProduct = insertProductSchema.parse(productData);
+      
+      const product = await storage.createProduct(validatedProduct);
+      
+      // Add images if provided
+      if (images && images.length > 0) {
+        const imageData = images.map((img: any) => ({
+          ...img,
+          productId: product.id
+        }));
+        await storage.updateProductImages(product.id, imageData);
+      }
+      
+      // Add specifications if provided
+      if (specifications && specifications.length > 0) {
+        const specData = specifications.map((spec: any) => ({
+          ...spec,
+          productId: product.id
+        }));
+        await storage.updateProductSpecifications(product.id, specData);
+      }
+      
+      // Add bulk pricing rules if provided
+      if (bulkPricingRules && bulkPricingRules.length > 0) {
+        const ruleData = bulkPricingRules.map((rule: any) => ({
+          ...rule,
+          productId: product.id
+        }));
+        await storage.updateBulkPricingRules(product.id, ruleData);
+      }
+      
+      // Return product with details
+      const productWithDetails = await storage.getProductWithDetails(product.id, product.tenantId);
+      res.status(201).json(productWithDetails);
+    } catch (error) {
+      console.error("Product creation error:", error);
+      res.status(400).json({ message: "Invalid product data" });
+    }
+  });
+
+  app.put("/api/products/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantId, images, specifications, bulkPricingRules, ...productData } = req.body;
+      
+      const product = await storage.updateProduct(id, tenantId, productData);
+      
+      // Update images if provided
+      if (images !== undefined) {
+        const imageData = images.map((img: any) => ({
+          ...img,
+          productId: id
+        }));
+        await storage.updateProductImages(id, imageData);
+      }
+      
+      // Update specifications if provided
+      if (specifications !== undefined) {
+        const specData = specifications.map((spec: any) => ({
+          ...spec,
+          productId: id
+        }));
+        await storage.updateProductSpecifications(id, specData);
+      }
+      
+      // Update bulk pricing rules if provided
+      if (bulkPricingRules !== undefined) {
+        const ruleData = bulkPricingRules.map((rule: any) => ({
+          ...rule,
+          productId: id
+        }));
+        await storage.updateBulkPricingRules(id, ruleData);
+      }
+      
+      // Return updated product with details
+      const productWithDetails = await storage.getProductWithDetails(id, tenantId);
+      res.json(productWithDetails);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/products/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantId } = req.body;
+      await storage.deleteProduct(id, tenantId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ message: "Failed to delete product" });
+    }
+  });
+
+  // Promotions management
+  app.get("/api/promotions/:tenantId", async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      const promotions = await storage.getPromotionsByTenantId(tenantId);
+      res.json(promotions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch promotions" });
+    }
+  });
+
+  app.post("/api/promotions", async (req, res) => {
+    try {
+      const promotion = await storage.createPromotion(req.body);
+      res.status(201).json(promotion);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid promotion data" });
+    }
+  });
+
+  app.put("/api/promotions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantId, ...promotionData } = req.body;
+      const promotion = await storage.updatePromotion(id, tenantId, promotionData);
+      res.json(promotion);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update promotion" });
+    }
+  });
+
+  app.delete("/api/promotions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { tenantId } = req.body;
+      await storage.deletePromotion(id, tenantId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ message: "Failed to delete promotion" });
+    }
+  });
+
+  // Order management
+  app.get("/api/orders/:tenantId", async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      const orders = await storage.getOrdersByTenantId(tenantId);
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  app.post("/api/orders", async (req, res) => {
+    try {
+      const orderData = insertOrderSchema.parse(req.body);
+      const order = await storage.createOrder(orderData);
+      res.status(201).json(order);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid order data" });
+    }
+  });
+
+  app.put("/api/orders/:id/status", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      const order = await storage.updateOrderStatus(id, status);
+      res.json(order);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update order status" });
     }
   });
 
