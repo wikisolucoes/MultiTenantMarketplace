@@ -1393,6 +1393,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Plugin Management Routes
+  app.get("/api/plugins", async (req, res) => {
+    try {
+      const plugins = await storage.getAllPlugins();
+      res.json(plugins);
+    } catch (error) {
+      console.error("Error fetching plugins:", error);
+      res.status(500).json({ message: "Failed to fetch plugins" });
+    }
+  });
+
+  app.get("/api/tenant/plugin-subscriptions", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const subscriptions = await storage.getTenantPluginSubscriptions(req.tenantId);
+      res.json(subscriptions);
+    } catch (error) {
+      console.error("Error fetching plugin subscriptions:", error);
+      res.status(500).json({ message: "Failed to fetch plugin subscriptions" });
+    }
+  });
+
+  app.post("/api/tenant/subscribe-plugin", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { pluginId, billingCycle } = req.body;
+      
+      const subscription = await storage.createPluginSubscription({
+        tenantId: req.tenantId,
+        pluginId,
+        billingCycle: billingCycle || 'monthly',
+        subscribedAt: new Date(),
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000),
+        status: 'trial',
+      });
+      
+      res.json(subscription);
+    } catch (error) {
+      console.error("Error subscribing to plugin:", error);
+      res.status(500).json({ message: "Failed to subscribe to plugin" });
+    }
+  });
+
+  app.delete("/api/tenant/plugin-subscriptions/:subscriptionId", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const subscriptionId = parseInt(req.params.subscriptionId);
+      await storage.cancelPluginSubscription(req.tenantId, subscriptionId);
+      res.json({ message: "Plugin subscription cancelled" });
+    } catch (error) {
+      console.error("Error cancelling plugin subscription:", error);
+      res.status(500).json({ message: "Failed to cancel plugin subscription" });
+    }
+  });
+
+  // Tax Configuration Routes
+  app.get("/api/tenant/nfe-config", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const config = await storage.getNfeConfiguration(req.tenantId);
+      res.json(config || {
+        tenantId: req.tenantId,
+        environment: 'homologacao',
+        serie: 1,
+        nextNumber: 1,
+        isActive: false,
+      });
+    } catch (error) {
+      console.error("Error fetching NF-e config:", error);
+      res.status(500).json({ message: "Failed to fetch NF-e configuration" });
+    }
+  });
+
+  app.put("/api/tenant/nfe-config", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const config = await storage.updateNfeConfiguration(req.tenantId, req.body);
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating NF-e config:", error);
+      res.status(500).json({ message: "Failed to update NF-e configuration" });
+    }
+  });
+
+  app.put("/api/tenant/products/:productId", authenticateToken, requireTenant, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const productId = parseInt(req.params.productId);
+      const product = await storage.updateProductTaxConfig(productId, req.tenantId, req.body);
+      res.json(product);
+    } catch (error) {
+      console.error("Error updating product tax config:", error);
+      res.status(500).json({ message: "Failed to update product tax configuration" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

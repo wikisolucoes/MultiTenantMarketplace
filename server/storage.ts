@@ -90,7 +90,12 @@ export interface IStorage {
   // Plugin Subscription Management
   getTenantPluginSubscriptions(tenantId: number): Promise<TenantPluginSubscription[]>;
   createPluginSubscription(subscription: InsertTenantPluginSubscription): Promise<TenantPluginSubscription>;
-  cancelPluginSubscription(tenantId: number, pluginId: number): Promise<void>;
+  cancelPluginSubscription(tenantId: number, subscriptionId: number): Promise<void>;
+
+  // Tax Configuration Management
+  getNfeConfiguration(tenantId: number): Promise<any>;
+  updateNfeConfiguration(tenantId: number, config: any): Promise<any>;
+  updateProductTaxConfig(productId: number, tenantId: number, taxConfig: any): Promise<Product>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -374,6 +379,120 @@ export class DatabaseStorage implements IStorage {
       platformRevenue,
       activeStores,
     };
+  }
+
+  // Plugin Management Implementation
+  async getAllPlugins(): Promise<Plugin[]> {
+    const result = await db.select().from(plugins).where(eq(plugins.isActive, true));
+    return result;
+  }
+
+  async getPlugin(id: number): Promise<Plugin | undefined> {
+    const [plugin] = await db.select().from(plugins).where(eq(plugins.id, id));
+    return plugin;
+  }
+
+  async createPlugin(insertPlugin: InsertPlugin): Promise<Plugin> {
+    const [plugin] = await db
+      .insert(plugins)
+      .values(insertPlugin)
+      .returning();
+    return plugin;
+  }
+
+  // Plugin Subscription Management Implementation
+  async getTenantPluginSubscriptions(tenantId: number): Promise<TenantPluginSubscription[]> {
+    const result = await db
+      .select()
+      .from(tenantPluginSubscriptions)
+      .leftJoin(plugins, eq(tenantPluginSubscriptions.pluginId, plugins.id))
+      .where(eq(tenantPluginSubscriptions.tenantId, tenantId));
+    
+    return result.map(row => ({
+      ...row.tenant_plugin_subscriptions,
+      plugin: row.plugins!
+    }));
+  }
+
+  async createPluginSubscription(subscription: InsertTenantPluginSubscription): Promise<TenantPluginSubscription> {
+    const [newSubscription] = await db
+      .insert(tenantPluginSubscriptions)
+      .values(subscription)
+      .returning();
+    
+    // Get the subscription with plugin details
+    const [result] = await db
+      .select()
+      .from(tenantPluginSubscriptions)
+      .leftJoin(plugins, eq(tenantPluginSubscriptions.pluginId, plugins.id))
+      .where(eq(tenantPluginSubscriptions.id, newSubscription.id));
+    
+    return {
+      ...result.tenant_plugin_subscriptions,
+      plugin: result.plugins!
+    };
+  }
+
+  async cancelPluginSubscription(tenantId: number, subscriptionId: number): Promise<void> {
+    await db
+      .update(tenantPluginSubscriptions)
+      .set({ 
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(tenantPluginSubscriptions.id, subscriptionId),
+          eq(tenantPluginSubscriptions.tenantId, tenantId)
+        )
+      );
+  }
+
+  // Tax Configuration Management Implementation
+  async getNfeConfiguration(tenantId: number): Promise<any> {
+    const result = await db.query.nfeConfigurations.findFirst({
+      where: eq(nfeConfigurations.tenantId, tenantId)
+    });
+    return result;
+  }
+
+  async updateNfeConfiguration(tenantId: number, config: any): Promise<any> {
+    const [result] = await db
+      .insert(nfeConfigurations)
+      .values({
+        tenantId,
+        ...config,
+        updatedAt: new Date()
+      })
+      .onConflictDoUpdate({
+        target: nfeConfigurations.tenantId,
+        set: {
+          ...config,
+          updatedAt: new Date()
+        }
+      })
+      .returning();
+    
+    return result;
+  }
+
+  async updateProductTaxConfig(productId: number, tenantId: number, taxConfig: any): Promise<Product> {
+    const [product] = await db
+      .update(products)
+      .set({
+        ...taxConfig,
+        updatedAt: new Date()
+      })
+      .where(
+        and(
+          eq(products.id, productId),
+          eq(products.tenantId, tenantId)
+        )
+      )
+      .returning();
+    
+    return product;
   }
 }
 
