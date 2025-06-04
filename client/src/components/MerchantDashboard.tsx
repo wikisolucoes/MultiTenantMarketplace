@@ -482,7 +482,7 @@ export default function MerchantDashboard() {
                                   <span className="capitalize">{order.paymentMethod}</span>
                                 </div>
                               </TableCell>
-                              <TableCell>{formatDate(order.createdAt)}</TableCell>
+                              <TableCell>{formatDate(order.createdAt.toString())}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -697,7 +697,7 @@ export default function MerchantDashboard() {
                                   {formatCurrency(withdrawal.amount)}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {formatDateTime(withdrawal.createdAt)}
+                                  {formatDateTime(withdrawal.createdAt.toString())}
                                 </p>
                               </div>
                               {getStatusBadge(withdrawal.status)}
@@ -753,7 +753,7 @@ export default function MerchantDashboard() {
                         <TableBody>
                           {withdrawals.map((withdrawal) => (
                             <TableRow key={withdrawal.id}>
-                              <TableCell>{formatDateTime(withdrawal.createdAt)}</TableCell>
+                              <TableCell>{formatDateTime(withdrawal.createdAt.toString())}</TableCell>
                               <TableCell>{formatCurrency(withdrawal.amount)}</TableCell>
                               <TableCell>{formatCurrency(withdrawal.fee)}</TableCell>
                               <TableCell className="font-semibold">
@@ -826,11 +826,11 @@ export default function MerchantDashboard() {
                               </span>
                             </TableCell>
                             <TableCell>{getStatusBadge(product.isActive ? "active" : "inactive")}</TableCell>
-                            <TableCell>{formatDate(product.createdAt)}</TableCell>
+                            <TableCell>{formatDate(product.createdAt.toString())}</TableCell>
                             <TableCell>
                               <div className="flex space-x-2">
-                                <Button variant="ghost" size="sm">Editar</Button>
-                                <Button variant="ghost" size="sm" className="text-destructive">
+                                <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)}>Editar</Button>
+                                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteProduct(product.id)}>
                                   Excluir
                                 </Button>
                               </div>
@@ -891,11 +891,11 @@ export default function MerchantDashboard() {
                                 <span className="capitalize">{order.paymentMethod}</span>
                               </div>
                             </TableCell>
-                            <TableCell>{formatDate(order.createdAt)}</TableCell>
+                            <TableCell>{formatDate(order.createdAt.toString())}</TableCell>
                             <TableCell>
                               <div className="flex space-x-2">
-                                <Button variant="ghost" size="sm">Ver</Button>
-                                <Button variant="ghost" size="sm">Editar</Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleViewOrder(order.id)}>Ver</Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleEditOrder(order.id)}>Editar</Button>
                               </div>
                             </TableCell>
                           </TableRow>
