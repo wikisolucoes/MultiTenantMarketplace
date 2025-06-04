@@ -48,8 +48,80 @@ export const users = pgTable("users", {
   phone: varchar("phone", { length: 20 }),
   role: varchar("role", { length: 50 }).default("merchant").notNull(), // 'admin', 'merchant'
   tenantId: integer("tenant_id").references(() => tenants.id),
+  // Profile and permissions
+  profileImage: text("profile_image"),
+  isActive: boolean("is_active").default(true).notNull(),
+  permissions: jsonb("permissions"), // Array of permission strings
+  lastLoginAt: timestamp("last_login_at"),
+  createdBy: integer("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User profiles with additional details and permissions
+export const userProfiles = pgTable("user_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  accessLevel: varchar("access_level", { length: 50 }).default("limited").notNull(), // 'full', 'limited', 'readonly'
+  departmentId: integer("department_id"),
+  jobTitle: varchar("job_title", { length: 255 }),
+  // Specific permissions
+  canManageProducts: boolean("can_manage_products").default(false).notNull(),
+  canManageOrders: boolean("can_manage_orders").default(false).notNull(),
+  canViewFinancials: boolean("can_view_financials").default(false).notNull(),
+  canManageUsers: boolean("can_manage_users").default(false).notNull(),
+  canManageSettings: boolean("can_manage_settings").default(false).notNull(),
+  canManageThemes: boolean("can_manage_themes").default(false).notNull(),
+  canManageBanners: boolean("can_manage_banners").default(false).notNull(),
+  canAccessSupport: boolean("can_access_support").default(true).notNull(),
+  // Activity tracking
+  lastActivityAt: timestamp("last_activity_at"),
+  loginAttempts: integer("login_attempts").default(0).notNull(),
+  isLocked: boolean("is_locked").default(false).notNull(),
+  lockedUntil: timestamp("locked_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Support ticket system
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  ticketNumber: varchar("ticket_number", { length: 50 }).unique().notNull(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  category: varchar("category", { length: 50 }).notNull(), // 'bug', 'feature', 'support', 'billing', 'technical'
+  priority: varchar("priority", { length: 20 }).default("medium").notNull(), // 'low', 'medium', 'high', 'urgent'
+  status: varchar("status", { length: 20 }).default("open").notNull(), // 'open', 'in_progress', 'waiting_response', 'resolved', 'closed'
+  assignedTo: integer("assigned_to"), // Support team member ID (optional)
+  attachments: jsonb("attachments"), // Array of file URLs/paths
+  tags: jsonb("tags"), // Array of tags for categorization
+  // Customer satisfaction
+  satisfactionRating: integer("satisfaction_rating"), // 1-5 stars
+  satisfactionComment: text("satisfaction_comment"),
+  // Tracking
+  firstResponseAt: timestamp("first_response_at"),
+  resolvedAt: timestamp("resolved_at"),
+  closedAt: timestamp("closed_at"),
+  lastUpdatedBy: integer("last_updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Support ticket messages/comments
+export const supportTicketMessages = pgTable("support_ticket_messages", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").references(() => supportTickets.id).notNull(),
+  userId: integer("user_id").references(() => users.id),
+  senderType: varchar("sender_type", { length: 20 }).notNull(), // 'user', 'support', 'system'
+  senderName: varchar("sender_name", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  attachments: jsonb("attachments"), // Array of file URLs/paths
+  isInternal: boolean("is_internal").default(false).notNull(), // Internal notes for support team
+  messageType: varchar("message_type", { length: 20 }).default("reply").notNull(), // 'reply', 'note', 'status_change'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Customer accounts for storefront
@@ -670,8 +742,90 @@ export type InsertStorefrontBanner = typeof storefrontBanners.$inferInsert;
 export type ThemeCustomization = typeof themeCustomizations.$inferSelect;
 export type InsertThemeCustomization = typeof themeCustomizations.$inferInsert;
 
+// User profile and support ticket schemas
+export const insertUserProfileSchema = createInsertSchema(userProfiles);
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ 
+  id: true, 
+  ticketNumber: true,
+  createdAt: true, 
+  updatedAt: true 
+});
+export const insertSupportTicketMessageSchema = createInsertSchema(supportTicketMessages).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+// Additional schemas for user management
+export const userPermissionSchema = z.object({
+  canManageProducts: z.boolean().default(false),
+  canManageOrders: z.boolean().default(false),
+  canViewFinancials: z.boolean().default(false),
+  canManageUsers: z.boolean().default(false),
+  canManageSettings: z.boolean().default(false),
+  canManageThemes: z.boolean().default(false),
+  canManageBanners: z.boolean().default(false),
+  canAccessSupport: z.boolean().default(true),
+});
+
+export const createUserSchema = z.object({
+  email: z.string().email("Email inválido"),
+  fullName: z.string().min(1, "Nome completo é obrigatório"),
+  document: z.string().min(11, "Documento inválido"),
+  documentType: z.enum(["cpf", "cnpj"]),
+  phone: z.string().optional(),
+  role: z.enum(["admin", "merchant"]).default("merchant"),
+  jobTitle: z.string().optional(),
+  accessLevel: z.enum(["full", "limited", "readonly"]).default("limited"),
+  permissions: userPermissionSchema,
+});
+
+export const updateUserSchema = createUserSchema.partial().extend({
+  id: z.number(),
+  isActive: z.boolean().optional(),
+});
+
+export const supportTicketCreateSchema = z.object({
+  title: z.string().min(1, "Título é obrigatório"),
+  description: z.string().min(10, "Descrição deve ter pelo menos 10 caracteres"),
+  category: z.enum(["bug", "feature", "support", "billing", "technical"]),
+  priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+  attachments: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+export const supportTicketUpdateSchema = z.object({
+  status: z.enum(["open", "in_progress", "waiting_response", "resolved", "closed"]).optional(),
+  priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  assignedTo: z.number().optional(),
+  satisfactionRating: z.number().min(1).max(5).optional(),
+  satisfactionComment: z.string().optional(),
+});
+
+export const supportMessageCreateSchema = z.object({
+  message: z.string().min(1, "Mensagem é obrigatória"),
+  attachments: z.array(z.string()).optional(),
+  isInternal: z.boolean().default(false),
+  messageType: z.enum(["reply", "note", "status_change"]).default("reply"),
+});
+
 export type LoginData = z.infer<typeof loginSchema>;
 export type TenantRegistrationData = z.infer<typeof tenantRegistrationSchema>;
 export type CustomerLoginData = z.infer<typeof customerLoginSchema>;
 export type CustomerRegisterData = z.infer<typeof customerRegisterSchema>;
 export type SocialLoginData = z.infer<typeof socialLoginSchema>;
+
+// User profile types
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
+export type CreateUserData = z.infer<typeof createUserSchema>;
+export type UpdateUserData = z.infer<typeof updateUserSchema>;
+export type UserPermissions = z.infer<typeof userPermissionSchema>;
+
+// Support ticket types
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicketMessage = typeof supportTicketMessages.$inferSelect;
+export type InsertSupportTicketMessage = z.infer<typeof insertSupportTicketMessageSchema>;
+export type CreateSupportTicketData = z.infer<typeof supportTicketCreateSchema>;
+export type UpdateSupportTicketData = z.infer<typeof supportTicketUpdateSchema>;
+export type CreateSupportMessageData = z.infer<typeof supportMessageCreateSchema>;

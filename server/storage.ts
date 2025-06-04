@@ -1,6 +1,9 @@
 import { 
   tenants, 
   users, 
+  userProfiles,
+  supportTickets,
+  supportTicketMessages,
   brands,
   productCategories,
   products,
@@ -11,10 +14,23 @@ import {
   orders,
   notifications,
   notificationPreferences,
+  customers,
+  customerAddresses,
   type Tenant, 
   type User, 
   type InsertUser,
   type InsertTenant,
+  type UserProfile,
+  type InsertUserProfile,
+  type CreateUserData,
+  type UpdateUserData,
+  type SupportTicket,
+  type InsertSupportTicket,
+  type CreateSupportTicketData,
+  type UpdateSupportTicketData,
+  type SupportTicketMessage,
+  type InsertSupportTicketMessage,
+  type CreateSupportMessageData,
   type Brand,
   type InsertBrand,
   type ProductCategory,
@@ -35,6 +51,10 @@ import {
   type InsertNotification,
   type NotificationPreferences,
   type InsertNotificationPreferences,
+  type Customer,
+  type InsertCustomer,
+  type CustomerAddress,
+  type InsertCustomerAddress,
   type TenantRegistrationData
 } from "@shared/schema";
 import { db } from "./db";
@@ -126,6 +146,25 @@ export interface IStorage {
   createCustomerAddress(address: InsertCustomerAddress): Promise<CustomerAddress>;
   updateCustomerAddress(id: number, customerId: number, address: Partial<InsertCustomerAddress>): Promise<CustomerAddress>;
   deleteCustomerAddress(id: number, customerId: number): Promise<void>;
+
+  // User profile management
+  getUserProfile(userId: number): Promise<UserProfile | undefined>;
+  getUsersByTenantId(tenantId: number): Promise<(User & { profile?: UserProfile })[]>;
+  createUserWithProfile(userData: CreateUserData, tenantId: number, createdById: number): Promise<{ user: User; profile: UserProfile }>;
+  updateUserProfile(userId: number, userData: UpdateUserData): Promise<{ user: User; profile: UserProfile }>;
+  updateUserPermissions(userId: number, permissions: Partial<UserProfile>): Promise<UserProfile>;
+  deactivateUser(userId: number): Promise<User>;
+  getUserActivityLog(userId: number, tenantId: number): Promise<any[]>;
+
+  // Support ticket system
+  getSupportTicketsByTenantId(tenantId: number): Promise<SupportTicket[]>;
+  getSupportTicketById(ticketId: number, tenantId: number): Promise<SupportTicket | undefined>;
+  createSupportTicket(ticketData: CreateSupportTicketData, userId: number, tenantId: number): Promise<SupportTicket>;
+  updateSupportTicket(ticketId: number, updateData: UpdateSupportTicketData): Promise<SupportTicket>;
+  getSupportTicketMessages(ticketId: number): Promise<SupportTicketMessage[]>;
+  createSupportTicketMessage(ticketId: number, messageData: CreateSupportMessageData, userId: number, senderName: string): Promise<SupportTicketMessage>;
+  closeSupportTicket(ticketId: number, userId: number): Promise<SupportTicket>;
+  rateSupportTicket(ticketId: number, rating: number, comment?: string): Promise<SupportTicket>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -571,6 +610,251 @@ export class DatabaseStorage implements IStorage {
         eq(customerAddresses.id, id),
         eq(customerAddresses.customerId, customerId)
       ));
+  }
+
+  // User profile management implementation
+  async getUserProfile(userId: number): Promise<UserProfile | undefined> {
+    const [profile] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId));
+    return profile;
+  }
+
+  async getUsersByTenantId(tenantId: number): Promise<(User & { profile?: UserProfile })[]> {
+    const usersWithProfiles = await db
+      .select()
+      .from(users)
+      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .where(eq(users.tenantId, tenantId));
+
+    return usersWithProfiles.map(row => ({
+      ...row.users,
+      profile: row.user_profiles || undefined
+    }));
+  }
+
+  async createUserWithProfile(userData: CreateUserData, tenantId: number, createdById: number): Promise<{ user: User; profile: UserProfile }> {
+    const hashedPassword = await Bun.password.hash(userData.email + "_temp_password"); // Generate temporary password
+    
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: userData.email,
+        password: hashedPassword,
+        fullName: userData.fullName,
+        document: userData.document,
+        documentType: userData.documentType,
+        phone: userData.phone,
+        role: userData.role,
+        tenantId,
+        createdBy: createdById,
+        isActive: true,
+      })
+      .returning();
+
+    const [profile] = await db
+      .insert(userProfiles)
+      .values({
+        userId: user.id,
+        tenantId,
+        accessLevel: userData.accessLevel,
+        jobTitle: userData.jobTitle,
+        canManageProducts: userData.permissions.canManageProducts,
+        canManageOrders: userData.permissions.canManageOrders,
+        canViewFinancials: userData.permissions.canViewFinancials,
+        canManageUsers: userData.permissions.canManageUsers,
+        canManageSettings: userData.permissions.canManageSettings,
+        canManageThemes: userData.permissions.canManageThemes,
+        canManageBanners: userData.permissions.canManageBanners,
+        canAccessSupport: userData.permissions.canAccessSupport,
+      })
+      .returning();
+
+    return { user, profile };
+  }
+
+  async updateUserProfile(userId: number, userData: UpdateUserData): Promise<{ user: User; profile: UserProfile }> {
+    const { permissions, ...userUpdateData } = userData;
+
+    // Update user table
+    const [user] = await db
+      .update(users)
+      .set({
+        ...userUpdateData,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    // Update profile if permissions are provided
+    let profile;
+    if (permissions) {
+      [profile] = await db
+        .update(userProfiles)
+        .set({
+          ...permissions,
+          updatedAt: new Date(),
+        })
+        .where(eq(userProfiles.userId, userId))
+        .returning();
+    } else {
+      const [existingProfile] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId));
+      profile = existingProfile;
+    }
+
+    if (!user || !profile) {
+      throw new Error("User or profile not found");
+    }
+
+    return { user, profile };
+  }
+
+  async updateUserPermissions(userId: number, permissions: Partial<UserProfile>): Promise<UserProfile> {
+    const [profile] = await db
+      .update(userProfiles)
+      .set({
+        ...permissions,
+        updatedAt: new Date(),
+      })
+      .where(eq(userProfiles.userId, userId))
+      .returning();
+
+    if (!profile) {
+      throw new Error("User profile not found");
+    }
+
+    return profile;
+  }
+
+  async deactivateUser(userId: number): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        isActive: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return user;
+  }
+
+  async getUserActivityLog(userId: number, tenantId: number): Promise<any[]> {
+    // For now, return empty array - this would be implemented with an activity log table
+    return [];
+  }
+
+  // Support ticket system implementation
+  async getSupportTicketsByTenantId(tenantId: number): Promise<SupportTicket[]> {
+    return await db
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.tenantId, tenantId))
+      .orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getSupportTicketById(ticketId: number, tenantId: number): Promise<SupportTicket | undefined> {
+    const [ticket] = await db
+      .select()
+      .from(supportTickets)
+      .where(and(
+        eq(supportTickets.id, ticketId),
+        eq(supportTickets.tenantId, tenantId)
+      ));
+    return ticket;
+  }
+
+  async createSupportTicket(ticketData: CreateSupportTicketData, userId: number, tenantId: number): Promise<SupportTicket> {
+    const ticketNumber = `SUP-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
+    const [ticket] = await db
+      .insert(supportTickets)
+      .values({
+        ticketNumber,
+        tenantId,
+        userId,
+        title: ticketData.title,
+        description: ticketData.description,
+        category: ticketData.category,
+        priority: ticketData.priority,
+        status: "open",
+        attachments: ticketData.attachments ? JSON.stringify(ticketData.attachments) : null,
+        tags: ticketData.tags ? JSON.stringify(ticketData.tags) : null,
+      })
+      .returning();
+
+    return ticket;
+  }
+
+  async updateSupportTicket(ticketId: number, updateData: UpdateSupportTicketData): Promise<SupportTicket> {
+    const updateFields: any = { ...updateData, updatedAt: new Date() };
+
+    if (updateData.status === "resolved" && !updateData.satisfactionRating) {
+      updateFields.resolvedAt = new Date();
+    }
+    
+    if (updateData.status === "closed") {
+      updateFields.closedAt = new Date();
+    }
+
+    const [ticket] = await db
+      .update(supportTickets)
+      .set(updateFields)
+      .where(eq(supportTickets.id, ticketId))
+      .returning();
+
+    if (!ticket) {
+      throw new Error("Support ticket not found");
+    }
+
+    return ticket;
+  }
+
+  async getSupportTicketMessages(ticketId: number): Promise<SupportTicketMessage[]> {
+    return await db
+      .select()
+      .from(supportTicketMessages)
+      .where(eq(supportTicketMessages.ticketId, ticketId))
+      .orderBy(supportTicketMessages.createdAt);
+  }
+
+  async createSupportTicketMessage(ticketId: number, messageData: CreateSupportMessageData, userId: number, senderName: string): Promise<SupportTicketMessage> {
+    const [message] = await db
+      .insert(supportTicketMessages)
+      .values({
+        ticketId,
+        userId,
+        senderType: "user",
+        senderName,
+        message: messageData.message,
+        attachments: messageData.attachments ? JSON.stringify(messageData.attachments) : null,
+        isInternal: messageData.isInternal,
+        messageType: messageData.messageType,
+      })
+      .returning();
+
+    // Update ticket's last updated timestamp
+    await db
+      .update(supportTickets)
+      .set({ updatedAt: new Date() })
+      .where(eq(supportTickets.id, ticketId));
+
+    return message;
+  }
+
+  async closeSupportTicket(ticketId: number, userId: number): Promise<SupportTicket> {
+    return await this.updateSupportTicket(ticketId, {
+      status: "closed",
+    });
+  }
+
+  async rateSupportTicket(ticketId: number, rating: number, comment?: string): Promise<SupportTicket> {
+    return await this.updateSupportTicket(ticketId, {
+      satisfactionRating: rating,
+      satisfactionComment: comment,
+    });
   }
 }
 
