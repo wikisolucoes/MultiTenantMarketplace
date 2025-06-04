@@ -113,6 +113,19 @@ export interface IStorage {
   markAllNotificationsAsRead(userId: number, tenantId: number): Promise<void>;
   getNotificationPreferences(userId: number, tenantId: number): Promise<NotificationPreferences | undefined>;
   updateNotificationPreferences(userId: number, tenantId: number, preferences: Partial<InsertNotificationPreferences>): Promise<NotificationPreferences>;
+
+  // Customer authentication
+  getCustomerByEmail(email: string, tenantId: number): Promise<Customer | undefined>;
+  getCustomerById(id: number, tenantId: number): Promise<Customer | undefined>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: number, tenantId: number, customer: Partial<InsertCustomer>): Promise<Customer>;
+  getCustomerBySocialId(provider: string, providerId: string, tenantId: number): Promise<Customer | undefined>;
+  
+  // Customer addresses
+  getCustomerAddresses(customerId: number): Promise<CustomerAddress[]>;
+  createCustomerAddress(address: InsertCustomerAddress): Promise<CustomerAddress>;
+  updateCustomerAddress(id: number, customerId: number, address: Partial<InsertCustomerAddress>): Promise<CustomerAddress>;
+  deleteCustomerAddress(id: number, customerId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -434,6 +447,130 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return result;
+  }
+
+  // Customer authentication methods
+  async getCustomerByEmail(email: string, tenantId: number): Promise<Customer | undefined> {
+    const [customer] = await db
+      .select()
+      .from(customers)
+      .where(and(
+        eq(customers.email, email),
+        eq(customers.tenantId, tenantId)
+      ));
+    return customer || undefined;
+  }
+
+  async getCustomerById(id: number, tenantId: number): Promise<Customer | undefined> {
+    const [customer] = await db
+      .select()
+      .from(customers)
+      .where(and(
+        eq(customers.id, id),
+        eq(customers.tenantId, tenantId)
+      ));
+    return customer || undefined;
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    const [newCustomer] = await db
+      .insert(customers)
+      .values(customer)
+      .returning();
+    return newCustomer;
+  }
+
+  async updateCustomer(id: number, tenantId: number, customer: Partial<InsertCustomer>): Promise<Customer> {
+    const [updated] = await db
+      .update(customers)
+      .set(customer)
+      .where(and(
+        eq(customers.id, id),
+        eq(customers.tenantId, tenantId)
+      ))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Customer not found");
+    }
+    
+    return updated;
+  }
+
+  async getCustomerBySocialId(provider: string, providerId: string, tenantId: number): Promise<Customer | undefined> {
+    let whereCondition;
+    
+    switch (provider) {
+      case 'google':
+        whereCondition = and(
+          eq(customers.googleId, providerId),
+          eq(customers.tenantId, tenantId)
+        );
+        break;
+      case 'apple':
+        whereCondition = and(
+          eq(customers.appleId, providerId),
+          eq(customers.tenantId, tenantId)
+        );
+        break;
+      case 'facebook':
+        whereCondition = and(
+          eq(customers.facebookId, providerId),
+          eq(customers.tenantId, tenantId)
+        );
+        break;
+      default:
+        return undefined;
+    }
+
+    const [customer] = await db
+      .select()
+      .from(customers)
+      .where(whereCondition);
+    return customer || undefined;
+  }
+
+  // Customer address methods
+  async getCustomerAddresses(customerId: number): Promise<CustomerAddress[]> {
+    return await db
+      .select()
+      .from(customerAddresses)
+      .where(eq(customerAddresses.customerId, customerId))
+      .orderBy(desc(customerAddresses.isDefault), desc(customerAddresses.createdAt));
+  }
+
+  async createCustomerAddress(address: InsertCustomerAddress): Promise<CustomerAddress> {
+    const [newAddress] = await db
+      .insert(customerAddresses)
+      .values(address)
+      .returning();
+    return newAddress;
+  }
+
+  async updateCustomerAddress(id: number, customerId: number, address: Partial<InsertCustomerAddress>): Promise<CustomerAddress> {
+    const [updated] = await db
+      .update(customerAddresses)
+      .set(address)
+      .where(and(
+        eq(customerAddresses.id, id),
+        eq(customerAddresses.customerId, customerId)
+      ))
+      .returning();
+    
+    if (!updated) {
+      throw new Error("Customer address not found");
+    }
+    
+    return updated;
+  }
+
+  async deleteCustomerAddress(id: number, customerId: number): Promise<void> {
+    await db
+      .delete(customerAddresses)
+      .where(and(
+        eq(customerAddresses.id, id),
+        eq(customerAddresses.customerId, customerId)
+      ));
   }
 }
 

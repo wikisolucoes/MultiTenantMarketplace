@@ -749,6 +749,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer authentication routes for storefront
+  app.post("/api/storefront/:subdomain/auth/login", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { email, password } = req.body;
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      // Find customer by email
+      const customer = await storage.getCustomerByEmail(email, tenantId);
+      if (!customer) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Verify password
+      const isValid = await bcrypt.compare(password, customer.password || '');
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Update last login
+      await storage.updateCustomer(customer.id, tenantId, {
+        lastLoginAt: new Date()
+      });
+      
+      // Return customer data (excluding password)
+      const { password: _, ...customerData } = customer;
+      res.json({ customer: customerData });
+    } catch (error) {
+      console.error("Customer login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/storefront/:subdomain/auth/register", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { firstName, lastName, email, password, phone, cpf, birthDate, gender } = req.body;
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      // Check if customer already exists
+      const existingCustomer = await storage.getCustomerByEmail(email, tenantId);
+      if (existingCustomer) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Create customer
+      const customer = await storage.createCustomer({
+        tenantId,
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        phone,
+        cpf,
+        birthDate: birthDate ? new Date(birthDate) : undefined,
+        gender,
+        isActive: true,
+        emailVerified: false,
+        lastLoginAt: new Date()
+      });
+      
+      // Return customer data (excluding password)
+      const { password: _, ...customerData } = customer;
+      res.status(201).json({ customer: customerData });
+    } catch (error) {
+      console.error("Customer registration error:", error);
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  app.post("/api/storefront/:subdomain/auth/social", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { provider, providerId, email, firstName, lastName } = req.body;
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      // Check if customer exists with social ID
+      let customer = await storage.getCustomerBySocialId(provider, providerId, tenantId);
+      
+      if (!customer) {
+        // Check if customer exists with email
+        customer = await storage.getCustomerByEmail(email, tenantId);
+        
+        if (customer) {
+          // Link social account to existing customer
+          const updateData: any = { lastLoginAt: new Date() };
+          if (provider === 'google') updateData.googleId = providerId;
+          else if (provider === 'apple') updateData.appleId = providerId;
+          else if (provider === 'facebook') updateData.facebookId = providerId;
+          
+          customer = await storage.updateCustomer(customer.id, tenantId, updateData);
+        } else {
+          // Create new customer with social account
+          const createData: any = {
+            tenantId,
+            email,
+            firstName,
+            lastName,
+            isActive: true,
+            emailVerified: true,
+            lastLoginAt: new Date()
+          };
+          
+          if (provider === 'google') createData.googleId = providerId;
+          else if (provider === 'apple') createData.appleId = providerId;
+          else if (provider === 'facebook') createData.facebookId = providerId;
+          
+          customer = await storage.createCustomer(createData);
+        }
+      } else {
+        // Update last login for existing social customer
+        customer = await storage.updateCustomer(customer.id, tenantId, {
+          lastLoginAt: new Date()
+        });
+      }
+      
+      // Return customer data (excluding password)
+      const { password: _, ...customerData } = customer;
+      res.json({ customer: customerData });
+    } catch (error) {
+      console.error("Social login error:", error);
+      res.status(500).json({ message: "Social login failed" });
+    }
+  });
+
+  app.get("/api/storefront/:subdomain/auth/customer", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const customerId = req.headers['x-customer-id'];
+      
+      if (!customerId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      const customer = await storage.getCustomerById(Number(customerId), tenantId);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      
+      // Return customer data (excluding password)
+      const { password: _, ...customerData } = customer;
+      res.json({ customer: customerData });
+    } catch (error) {
+      console.error("Get customer error:", error);
+      res.status(500).json({ message: "Failed to get customer" });
+    }
+  });
+
   // Demo route to test notifications
   app.post("/api/demo/notification", async (req, res) => {
     try {
