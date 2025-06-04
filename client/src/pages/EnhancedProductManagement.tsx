@@ -836,26 +836,108 @@ export default function EnhancedProductManagement() {
                       </Button>
                     </div>
                     <p className="text-sm text-gray-600">
-                      Configure diferentes variações como tamanho, cor, etc.
+                      Configure diferentes variações como tamanho, cor, etc. Cada variação pode ter sua própria imagem.
                     </p>
                     
-                    <div className="border rounded-lg p-4">
-                      <div className="grid grid-cols-4 gap-4">
-                        <div>
-                          <Label>Tipo</Label>
-                          <Input placeholder="ex: Tamanho" />
+                    <div className="space-y-4">
+                      {/* Variant Type Examples */}
+                      <div className="border rounded-lg p-4">
+                        <div className="grid grid-cols-6 gap-4 items-end">
+                          <div>
+                            <Label>Tipo</Label>
+                            <Input placeholder="ex: Cor" />
+                          </div>
+                          <div>
+                            <Label>Valor</Label>
+                            <Input placeholder="ex: Azul" />
+                          </div>
+                          <div>
+                            <Label>Preço Extra</Label>
+                            <Input placeholder="0.00" />
+                          </div>
+                          <div>
+                            <Label>Estoque</Label>
+                            <Input type="number" placeholder="0" />
+                          </div>
+                          <div>
+                            <Label>Imagem da Variação</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar imagem" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="general">Usar imagens gerais</SelectItem>
+                                {imageFields.map((img, idx) => (
+                                  <SelectItem key={idx} value={img.url}>
+                                    Imagem {idx + 1}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Button type="button" variant="outline" size="sm">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div>
-                          <Label>Valor</Label>
-                          <Input placeholder="ex: M" />
+                      </div>
+
+                      <div className="border rounded-lg p-4">
+                        <div className="grid grid-cols-6 gap-4 items-end">
+                          <div>
+                            <Label>Tipo</Label>
+                            <Input placeholder="ex: Tamanho" />
+                          </div>
+                          <div>
+                            <Label>Valor</Label>
+                            <Input placeholder="ex: M" />
+                          </div>
+                          <div>
+                            <Label>Preço Extra</Label>
+                            <Input placeholder="5.00" />
+                          </div>
+                          <div>
+                            <Label>Estoque</Label>
+                            <Input type="number" placeholder="20" />
+                          </div>
+                          <div>
+                            <Label>Imagem da Variação</Label>
+                            <Select>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecionar imagem" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="general">Usar imagens gerais</SelectItem>
+                                {imageFields.map((img, idx) => (
+                                  <SelectItem key={idx} value={img.url}>
+                                    Imagem {idx + 1}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Button type="button" variant="outline" size="sm">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div>
-                          <Label>Preço Extra</Label>
-                          <Input placeholder="0.00" />
-                        </div>
-                        <div>
-                          <Label>Estoque</Label>
-                          <Input type="number" placeholder="0" />
+                      </div>
+
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mt-0.5">
+                            <span className="text-blue-600 text-sm font-medium">i</span>
+                          </div>
+                          <div className="flex-1">
+                            <h5 className="font-medium text-blue-900">Imagens por Variação</h5>
+                            <p className="text-sm text-blue-700 mt-1">
+                              Quando o cliente selecionar uma variação específica no storefront, 
+                              a imagem associada será exibida automaticamente. Se nenhuma imagem 
+                              específica for selecionada, as imagens gerais do produto serão usadas.
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
