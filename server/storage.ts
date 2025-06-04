@@ -9,6 +9,8 @@ import {
   productPromotions,
   bulkPricingRules,
   orders,
+  notifications,
+  notificationPreferences,
   type Tenant, 
   type User, 
   type InsertUser,
@@ -29,6 +31,10 @@ import {
   type InsertBulkPricingRule,
   type Order,
   type InsertOrder,
+  type Notification,
+  type InsertNotification,
+  type NotificationPreferences,
+  type InsertNotificationPreferences,
   type TenantRegistrationData
 } from "@shared/schema";
 import { db } from "./db";
@@ -99,6 +105,14 @@ export interface IStorage {
   getOrdersByTenantId(tenantId: number): Promise<Order[]>;
   createOrder(order: InsertOrder): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
+  
+  // Notifications
+  getNotificationsByUserId(userId: number, tenantId: number): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(notificationId: number): Promise<void>;
+  markAllNotificationsAsRead(userId: number, tenantId: number): Promise<void>;
+  getNotificationPreferences(userId: number, tenantId: number): Promise<NotificationPreferences | undefined>;
+  updateNotificationPreferences(userId: number, tenantId: number, preferences: Partial<InsertNotificationPreferences>): Promise<NotificationPreferences>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -367,6 +381,59 @@ export class DatabaseStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return updatedOrder;
+  }
+
+  // Notification methods
+  async getNotificationsByUserId(userId: number, tenantId: number): Promise<Notification[]> {
+    const result = await db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.tenantId, tenantId)))
+      .orderBy(desc(notifications.createdAt))
+      .limit(50);
+    return result;
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [result] = await db
+      .insert(notifications)
+      .values(notification)
+      .returning();
+    return result;
+  }
+
+  async markNotificationAsRead(notificationId: number): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true, updatedAt: new Date() })
+      .where(eq(notifications.id, notificationId));
+  }
+
+  async markAllNotificationsAsRead(userId: number, tenantId: number): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true, updatedAt: new Date() })
+      .where(and(eq(notifications.userId, userId), eq(notifications.tenantId, tenantId)));
+  }
+
+  async getNotificationPreferences(userId: number, tenantId: number): Promise<NotificationPreferences | undefined> {
+    const [result] = await db
+      .select()
+      .from(notificationPreferences)
+      .where(and(eq(notificationPreferences.userId, userId), eq(notificationPreferences.tenantId, tenantId)));
+    return result;
+  }
+
+  async updateNotificationPreferences(userId: number, tenantId: number, preferences: Partial<InsertNotificationPreferences>): Promise<NotificationPreferences> {
+    const [result] = await db
+      .insert(notificationPreferences)
+      .values({ ...preferences, userId, tenantId })
+      .onConflictDoUpdate({
+        target: [notificationPreferences.userId, notificationPreferences.tenantId],
+        set: { ...preferences, updatedAt: new Date() }
+      })
+      .returning();
+    return result;
   }
 }
 

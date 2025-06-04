@@ -653,6 +653,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Demo route to test notifications
+  app.post("/api/demo/notification", async (req, res) => {
+    try {
+      const notification = await storage.createNotification({
+        tenantId: 5,
+        userId: 1,
+        type: "order",
+        title: "Novo Pedido Recebido",
+        message: "Pedido #12345 foi criado no valor de R$ 299,99",
+        priority: "high",
+        actionUrl: "/orders/12345",
+        data: { orderId: 12345, amount: 299.99 }
+      });
+      
+      // Send real-time notification
+      const server = httpServer as any;
+      if (server.sendNotification) {
+        server.sendNotification(5, 1, "merchant", notification);
+      }
+      
+      res.json({ success: true, notification });
+    } catch (error) {
+      console.error("Error creating demo notification:", error);
+      res.status(500).json({ message: "Failed to create demo notification" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // WebSocket Server for real-time notifications
