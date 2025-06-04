@@ -36,7 +36,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { removeAuthToken, getUser } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { FinancialStats, Product, Order, Withdrawal } from "@/types/api";
+import { FinancialStats, Product, Order } from "@/types/api";
+import EnhancedProductManagement from "@/pages/EnhancedProductManagement";
 import { 
   LayoutDashboard,
   Package,
@@ -841,75 +842,9 @@ export default function MerchantDashboard() {
               </div>
             )}
 
-            {/* Products Section */}
+            {/* Enhanced Products Section */}
             {activeSection === "products" && (
-              <Card>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle>Produtos</CardTitle>
-                    <Button onClick={handleNewProduct}>
-                      <Package className="mr-2 h-4 w-4" />
-                      Novo Produto
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {productsLoading ? (
-                    <div className="text-center py-8 text-muted-foreground">Carregando produtos...</div>
-                  ) : !products || products.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Package className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <p>Nenhum produto cadastrado</p>
-                      <Button className="mt-4" onClick={handleNewProduct}>Cadastrar primeiro produto</Button>
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Produto</TableHead>
-                          <TableHead>Preço</TableHead>
-                          <TableHead>Estoque</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Criado em</TableHead>
-                          <TableHead>Ações</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {products.map((product) => (
-                          <TableRow key={product.id}>
-                            <TableCell>
-                              <div>
-                                <div className="font-medium">{product.name}</div>
-                                {product.description && (
-                                  <div className="text-sm text-muted-foreground">
-                                    {product.description.substring(0, 50)}...
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>{formatCurrency(product.price)}</TableCell>
-                            <TableCell>
-                              <span className={product.stock === 0 ? "text-red-600" : ""}>
-                                {product.stock}
-                              </span>
-                            </TableCell>
-                            <TableCell>{getStatusBadge(product.isActive ? "active" : "inactive")}</TableCell>
-                            <TableCell>{formatDate(product.createdAt.toString())}</TableCell>
-                            <TableCell>
-                              <div className="flex space-x-2">
-                                <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)}>Editar</Button>
-                                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteProduct(product.id)}>
-                                  Excluir
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
+              <EnhancedProductManagement />
             )}
 
             {/* Orders Section */}
