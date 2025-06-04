@@ -67,31 +67,29 @@ export const productCategories = pgTable("product_categories", {
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
+  name: text("name").notNull(),
   description: text("description"),
-  sku: varchar("sku", { length: 100 }),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
-  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   stock: integer("stock").default(0).notNull(),
-  minStock: integer("min_stock").default(0),
-  maxStock: integer("max_stock"),
   brandId: integer("brand_id").references(() => brands.id),
   categoryId: integer("category_id").references(() => productCategories.id),
-  weight: decimal("weight", { precision: 8, scale: 3 }),
-  dimensions: jsonb("dimensions"), // {length, width, height}
   isActive: boolean("is_active").default(true).notNull(),
-  isFeatured: boolean("is_featured").default(false).notNull(),
-  tags: text("tags").array(),
   // Brazilian tax fields
-  ncmCode: varchar("ncm_code", { length: 10 }),
-  cfopCode: varchar("cfop_code", { length: 4 }),
+  ncm: varchar("ncm", { length: 10 }),
+  cest: varchar("cest", { length: 7 }),
+  cfop: varchar("cfop", { length: 4 }),
+  icmsOrigin: varchar("icms_origin", { length: 1 }),
+  icmsCst: varchar("icms_cst", { length: 3 }),
   icmsRate: decimal("icms_rate", { precision: 5, scale: 2 }),
+  ipiCst: varchar("ipi_cst", { length: 2 }),
   ipiRate: decimal("ipi_rate", { precision: 5, scale: 2 }),
+  pisCst: varchar("pis_cst", { length: 2 }),
   pisRate: decimal("pis_rate", { precision: 5, scale: 2 }),
+  cofinsCst: varchar("cofins_cst", { length: 2 }),
   cofinsRate: decimal("cofins_rate", { precision: 5, scale: 2 }),
-  origin: varchar("origin", { length: 1 }), // Tax origin (0-8)
-  cest: varchar("cest", { length: 7 }), // CEST code for ICMS-ST
+  productUnit: varchar("product_unit", { length: 10 }),
+  grossWeight: decimal("gross_weight", { precision: 8, scale: 3 }),
+  netWeight: decimal("net_weight", { precision: 8, scale: 3 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -152,11 +150,28 @@ export const bulkPricingRules = pgTable("bulk_pricing_rules", {
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  productId: integer("product_id").references(() => products.id).notNull(),
-  quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
-  status: varchar("status", { length: 20 }).default("pending").notNull(), // 'pending', 'processing', 'shipped', 'delivered', 'cancelled'
+  customerName: text("customer_name"),
+  customerEmail: text("customer_email"),
+  customerDocument: varchar("customer_document", { length: 20 }),
+  customerPhone: varchar("customer_phone", { length: 20 }),
+  customerAddress: text("customer_address"),
+  customerCity: text("customer_city"),
+  customerState: text("customer_state"),
+  customerZipCode: text("customer_zip_code"),
+  total: decimal("total", { precision: 10, scale: 2 }),
+  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }),
+  status: text("status").default("pending").notNull(),
+  paymentMethod: text("payment_method"),
+  paymentStatus: text("payment_status"),
+  celcoinTransactionId: text("celcoin_transaction_id"),
+  shippingAddress: jsonb("shipping_address"),
+  items: jsonb("items"),
+  nfeKey: text("nfe_key"),
+  nfeNumber: text("nfe_number"),
+  nfeStatus: text("nfe_status"),
+  nfeXml: text("nfe_xml"),
+  nfeProtocol: text("nfe_protocol"),
+  nfeErrorMessage: text("nfe_error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -221,7 +236,6 @@ export const bulkPricingRulesRelations = relations(bulkPricingRules, ({ one }) =
 
 export const ordersRelations = relations(orders, ({ one }) => ({
   tenant: one(tenants, { fields: [orders.tenantId], references: [tenants.id] }),
-  product: one(products, { fields: [orders.productId], references: [products.id] }),
 }));
 
 // Zod schemas for validation
