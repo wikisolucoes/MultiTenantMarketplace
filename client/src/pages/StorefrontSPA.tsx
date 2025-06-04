@@ -133,6 +133,7 @@ export default function StorefrontSPA() {
   };
 
   const handleNavigation = (page: string, productId?: number, filters?: any) => {
+    console.log("Navigating to:", page); // Debug log
     setCurrentPage(page);
     if (productId) {
       setSelectedProductId(productId);
@@ -142,6 +143,8 @@ export default function StorefrontSPA() {
       setBrandFilter(filters.brand || "");
       setShowPromotions(filters.promotion || false);
     }
+    // Scroll to top when navigating
+    window.scrollTo(0, 0);
   };
 
   if (tenantLoading) {
