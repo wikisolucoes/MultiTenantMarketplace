@@ -48,6 +48,31 @@ const productSchema = z.object({
   stock: z.number().min(0, "Estoque deve ser não negativo"),
   minStock: z.number().min(0, "Estoque mínimo deve ser não negativo"),
   maxStock: z.number().min(1, "Estoque máximo deve ser positivo"),
+  
+  // SEO fields
+  slug: z.string().optional(),
+  metaTitle: z.string().optional(),
+  metaDescription: z.string().optional(),
+  metaKeywords: z.string().optional(),
+  
+  // Customer type pricing
+  priceB2B: z.string().optional(),
+  priceB2C: z.string().optional(),
+  
+  // Promotional pricing
+  promotionalPrice: z.string().optional(),
+  promotionalStartDate: z.string().optional(),
+  promotionalEndDate: z.string().optional(),
+  
+  // Reward points
+  rewardPointsB2B: z.number().min(0).optional(),
+  rewardPointsB2C: z.number().min(0).optional(),
+  
+  // Availability and settings
+  availabilityDate: z.string().optional(),
+  requiresShipping: z.boolean().optional(),
+  isDigital: z.boolean().optional(),
+  hasUnlimitedStock: z.boolean().optional(),
   brandId: z.number().optional(),
   categoryId: z.number().optional(),
   weight: z.string().optional(),
@@ -235,6 +260,33 @@ export default function EnhancedProductManagement() {
       categoryId: product.categoryId || "",
       brandId: product.brandId || "",
       isActive: product.isActive || true,
+      
+      // SEO fields
+      slug: product.slug || "",
+      metaTitle: product.metaTitle || "",
+      metaDescription: product.metaDescription || "",
+      metaKeywords: product.metaKeywords || "",
+      
+      // Promotional pricing
+      promotionalPrice: product.promotionalPrice?.toString() || "",
+      promotionalStartDate: product.promotionalStartDate || "",
+      promotionalEndDate: product.promotionalEndDate || "",
+      
+      // Customer type pricing
+      priceB2B: product.priceB2B?.toString() || "",
+      priceB2C: product.priceB2C?.toString() || "",
+      
+      // Reward points
+      rewardPointsB2B: product.rewardPointsB2B || 0,
+      rewardPointsB2C: product.rewardPointsB2C || 0,
+      
+      // Product availability and settings
+      availabilityDate: product.availabilityDate || "",
+      requiresShipping: product.requiresShipping !== false,
+      isDigital: product.isDigital || false,
+      hasUnlimitedStock: product.hasUnlimitedStock || false,
+      
+      // Brazilian tax fields
       ncm: product.ncm || "",
       cest: product.cest || "",
       cfop: product.cfop || "",
@@ -250,11 +302,14 @@ export default function EnhancedProductManagement() {
       productUnit: product.productUnit || "",
       grossWeight: product.grossWeight?.toString() || "",
       netWeight: product.netWeight?.toString() || "",
+      
+      // Legacy fields for compatibility
       compareAtPrice: "",
       costPrice: "",
       images: [],
       specifications: [],
-      bulkPricingRules: []
+      bulkPricingRules: [],
+      variants: []
     });
     setIsProductDialogOpen(true);
   };
@@ -333,11 +388,14 @@ export default function EnhancedProductManagement() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-5">
+                  <TabsList className="grid w-full grid-cols-8">
                     <TabsTrigger value="basic">Básico</TabsTrigger>
+                    <TabsTrigger value="seo">SEO</TabsTrigger>
+                    <TabsTrigger value="pricing">Preços</TabsTrigger>
+                    <TabsTrigger value="variants">Variações</TabsTrigger>
                     <TabsTrigger value="images">Imagens</TabsTrigger>
                     <TabsTrigger value="specs">Especificações</TabsTrigger>
-                    <TabsTrigger value="pricing">Atacado</TabsTrigger>
+                    <TabsTrigger value="settings">Configurações</TabsTrigger>
                     <TabsTrigger value="tax">Impostos</TabsTrigger>
                   </TabsList>
 
@@ -578,6 +636,231 @@ export default function EnhancedProductManagement() {
                     </div>
                   </TabsContent>
 
+                  {/* SEO Tab */}
+                  <TabsContent value="seo" className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="slug"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>URL Amigável (Slug)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="meu-produto-incrivel" {...field} />
+                          </FormControl>
+                          <FormDescription>URL personalizada para o produto</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="metaTitle"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Título SEO (Meta Title)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Título otimizado para mecanismos de busca" {...field} />
+                          </FormControl>
+                          <FormDescription>Máximo 60 caracteres</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="metaDescription"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Meta Descrição</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Descrição otimizada para aparecer nos resultados de busca..."
+                              className="min-h-[80px]"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Máximo 160 caracteres</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="metaKeywords"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Palavras-chave</FormLabel>
+                          <FormControl>
+                            <Input placeholder="palavra1, palavra2, palavra3" {...field} />
+                          </FormControl>
+                          <FormDescription>Separadas por vírgula</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </TabsContent>
+
+                  {/* Pricing Tab */}
+                  <TabsContent value="pricing" className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="priceB2C"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Preço Pessoa Física (B2C)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="0.00" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="priceB2B"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Preço Pessoa Jurídica (B2B)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="0.00" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-medium">Preço Promocional</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="promotionalPrice"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Preço Promocional</FormLabel>
+                              <FormControl>
+                                <Input placeholder="0.00" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="promotionalStartDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Data Início</FormLabel>
+                              <FormControl>
+                                <Input type="datetime-local" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="promotionalEndDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Data Fim</FormLabel>
+                              <FormControl>
+                                <Input type="datetime-local" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-medium">Pontos de Recompensa</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="rewardPointsB2C"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Pontos PF</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  placeholder="0" 
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="rewardPointsB2B"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Pontos PJ</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  placeholder="0" 
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  {/* Variants Tab */}
+                  <TabsContent value="variants" className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-medium">Variações do Produto</h4>
+                      <Button type="button" variant="outline" size="sm">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Variação
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Configure diferentes variações como tamanho, cor, etc.
+                    </p>
+                    
+                    <div className="border rounded-lg p-4">
+                      <div className="grid grid-cols-4 gap-4">
+                        <div>
+                          <Label>Tipo</Label>
+                          <Input placeholder="ex: Tamanho" />
+                        </div>
+                        <div>
+                          <Label>Valor</Label>
+                          <Input placeholder="ex: M" />
+                        </div>
+                        <div>
+                          <Label>Preço Extra</Label>
+                          <Input placeholder="0.00" />
+                        </div>
+                        <div>
+                          <Label>Estoque</Label>
+                          <Input type="number" placeholder="0" />
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+
                   {/* Images Tab */}
                   <TabsContent value="images" className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -709,6 +992,100 @@ export default function EnhancedProductManagement() {
                         <p className="text-sm">Adicione especificações técnicas do produto</p>
                       </div>
                     )}
+                  </TabsContent>
+
+                  {/* Settings Tab */}
+                  <TabsContent value="settings" className="space-y-4">
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-medium">Configurações de Disponibilidade</h4>
+                      
+                      <FormField
+                        control={form.control}
+                        name="availabilityDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Data de Disponibilidade</FormLabel>
+                            <FormControl>
+                              <Input type="datetime-local" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              Defina quando o produto ficará disponível na loja
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="isDigital"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Produto Digital</FormLabel>
+                                <FormDescription>
+                                  Produto não físico (download, serviço digital)
+                                </FormDescription>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="requiresShipping"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Requer Frete</FormLabel>
+                                <FormDescription>
+                                  Produto precisa ser enviado fisicamente
+                                </FormDescription>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="hasUnlimitedStock"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={(checked) => {
+                                  field.onChange(checked);
+                                  if (checked) {
+                                    form.setValue("stock", 999999);
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Estoque Ilimitado</FormLabel>
+                              <FormDescription>
+                                Produto sempre disponível, sem controle de estoque
+                              </FormDescription>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </TabsContent>
 
                   {/* Bulk Pricing Tab */}
