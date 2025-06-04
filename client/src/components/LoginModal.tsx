@@ -51,7 +51,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
       const response = await apiRequest("POST", "/api/auth/login", data);
-      return await response.json() as AuthResponse;
+      return (await response.json()) as AuthResponse;
     },
     onSuccess: (data) => {
       setAuthToken(data.token);
@@ -61,7 +61,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         description: `Bem-vindo, ${data.user.fullName}!`,
       });
       onClose();
-      
+
       // Redirect based on user role
       if (data.user.role === "admin") {
         window.location.href = "/admin";
@@ -99,10 +99,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   const loginAsMerchant = () => {
     form.setValue("email", "joao@exemplo.com");
-    form.setValue("password", "123456");
+    form.setValue("password", "demo123");
     loginMutation.mutate({
       email: "joao@exemplo.com",
-      password: "123456",
+      password: "demo123",
     });
   };
 
@@ -127,7 +127,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <FormItem>
                   <FormLabel>E-mail</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="seu@email.com" {...field} />
+                    <Input
+                      type="email"
+                      placeholder="seu@email.com"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -159,9 +163,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               </Button>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={loginMutation.isPending}
             >
               {loginMutation.isPending ? "Entrando..." : "Entrar"}
