@@ -74,7 +74,7 @@ function AppRouter() {
       <Route path="/notifications-demo">
         {isAuth && userRole === "merchant" ? <NotificationDemo /> : <Home />}
       </Route>
-      <Route path="/storefront*" component={StorefrontSPA} />
+      <Route path="/storefront/*" component={StorefrontSPA} />
       <Route component={NotFound} />
     </Switch>
   );
