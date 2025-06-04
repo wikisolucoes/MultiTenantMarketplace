@@ -221,34 +221,7 @@ export class DatabaseStorage implements IStorage {
 
   // Products with advanced features
   async getProductsByTenantId(tenantId: number): Promise<Product[]> {
-    return await db.select({
-      id: products.id,
-      tenantId: products.tenantId,
-      name: products.name,
-      description: products.description,
-      price: products.price,
-      stock: products.stock,
-      isActive: products.isActive,
-      createdAt: products.createdAt,
-      updatedAt: products.updatedAt,
-      categoryId: products.categoryId,
-      brandId: products.brandId,
-      ncm: products.ncm,
-      cest: products.cest,
-      cfop: products.cfop,
-      icmsOrigin: products.icmsOrigin,
-      icmsCst: products.icmsCst,
-      icmsRate: products.icmsRate,
-      ipiCst: products.ipiCst,
-      ipiRate: products.ipiRate,
-      pisCst: products.pisCst,
-      pisRate: products.pisRate,
-      cofinsCst: products.cofinsCst,
-      cofinsRate: products.cofinsRate,
-      productUnit: products.productUnit,
-      grossWeight: products.grossWeight,
-      netWeight: products.netWeight
-    }).from(products).where(eq(products.tenantId, tenantId)).orderBy(desc(products.createdAt));
+    return await db.select().from(products).where(eq(products.tenantId, tenantId)).orderBy(desc(products.createdAt));
   }
 
   async getProductWithDetails(id: number, tenantId: number): Promise<Product & { 
