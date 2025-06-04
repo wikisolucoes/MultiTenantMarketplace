@@ -375,6 +375,229 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tenant-specific API routes for merchant dashboard
+  app.get("/api/tenant/financial-stats", async (req, res) => {
+    try {
+      const tenantId = 5; // Using the demo tenant ID
+      const orders = await storage.getOrdersByTenantId(tenantId);
+      
+      // Calculate financial stats from orders
+      let grossSales = 0;
+      let pendingAmount = 0;
+      let completedAmount = 0;
+      
+      orders.forEach(order => {
+        const orderTotal = parseFloat(order.totalPrice);
+        grossSales += orderTotal;
+        
+        if (order.status === 'completed') {
+          completedAmount += orderTotal;
+        } else if (order.status === 'pending') {
+          pendingAmount += orderTotal;
+        }
+      });
+      
+      // Calculate net revenue (assuming 5% platform fee)
+      const netRevenue = completedAmount * 0.95;
+      const availableBalance = netRevenue * 0.8; // 80% available for withdrawal
+      
+      const stats = {
+        availableBalance: availableBalance.toFixed(2),
+        pendingBalance: pendingAmount.toFixed(2), 
+        monthlyWithdrawals: "0.00",
+        dailyWithdrawals: "0.00",
+        grossSales: grossSales.toFixed(2),
+        netRevenue: netRevenue.toFixed(2)
+      };
+      res.json(stats);
+    } catch (error) {
+      console.error("Error calculating financial stats:", error);
+      res.status(500).json({ message: "Failed to fetch financial stats" });
+    }
+  });
+
+  app.get("/api/tenant/products", async (req, res) => {
+    try {
+      // Get tenant ID from user session or default to 5
+      const tenantId = 5; // Using the demo tenant ID
+      let products = await storage.getProductsByTenantId(tenantId);
+      
+      // If no products exist, create some sample data
+      if (products.length === 0) {
+        // Create sample brands first
+        const sampleBrands = [
+          { name: "Nike", tenantId, isActive: true },
+          { name: "Adidas", tenantId, isActive: true },
+          { name: "Apple", tenantId, isActive: true }
+        ];
+        
+        for (const brand of sampleBrands) {
+          try {
+            await storage.createBrand(brand);
+          } catch (e) {
+            // Brand might already exist
+          }
+        }
+        
+        // Create sample categories
+        const sampleCategories = [
+          { name: "Esportes", tenantId, isActive: true },
+          { name: "Tecnologia", tenantId, isActive: true },
+          { name: "Moda", tenantId, isActive: true }
+        ];
+        
+        for (const category of sampleCategories) {
+          try {
+            await storage.createCategory(category);
+          } catch (e) {
+            // Category might already exist
+          }
+        }
+        
+        // Create sample products
+        const sampleProducts = [
+          {
+            name: "Tênis Nike Air Max",
+            description: "Tênis esportivo confortável para corrida",
+            price: "299.90",
+            compareAtPrice: "399.90",
+            sku: "NIKE-001",
+            stock: 50,
+            isActive: true,
+            tenantId,
+            weight: "500",
+            dimensions: "30x20x15",
+            ncm: "64041100",
+            cfop: "5102",
+            icmsRate: "18.00",
+            ipiRate: "0.00",
+            pisRate: "1.65",
+            cofinsRate: "7.60"
+          },
+          {
+            name: "iPhone 15 Pro",
+            description: "Smartphone Apple com 128GB",
+            price: "8999.00",
+            compareAtPrice: "9999.00",
+            sku: "APPLE-001",
+            stock: 25,
+            isActive: true,
+            tenantId,
+            weight: "187",
+            dimensions: "15x7x1",
+            ncm: "85171200",
+            cfop: "5102",
+            icmsRate: "18.00",
+            ipiRate: "0.00",
+            pisRate: "1.65",
+            cofinsRate: "7.60"
+          },
+          {
+            name: "Camiseta Adidas",
+            description: "Camiseta esportiva de algodão",
+            price: "89.90",
+            compareAtPrice: "129.90",
+            sku: "ADIDAS-001",
+            stock: 100,
+            isActive: true,
+            tenantId,
+            weight: "200",
+            dimensions: "25x35x2",
+            ncm: "61091000",
+            cfop: "5102",
+            icmsRate: "18.00",
+            ipiRate: "0.00",
+            pisRate: "1.65",
+            cofinsRate: "7.60"
+          }
+        ];
+        
+        for (const product of sampleProducts) {
+          try {
+            await storage.createProduct(product);
+          } catch (e) {
+            console.error("Error creating sample product:", e);
+          }
+        }
+        
+        // Fetch products again after creating samples
+        products = await storage.getProductsByTenantId(tenantId);
+      }
+      
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching tenant products:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.get("/api/tenant/orders", async (req, res) => {
+    try {
+      const tenantId = 5; // Using the demo tenant ID
+      let orders = await storage.getOrdersByTenantId(tenantId);
+      
+      // If no orders exist, create some sample data
+      if (orders.length === 0) {
+        // Get products to create orders for
+        const products = await storage.getProductsByTenantId(tenantId);
+        
+        if (products.length > 0) {
+          const sampleOrders = [
+            {
+              tenantId,
+              productId: products[0].id,
+              quantity: 2,
+              unitPrice: products[0].price,
+              totalPrice: (parseFloat(products[0].price) * 2).toFixed(2),
+              status: "completed"
+            },
+            {
+              tenantId,
+              productId: products[1] ? products[1].id : products[0].id,
+              quantity: 1,
+              unitPrice: products[1] ? products[1].price : products[0].price,
+              totalPrice: products[1] ? products[1].price : products[0].price,
+              status: "pending"
+            },
+            {
+              tenantId,
+              productId: products[2] ? products[2].id : products[0].id,
+              quantity: 3,
+              unitPrice: products[2] ? products[2].price : products[0].price,
+              totalPrice: products[2] ? (parseFloat(products[2].price) * 3).toFixed(2) : (parseFloat(products[0].price) * 3).toFixed(2),
+              status: "completed"
+            }
+          ];
+          
+          for (const order of sampleOrders) {
+            try {
+              await storage.createOrder(order);
+            } catch (e) {
+              console.error("Error creating sample order:", e);
+            }
+          }
+          
+          // Fetch orders again after creating samples
+          orders = await storage.getOrdersByTenantId(tenantId);
+        }
+      }
+      
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching tenant orders:", error);
+      res.status(500).json({ message: "Failed to fetch orders" });
+    }
+  });
+
+  app.get("/api/tenant/withdrawals", async (req, res) => {
+    try {
+      // Return empty withdrawals array for now
+      res.json([]);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch withdrawals" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

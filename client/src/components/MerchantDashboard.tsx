@@ -350,7 +350,7 @@ export default function MerchantDashboard() {
               <Button
                 variant="ghost"
                 className={`w-full justify-start ${activeSection === "products" ? "bg-accent" : ""}`}
-                onClick={() => setActiveSection("products")}
+                onClick={() => window.location.href = "/products"}
               >
                 <Package className="mr-3 h-4 w-4" />
                 Produtos
