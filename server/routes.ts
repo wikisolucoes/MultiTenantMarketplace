@@ -599,6 +599,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notification API routes
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      const notifications = await storage.getNotificationsByUserId(1, 5); // Demo user and tenant
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.put("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const notificationId = parseInt(req.params.id);
+      await storage.markNotificationAsRead(notificationId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.put("/api/notifications/read-all", async (req, res) => {
+    try {
+      await storage.markAllNotificationsAsRead(1, 5); // Demo user and tenant
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  app.post("/api/notifications", async (req, res) => {
+    try {
+      const notificationData = req.body;
+      const notification = await storage.createNotification({
+        ...notificationData,
+        tenantId: 5, // Demo tenant
+        userId: 1    // Demo user
+      });
+      
+      // Send real-time notification
+      const server = httpServer as any;
+      if (server.sendNotification) {
+        server.sendNotification(5, 1, "merchant", notification);
+      }
+      
+      res.json(notification);
+    } catch (error) {
+      console.error("Error creating notification:", error);
+      res.status(500).json({ message: "Failed to create notification" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // WebSocket Server for real-time notifications
