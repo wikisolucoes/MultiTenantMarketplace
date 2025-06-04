@@ -10,6 +10,7 @@ import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import Merchant from "@/pages/Merchant";
 import StorefrontSPA from "@/pages/StorefrontSPA";
+import StorefrontThemed from "@/pages/StorefrontThemed";
 import EcommerceAdmin from "@/pages/EcommerceAdmin";
 import TaxConfiguration from "@/pages/TaxConfiguration";
 import PluginSubscriptions from "@/pages/PluginSubscriptions";
@@ -75,6 +76,7 @@ function AppRouter() {
         {isAuth && userRole === "merchant" ? <NotificationDemo /> : <Home />}
       </Route>
       <Route path="/storefront/*" component={StorefrontSPA} />
+      <Route path="/themes" component={StorefrontThemed} />
       <Route component={NotFound} />
     </Switch>
   );

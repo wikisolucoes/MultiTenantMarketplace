@@ -325,12 +325,7 @@ export default function StorefrontThemed() {
       </div>
 
       {/* Theme Content */}
-      <motion.div
-        key={currentTheme}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
+      <div key={currentTheme} className="animate-in fade-in duration-500">
         <CurrentThemeComponent
           tenant={demoTenant}
           products={demoProducts}
@@ -340,7 +335,7 @@ export default function StorefrontThemed() {
           onToggleWishlist={handleToggleWishlist}
           wishlist={wishlist}
         />
-      </motion.div>
+      </div>
 
       {/* Customer Auth Modal */}
       {showAuth && (
@@ -351,7 +346,9 @@ export default function StorefrontThemed() {
                 setCurrentCustomer(customer);
                 setShowAuth(false);
               }}
-              onBack={() => setShowAuth(false)}
+              onClose={() => setShowAuth(false)}
+              storeName={demoTenant.name}
+              subdomain={demoTenant.subdomain}
             />
           </div>
         </div>
