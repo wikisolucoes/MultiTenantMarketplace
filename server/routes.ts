@@ -921,6 +921,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Password recovery request
+  app.post("/api/storefront/:subdomain/auth/forgot-password", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { email } = req.body;
+      
+      // Rate limiting
+      const rateLimitKey = `forgot-password:${req.ip}`;
+      if (!checkRateLimit(rateLimitKey, 3, 15 * 60 * 1000)) { // 3 attempts per 15 minutes
+        return res.status(429).json({ message: "Too many requests. Try again later." });
+      }
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      const customer = await storage.getCustomerByEmail(email, tenantId);
+      if (!customer) {
+        // Don't reveal if email exists for security
+        return res.json({ message: "If the email exists, a password reset link has been sent." });
+      }
+      
+      // Generate password reset token
+      const resetToken = generateSecureToken();
+      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      
+      await storage.updateCustomer(customer.id, tenantId, {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires
+      });
+      
+      // Send password reset email
+      const emailSent = await sendEmail(email, "password_reset", {
+        firstName: customer.firstName,
+        storeName: "Loja Demo",
+        subdomain,
+        token: resetToken
+      });
+      
+      if (!emailSent) {
+        return res.status(500).json({ message: "Failed to send reset email" });
+      }
+      
+      res.json({ message: "If the email exists, a password reset link has been sent." });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Failed to process request" });
+    }
+  });
+
+  // Password reset confirmation
+  app.post("/api/storefront/:subdomain/auth/reset-password", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ message: "Token and password are required" });
+      }
+      
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      // Find customer by reset token
+      const customers = await storage.getCustomersByTenantId(tenantId);
+      const customer = customers.find(c => 
+        c.passwordResetToken === token && 
+        c.passwordResetExpires && 
+        c.passwordResetExpires > new Date()
+      );
+      
+      if (!customer) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+      
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Update customer password and clear reset token
+      await storage.updateCustomer(customer.id, tenantId, {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        failedLoginAttempts: 0 // Reset failed attempts
+      });
+      
+      res.json({ message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // Email verification
+  app.get("/api/storefront/:subdomain/auth/verify-email", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { token } = req.query;
+      
+      if (!token) {
+        return res.status(400).json({ message: "Verification token is required" });
+      }
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      // Find customer by verification token
+      const customers = await storage.getCustomersByTenantId(tenantId);
+      const customer = customers.find(c => 
+        c.emailVerificationToken === token &&
+        c.emailVerificationExpires &&
+        c.emailVerificationExpires > new Date()
+      );
+      
+      if (!customer) {
+        return res.status(400).json({ message: "Invalid or expired verification token" });
+      }
+      
+      // Mark email as verified
+      await storage.updateCustomer(customer.id, tenantId, {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null
+      });
+      
+      // Redirect to storefront with success message
+      res.redirect(`/storefront/${subdomain}?verified=true`);
+    } catch (error) {
+      console.error("Email verification error:", error);
+      res.status(500).json({ message: "Failed to verify email" });
+    }
+  });
+
+  // Resend email verification
+  app.post("/api/storefront/:subdomain/auth/resend-verification", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { email } = req.body;
+      
+      // Rate limiting
+      const rateLimitKey = `resend-verification:${req.ip}`;
+      if (!checkRateLimit(rateLimitKey, 3, 15 * 60 * 1000)) {
+        return res.status(429).json({ message: "Too many requests. Try again later." });
+      }
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      const customer = await storage.getCustomerByEmail(email, tenantId);
+      if (!customer || customer.emailVerified) {
+        return res.json({ message: "If the email exists and is unverified, a verification email has been sent." });
+      }
+      
+      // Generate new verification token
+      const verificationToken = generateSecureToken();
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      await storage.updateCustomer(customer.id, tenantId, {
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: verificationExpires
+      });
+      
+      // Send verification email
+      const emailSent = await sendEmail(email, "email_verification", {
+        firstName: customer.firstName,
+        storeName: "Loja Demo",
+        subdomain,
+        token: verificationToken
+      });
+      
+      if (!emailSent) {
+        return res.status(500).json({ message: "Failed to send verification email" });
+      }
+      
+      res.json({ message: "If the email exists and is unverified, a verification email has been sent." });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Failed to resend verification" });
+    }
+  });
+
   // Demo route to test notifications
   app.post("/api/demo/notification", async (req, res) => {
     try {

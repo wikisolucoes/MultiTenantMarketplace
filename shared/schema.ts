@@ -52,15 +52,52 @@ export const customers = pgTable("customers", {
   isActive: boolean("is_active").default(true).notNull(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   emailVerificationToken: varchar("email_verification_token", { length: 255 }),
+  emailVerificationExpires: timestamp("email_verification_expires"),
   passwordResetToken: varchar("password_reset_token", { length: 255 }),
   passwordResetExpires: timestamp("password_reset_expires"),
+  // 2FA fields
+  twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
+  twoFactorSecret: varchar("two_factor_secret", { length: 255 }),
+  twoFactorBackupCodes: jsonb("two_factor_backup_codes"), // Array of backup codes
+  twoFactorLastUsed: timestamp("two_factor_last_used"),
+  // Security fields
+  failedLoginAttempts: integer("failed_login_attempts").default(0).notNull(),
+  lockoutUntil: timestamp("lockout_until"),
   // Social login fields
   googleId: varchar("google_id", { length: 255 }),
   appleId: varchar("apple_id", { length: 255 }),
   facebookId: varchar("facebook_id", { length: 255 }),
   lastLoginAt: timestamp("last_login_at"),
+  lastLoginIp: varchar("last_login_ip", { length: 45 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Customer login sessions for enhanced security
+export const customerSessions = pgTable("customer_sessions", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  sessionToken: varchar("session_token", { length: 255 }).notNull().unique(),
+  deviceInfo: jsonb("device_info"), // Browser, OS, device type
+  ipAddress: varchar("ip_address", { length: 45 }),
+  location: varchar("location", { length: 255 }), // City, country
+  isActive: boolean("is_active").default(true).notNull(),
+  lastAccessedAt: timestamp("last_accessed_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Customer security events log
+export const customerSecurityEvents = pgTable("customer_security_events", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  eventType: varchar("event_type", { length: 50 }).notNull(), // 'login', 'password_change', '2fa_enabled', 'suspicious_activity'
+  description: text("description"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  metadata: jsonb("metadata"), // Additional event-specific data
+  severity: varchar("severity", { length: 20 }).default("info").notNull(), // 'info', 'warning', 'critical'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Customer addresses
