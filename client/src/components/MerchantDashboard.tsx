@@ -986,6 +986,16 @@ export default function MerchantDashboard() {
               />
             )}
 
+            {/* User Management Section */}
+            {activeSection === "users" && (
+              <UserManagement />
+            )}
+
+            {/* Support Ticket Section */}
+            {activeSection === "support" && (
+              <SupportTicketSystem />
+            )}
+
             {/* Settings Section */}
             {activeSection === "settings" && (
               <div className="space-y-6">

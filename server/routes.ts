@@ -1362,6 +1362,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User Management Routes
+  app.get("/api/users", async (req, res) => {
+    try {
+      const tenantId = 1; // Get from authenticated user
+      const users = await storage.getUsersByTenantId(tenantId);
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", async (req, res) => {
+    try {
+      const tenantId = 1; // Get from authenticated user
+      const createdById = 1; // Get from authenticated user
+      const userData = req.body;
+      
+      const result = await storage.createUserWithProfile(userData, tenantId, createdById);
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  app.patch("/api/users/:userId/permissions", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const permissions = req.body;
+      
+      const result = await storage.updateUserPermissions(userId, permissions);
+      res.json(result);
+    } catch (error) {
+      console.error("Error updating permissions:", error);
+      res.status(500).json({ message: "Failed to update permissions" });
+    }
+  });
+
+  app.patch("/api/users/:userId/deactivate", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      
+      const result = await storage.deactivateUser(userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error deactivating user:", error);
+      res.status(500).json({ message: "Failed to deactivate user" });
+    }
+  });
+
+  // Support Ticket Routes
+  app.get("/api/support-tickets", async (req, res) => {
+    try {
+      const tenantId = 1; // Get from authenticated user
+      const tickets = await storage.getSupportTicketsByTenantId(tenantId);
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching support tickets:", error);
+      res.status(500).json({ message: "Failed to fetch support tickets" });
+    }
+  });
+
+  app.post("/api/support-tickets", async (req, res) => {
+    try {
+      const tenantId = 1; // Get from authenticated user
+      const userId = 1; // Get from authenticated user
+      const ticketData = req.body;
+      
+      const ticket = await storage.createSupportTicket(ticketData, userId, tenantId);
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error creating support ticket:", error);
+      res.status(500).json({ message: "Failed to create support ticket" });
+    }
+  });
+
+  app.get("/api/support-tickets/:ticketId/messages", async (req, res) => {
+    try {
+      const ticketId = parseInt(req.params.ticketId);
+      const messages = await storage.getSupportTicketMessages(ticketId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching ticket messages:", error);
+      res.status(500).json({ message: "Failed to fetch ticket messages" });
+    }
+  });
+
+  app.post("/api/support-tickets/:ticketId/messages", async (req, res) => {
+    try {
+      const ticketId = parseInt(req.params.ticketId);
+      const userId = 1; // Get from authenticated user
+      const senderName = "User"; // Get from authenticated user
+      const messageData = req.body;
+      
+      const message = await storage.createSupportTicketMessage(ticketId, messageData, userId, senderName);
+      res.json(message);
+    } catch (error) {
+      console.error("Error creating ticket message:", error);
+      res.status(500).json({ message: "Failed to create ticket message" });
+    }
+  });
+
+  app.patch("/api/support-tickets/:ticketId/rate", async (req, res) => {
+    try {
+      const ticketId = parseInt(req.params.ticketId);
+      const { rating, comment } = req.body;
+      
+      const ticket = await storage.rateSupportTicket(ticketId, rating, comment);
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error rating ticket:", error);
+      res.status(500).json({ message: "Failed to rate ticket" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // WebSocket Server for real-time notifications
