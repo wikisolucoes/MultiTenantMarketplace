@@ -1,508 +1,503 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Plus, Edit, Trash2, Eye, Calendar, Link, Image, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import BannerCarousel from "./BannerCarousel";
+import { Image, Plus, Edit, Trash2, Eye, BarChart3, Calendar, Clock } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface Banner {
   id: number;
   title: string;
-  description?: string;
+  description: string;
   imageUrl: string;
   mobileImageUrl?: string;
   linkUrl?: string;
-  linkText?: string;
-  position: number;
+  buttonText?: string;
   isActive: boolean;
-  showOnThemes: string[];
+  position: number;
+  displayOrder: number;
   startDate?: string;
   endDate?: string;
-  clickCount: number;
+  targetAudience?: string;
+  impressions?: number;
+  clicks?: number;
+  conversionRate?: number;
 }
 
 interface BannerManagerProps {
   banners: Banner[];
-  onBannerCreate: (banner: Omit<Banner, 'id' | 'clickCount'>) => void;
-  onBannerUpdate: (id: number, banner: Partial<Banner>) => void;
-  onBannerDelete: (id: number) => void;
-  currentTheme: string;
+  onUpdateBanners: (banners: Banner[]) => void;
 }
 
-const themeOptions = [
-  { value: 'modern', label: 'Modern' },
-  { value: 'classic', label: 'Classic' },
-  { value: 'minimal', label: 'Minimal' },
-  { value: 'bold', label: 'Bold' },
-  { value: 'elegant', label: 'Elegant' }
-];
-
-export default function BannerManager({
-  banners,
-  onBannerCreate,
-  onBannerUpdate,
-  onBannerDelete,
-  currentTheme
-}: BannerManagerProps) {
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+export default function BannerManager({ banners, onUpdateBanners }: BannerManagerProps) {
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
-  const [previewBanner, setPreviewBanner] = useState<Banner | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    imageUrl: '',
-    mobileImageUrl: '',
-    linkUrl: '',
-    linkText: '',
-    position: 0,
-    isActive: true,
-    showOnThemes: ['modern', 'classic', 'minimal', 'bold', 'elegant'],
-    startDate: '',
-    endDate: ''
-  });
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+  const { toast } = useToast();
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      imageUrl: '',
-      mobileImageUrl: '',
-      linkUrl: '',
-      linkText: '',
-      position: 0,
+  const handleCreateBanner = () => {
+    const newBanner: Banner = {
+      id: Date.now(),
+      title: "Novo Banner",
+      description: "Descrição do banner",
+      imageUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=600&fit=crop",
+      mobileImageUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=400&fit=crop",
+      linkUrl: "",
+      buttonText: "Saiba Mais",
       isActive: true,
-      showOnThemes: ['modern', 'classic', 'minimal', 'bold', 'elegant'],
-      startDate: '',
-      endDate: ''
-    });
+      position: banners.length + 1,
+      displayOrder: banners.length + 1,
+      targetAudience: "all",
+      impressions: 0,
+      clicks: 0,
+      conversionRate: 0
+    };
+    setEditingBanner(newBanner);
+    setIsDialogOpen(true);
   };
 
-  const handleCreate = () => {
-    onBannerCreate(formData);
-    resetForm();
-    setIsCreateOpen(false);
+  const handleEditBanner = (banner: Banner) => {
+    setEditingBanner({ ...banner });
+    setIsDialogOpen(true);
   };
 
-  const handleEdit = (banner: Banner) => {
-    setEditingBanner(banner);
-    setFormData({
-      title: banner.title,
-      description: banner.description || '',
-      imageUrl: banner.imageUrl,
-      mobileImageUrl: banner.mobileImageUrl || '',
-      linkUrl: banner.linkUrl || '',
-      linkText: banner.linkText || '',
-      position: banner.position,
-      isActive: banner.isActive,
-      showOnThemes: banner.showOnThemes,
-      startDate: banner.startDate || '',
-      endDate: banner.endDate || ''
-    });
-  };
+  const handleSaveBanner = () => {
+    if (!editingBanner) return;
 
-  const handleUpdate = () => {
-    if (editingBanner) {
-      onBannerUpdate(editingBanner.id, formData);
-      resetForm();
-      setEditingBanner(null);
+    const existingIndex = banners.findIndex(b => b.id === editingBanner.id);
+    let updatedBanners;
+
+    if (existingIndex >= 0) {
+      updatedBanners = [...banners];
+      updatedBanners[existingIndex] = editingBanner;
+    } else {
+      updatedBanners = [...banners, editingBanner];
     }
+
+    onUpdateBanners(updatedBanners);
+    setIsDialogOpen(false);
+    setEditingBanner(null);
+    
+    toast({
+      title: "Banner salvo",
+      description: "O banner foi salvo com sucesso.",
+    });
   };
 
-  const activeBanners = banners.filter(banner => 
-    banner.isActive && 
-    banner.showOnThemes.includes(currentTheme)
-  ).sort((a, b) => a.position - b.position);
+  const handleDeleteBanner = (bannerId: number) => {
+    const updatedBanners = banners.filter(b => b.id !== bannerId);
+    onUpdateBanners(updatedBanners);
+    
+    toast({
+      title: "Banner removido",
+      description: "O banner foi removido com sucesso.",
+    });
+  };
+
+  const handleToggleActive = (bannerId: number) => {
+    const updatedBanners = banners.map(b =>
+      b.id === bannerId ? { ...b, isActive: !b.isActive } : b
+    );
+    onUpdateBanners(updatedBanners);
+  };
+
+  const reorderBanners = (dragIndex: number, dropIndex: number) => {
+    const updatedBanners = [...banners];
+    const draggedBanner = updatedBanners[dragIndex];
+    updatedBanners.splice(dragIndex, 1);
+    updatedBanners.splice(dropIndex, 0, draggedBanner);
+    
+    // Update display order
+    updatedBanners.forEach((banner, index) => {
+      banner.displayOrder = index + 1;
+    });
+    
+    onUpdateBanners(updatedBanners);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gerenciamento de Banners</h2>
-          <p className="text-gray-600">Controle os banners do carousel da sua loja</p>
+          <h2 className="text-2xl font-bold text-gray-800">Gerenciar Banners</h2>
+          <p className="text-gray-600">Configure banners para sua loja virtual</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Banner
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Criar Novo Banner</DialogTitle>
-            </DialogHeader>
-            <BannerForm
-              formData={formData}
-              setFormData={setFormData}
-              onSubmit={handleCreate}
-              onCancel={() => setIsCreateOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center space-x-4">
+          <Button
+            variant="outline"
+            onClick={() => setPreviewMode(!previewMode)}
+            className="flex items-center space-x-2"
+          >
+            <Eye className="h-4 w-4" />
+            <span>{previewMode ? "Editar" : "Visualizar"}</span>
+          </Button>
+          <Button onClick={handleCreateBanner} className="flex items-center space-x-2">
+            <Plus className="h-4 w-4" />
+            <span>Novo Banner</span>
+          </Button>
+        </div>
       </div>
 
-      <Tabs defaultValue="manage" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="manage">Gerenciar</TabsTrigger>
-          <TabsTrigger value="preview">Preview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-        </TabsList>
-
-        {/* Banner Management */}
-        <TabsContent value="manage" className="space-y-4">
-          <div className="grid gap-4">
-            {banners.map((banner, index) => (
-              <motion.div
-                key={banner.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-              >
-                <Card className={`${banner.isActive ? 'border-green-200 bg-green-50' : 'border-gray-200'}`}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex space-x-4">
-                        <img
-                          src={banner.imageUrl}
-                          alt={banner.title}
-                          className="w-24 h-16 object-cover rounded-lg"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = `https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=200&h=150&fit=crop`;
-                          }}
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h3 className="font-semibold text-gray-900">{banner.title}</h3>
-                            <Badge variant={banner.isActive ? "default" : "secondary"}>
-                              {banner.isActive ? 'Ativo' : 'Inativo'}
-                            </Badge>
-                            <Badge variant="outline">Posição {banner.position}</Badge>
-                          </div>
-                          {banner.description && (
-                            <p className="text-sm text-gray-600 mb-2">{banner.description}</p>
-                          )}
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {banner.showOnThemes.map(theme => (
-                              <Badge key={theme} variant="secondary" className="text-xs">
-                                {themeOptions.find(t => t.value === theme)?.label}
-                              </Badge>
-                            ))}
-                          </div>
-                          <div className="flex items-center space-x-4 text-sm text-gray-500">
-                            <span className="flex items-center">
-                              <Eye className="h-4 w-4 mr-1" />
-                              {banner.clickCount} cliques
-                            </span>
-                            {banner.linkUrl && (
-                              <span className="flex items-center">
-                                <Link className="h-4 w-4 mr-1" />
-                                Link ativo
-                              </span>
-                            )}
-                            {banner.mobileImageUrl && (
-                              <span className="flex items-center">
-                                <Smartphone className="h-4 w-4 mr-1" />
-                                Mobile otimizado
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPreviewBanner(banner)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(banner)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onBannerDelete(banner.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Preview */}
-        <TabsContent value="preview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preview do Carousel - Tema {currentTheme}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {activeBanners.length > 0 ? (
-                <BannerCarousel
-                  banners={activeBanners}
-                  theme={currentTheme as any}
-                  height="h-64"
-                />
-              ) : (
-                <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <p className="text-gray-500">Nenhum banner ativo para este tema</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Analytics */}
-        <TabsContent value="analytics" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-2xl font-bold text-gray-900">{banners.length}</div>
-                <p className="text-sm text-gray-600">Total de Banners</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-2xl font-bold text-green-600">
-                  {banners.filter(b => b.isActive).length}
-                </div>
+      {/* Analytics Overview */}
+      <div className="grid md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <BarChart3 className="h-5 w-5 text-blue-500" />
+              <div>
+                <p className="text-sm text-gray-600">Total Impressões</p>
+                <p className="text-2xl font-bold">
+                  {banners.reduce((sum, b) => sum + (b.impressions || 0), 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Eye className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="text-sm text-gray-600">Total Cliques</p>
+                <p className="text-2xl font-bold">
+                  {banners.reduce((sum, b) => sum + (b.clicks || 0), 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-5 w-5 text-purple-500" />
+              <div>
                 <p className="text-sm text-gray-600">Banners Ativos</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-2xl font-bold text-cyan-600">
-                  {banners.reduce((sum, banner) => sum + banner.clickCount, 0)}
+                <p className="text-2xl font-bold">
+                  {banners.filter(b => b.isActive).length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Clock className="h-5 w-5 text-orange-500" />
+              <div>
+                <p className="text-sm text-gray-600">Taxa Conversão</p>
+                <p className="text-2xl font-bold">
+                  {banners.length > 0 
+                    ? ((banners.reduce((sum, b) => sum + (b.conversionRate || 0), 0) / banners.length)).toFixed(1) + '%'
+                    : '0%'
+                  }
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Banner List */}
+      <div className="grid gap-4">
+        {banners.map((banner, index) => (
+          <Card key={banner.id} className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="flex items-center">
+                <div className="w-32 h-20 bg-gray-100 flex-shrink-0 overflow-hidden">
+                  <img
+                    src={banner.imageUrl}
+                    alt={banner.title}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <p className="text-sm text-gray-600">Total de Cliques</p>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance dos Banners</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {banners
-                  .sort((a, b) => b.clickCount - a.clickCount)
-                  .map((banner) => (
-                    <div key={banner.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <img
-                          src={banner.imageUrl}
-                          alt={banner.title}
-                          className="w-12 h-8 object-cover rounded"
-                        />
-                        <div>
-                          <p className="font-medium">{banner.title}</p>
-                          <p className="text-sm text-gray-600">{banner.clickCount} cliques</p>
-                        </div>
-                      </div>
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-cyan-600 h-2 rounded-full"
-                          style={{
-                            width: `${Math.min(100, (banner.clickCount / Math.max(...banners.map(b => b.clickCount))) * 100)}%`
-                          }}
-                        ></div>
+                
+                <div className="flex-1 p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold text-gray-800">{banner.title}</h3>
+                      <p className="text-sm text-gray-600 mt-1">{banner.description}</p>
+                      <div className="flex items-center space-x-4 mt-2">
+                        <Badge variant={banner.isActive ? "default" : "secondary"}>
+                          {banner.isActive ? "Ativo" : "Inativo"}
+                        </Badge>
+                        <span className="text-sm text-gray-500">Posição: {banner.displayOrder}</span>
+                        {banner.impressions && (
+                          <span className="text-sm text-gray-500">
+                            {banner.impressions.toLocaleString()} impressões
+                          </span>
+                        )}
+                        {banner.clicks && (
+                          <span className="text-sm text-gray-500">
+                            {banner.clicks.toLocaleString()} cliques
+                          </span>
+                        )}
                       </div>
                     </div>
-                  ))}
+                    
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={banner.isActive}
+                        onCheckedChange={() => handleToggleActive(banner.id)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditBanner(banner)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteBanner(banner.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        ))}
+        
+        {banners.length === 0 && (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Nenhum banner configurado</h3>
+              <p className="text-gray-600 mb-4">Crie seu primeiro banner para começar a promover seus produtos</p>
+              <Button onClick={handleCreateBanner}>
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Primeiro Banner
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingBanner} onOpenChange={() => setEditingBanner(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* Banner Editor Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Banner</DialogTitle>
+            <DialogTitle>
+              {editingBanner?.id ? 'Editar Banner' : 'Novo Banner'}
+            </DialogTitle>
           </DialogHeader>
-          <BannerForm
-            formData={formData}
-            setFormData={setFormData}
-            onSubmit={handleUpdate}
-            onCancel={() => setEditingBanner(null)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* Preview Dialog */}
-      <Dialog open={!!previewBanner} onOpenChange={() => setPreviewBanner(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Preview do Banner</DialogTitle>
-          </DialogHeader>
-          {previewBanner && (
-            <BannerCarousel
-              banners={[previewBanner]}
-              theme={currentTheme as any}
-              height="h-64"
-              autoplay={false}
-            />
+          
+          {editingBanner && (
+            <Tabs defaultValue="content" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="content">Conteúdo</TabsTrigger>
+                <TabsTrigger value="design">Design</TabsTrigger>
+                <TabsTrigger value="scheduling">Agendamento</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="content" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="title">Título</Label>
+                    <Input
+                      id="title"
+                      value={editingBanner.title}
+                      onChange={(e) => setEditingBanner({
+                        ...editingBanner,
+                        title: e.target.value
+                      })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="buttonText">Texto do Botão</Label>
+                    <Input
+                      id="buttonText"
+                      value={editingBanner.buttonText || ""}
+                      onChange={(e) => setEditingBanner({
+                        ...editingBanner,
+                        buttonText: e.target.value
+                      })}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="description">Descrição</Label>
+                  <Textarea
+                    id="description"
+                    value={editingBanner.description}
+                    onChange={(e) => setEditingBanner({
+                      ...editingBanner,
+                      description: e.target.value
+                    })}
+                    rows={3}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="linkUrl">URL de Destino</Label>
+                  <Input
+                    id="linkUrl"
+                    value={editingBanner.linkUrl || ""}
+                    onChange={(e) => setEditingBanner({
+                      ...editingBanner,
+                      linkUrl: e.target.value
+                    })}
+                    placeholder="https://..."
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="design" className="space-y-4">
+                <div>
+                  <Label htmlFor="imageUrl">URL da Imagem (Desktop)</Label>
+                  <Input
+                    id="imageUrl"
+                    value={editingBanner.imageUrl}
+                    onChange={(e) => setEditingBanner({
+                      ...editingBanner,
+                      imageUrl: e.target.value
+                    })}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="mobileImageUrl">URL da Imagem (Mobile)</Label>
+                  <Input
+                    id="mobileImageUrl"
+                    value={editingBanner.mobileImageUrl || ""}
+                    onChange={(e) => setEditingBanner({
+                      ...editingBanner,
+                      mobileImageUrl: e.target.value
+                    })}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="position">Posição</Label>
+                    <Input
+                      id="position"
+                      type="number"
+                      value={editingBanner.position}
+                      onChange={(e) => setEditingBanner({
+                        ...editingBanner,
+                        position: parseInt(e.target.value) || 1
+                      })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="targetAudience">Público-Alvo</Label>
+                    <Select
+                      value={editingBanner.targetAudience || "all"}
+                      onValueChange={(value) => setEditingBanner({
+                        ...editingBanner,
+                        targetAudience: value
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os Visitantes</SelectItem>
+                        <SelectItem value="new">Novos Visitantes</SelectItem>
+                        <SelectItem value="returning">Visitantes Recorrentes</SelectItem>
+                        <SelectItem value="mobile">Usuários Mobile</SelectItem>
+                        <SelectItem value="desktop">Usuários Desktop</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {/* Image Preview */}
+                {editingBanner.imageUrl && (
+                  <div>
+                    <Label>Pré-visualização</Label>
+                    <div className="mt-2 border rounded-lg overflow-hidden">
+                      <img
+                        src={editingBanner.imageUrl}
+                        alt="Preview"
+                        className="w-full h-40 object-cover"
+                      />
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="scheduling" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="startDate">Data de Início</Label>
+                    <Input
+                      id="startDate"
+                      type="datetime-local"
+                      value={editingBanner.startDate || ""}
+                      onChange={(e) => setEditingBanner({
+                        ...editingBanner,
+                        startDate: e.target.value
+                      })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="endDate">Data de Término</Label>
+                    <Input
+                      id="endDate"
+                      type="datetime-local"
+                      value={editingBanner.endDate || ""}
+                      onChange={(e) => setEditingBanner({
+                        ...editingBanner,
+                        endDate: e.target.value
+                      })}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="isActive"
+                    checked={editingBanner.isActive}
+                    onCheckedChange={(checked) => setEditingBanner({
+                      ...editingBanner,
+                      isActive: checked
+                    })}
+                  />
+                  <Label htmlFor="isActive">Banner Ativo</Label>
+                </div>
+                
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-blue-800 mb-2">Dicas de Agendamento</h4>
+                  <ul className="text-sm text-blue-700 space-y-1">
+                    <li>• Use datas específicas para campanhas promocionais</li>
+                    <li>• Deixe vazio para banners permanentes</li>
+                    <li>• Configure com antecedência para não perder prazos</li>
+                  </ul>
+                </div>
+              </TabsContent>
+            </Tabs>
           )}
+          
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveBanner}>
+              Salvar Banner
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-interface BannerFormProps {
-  formData: any;
-  setFormData: (data: any) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-}
-
-function BannerForm({ formData, setFormData, onSubmit, onCancel }: BannerFormProps) {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="title">Título *</Label>
-          <Input
-            id="title"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="Título do banner"
-          />
-        </div>
-        <div>
-          <Label htmlFor="position">Posição</Label>
-          <Input
-            id="position"
-            type="number"
-            value={formData.position}
-            onChange={(e) => setFormData({ ...formData, position: parseInt(e.target.value) || 0 })}
-            placeholder="0"
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="description">Descrição</Label>
-        <Textarea
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Descrição do banner"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="imageUrl">URL da Imagem Desktop *</Label>
-          <Input
-            id="imageUrl"
-            value={formData.imageUrl}
-            onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-            placeholder="https://..."
-          />
-        </div>
-        <div>
-          <Label htmlFor="mobileImageUrl">URL da Imagem Mobile</Label>
-          <Input
-            id="mobileImageUrl"
-            value={formData.mobileImageUrl}
-            onChange={(e) => setFormData({ ...formData, mobileImageUrl: e.target.value })}
-            placeholder="https://..."
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="linkUrl">URL do Link</Label>
-          <Input
-            id="linkUrl"
-            value={formData.linkUrl}
-            onChange={(e) => setFormData({ ...formData, linkUrl: e.target.value })}
-            placeholder="https://..."
-          />
-        </div>
-        <div>
-          <Label htmlFor="linkText">Texto do Botão</Label>
-          <Input
-            id="linkText"
-            value={formData.linkText}
-            onChange={(e) => setFormData({ ...formData, linkText: e.target.value })}
-            placeholder="Saiba Mais"
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label>Exibir nos Temas</Label>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-          {themeOptions.map((theme) => (
-            <div key={theme.value} className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id={theme.value}
-                checked={formData.showOnThemes.includes(theme.value)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setFormData({
-                      ...formData,
-                      showOnThemes: [...formData.showOnThemes, theme.value]
-                    });
-                  } else {
-                    setFormData({
-                      ...formData,
-                      showOnThemes: formData.showOnThemes.filter((t: string) => t !== theme.value)
-                    });
-                  }
-                }}
-                className="rounded"
-              />
-              <Label htmlFor={theme.value} className="text-sm">{theme.label}</Label>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="isActive"
-          checked={formData.isActive}
-          onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-        />
-        <Label htmlFor="isActive">Banner Ativo</Label>
-      </div>
-
-      <div className="flex justify-end space-x-2">
-        <Button variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-        <Button onClick={onSubmit} disabled={!formData.title || !formData.imageUrl}>
-          Salvar Banner
-        </Button>
-      </div>
     </div>
   );
 }

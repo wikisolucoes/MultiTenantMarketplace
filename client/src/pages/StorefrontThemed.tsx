@@ -9,6 +9,11 @@ import ClassicTheme from "@/components/storefront/themes/ClassicTheme";
 import MinimalTheme from "@/components/storefront/themes/MinimalTheme";
 import BoldTheme from "@/components/storefront/themes/BoldTheme";
 import ElegantTheme from "@/components/storefront/themes/ElegantTheme";
+import LuxuryTheme from "@/components/storefront/themes/LuxuryTheme";
+import SportTheme from "@/components/storefront/themes/SportTheme";
+import TechTheme from "@/components/storefront/themes/TechTheme";
+import VintageTheme from "@/components/storefront/themes/VintageTheme";
+import NatureTheme from "@/components/storefront/themes/NatureTheme";
 import ThemeManager from "@/components/storefront/ThemeManager";
 import CustomerAuth from "@/components/storefront/CustomerAuth";
 
@@ -17,7 +22,12 @@ const themeComponents = {
   classic: ClassicTheme,
   minimal: MinimalTheme,
   bold: BoldTheme,
-  elegant: ElegantTheme
+  elegant: ElegantTheme,
+  luxury: LuxuryTheme,
+  sport: SportTheme,
+  tech: TechTheme,
+  vintage: VintageTheme,
+  nature: NatureTheme
 };
 
 // Demo banners for each theme
