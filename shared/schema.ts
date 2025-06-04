@@ -74,6 +74,32 @@ export const products = pgTable("products", {
   brandId: integer("brand_id").references(() => brands.id),
   categoryId: integer("category_id").references(() => productCategories.id),
   isActive: boolean("is_active").default(true).notNull(),
+  
+  // SEO fields
+  slug: varchar("slug", { length: 255 }),
+  metaTitle: varchar("meta_title", { length: 255 }),
+  metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
+  
+  // Promotional pricing
+  promotionalPrice: decimal("promotional_price", { precision: 10, scale: 2 }),
+  promotionalStartDate: timestamp("promotional_start_date"),
+  promotionalEndDate: timestamp("promotional_end_date"),
+  
+  // Customer type pricing
+  priceB2B: decimal("price_b2b", { precision: 10, scale: 2 }),
+  priceB2C: decimal("price_b2c", { precision: 10, scale: 2 }),
+  
+  // Reward points
+  rewardPointsB2B: integer("reward_points_b2b").default(0),
+  rewardPointsB2C: integer("reward_points_b2c").default(0),
+  
+  // Product availability and settings
+  availabilityDate: timestamp("availability_date"),
+  requiresShipping: boolean("requires_shipping").default(true),
+  isDigital: boolean("is_digital").default(false),
+  hasUnlimitedStock: boolean("has_unlimited_stock").default(false),
+  
   // Brazilian tax fields
   ncm: varchar("ncm", { length: 10 }),
   cest: varchar("cest", { length: 7 }),
@@ -147,6 +173,19 @@ export const bulkPricingRules = pgTable("bulk_pricing_rules", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const productVariants = pgTable("product_variants", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "Tamanho", "Cor"
+  value: varchar("value", { length: 255 }).notNull(), // e.g., "M", "Azul"
+  price: decimal("price", { precision: 10, scale: 2 }),
+  stock: integer("stock").default(0),
+  sku: varchar("sku", { length: 100 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
@@ -209,6 +248,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   images: many(productImages),
   specifications: many(productSpecifications),
   bulkPricingRules: many(bulkPricingRules),
+  variants: many(productVariants),
   orders: many(orders),
 }));
 
@@ -232,6 +272,10 @@ export const productPromotionProductsRelations = relations(productPromotionProdu
 
 export const bulkPricingRulesRelations = relations(bulkPricingRules, ({ one }) => ({
   product: one(products, { fields: [bulkPricingRules.productId], references: [products.id] }),
+}));
+
+export const productVariantsRelations = relations(productVariants, ({ one }) => ({
+  product: one(products, { fields: [productVariants.productId], references: [products.id] }),
 }));
 
 export const ordersRelations = relations(orders, ({ one }) => ({
@@ -291,6 +335,12 @@ export const insertBulkPricingRuleSchema = createInsertSchema(bulkPricingRules).
   updatedAt: true,
 });
 
+export const insertProductVariantSchema = createInsertSchema(productVariants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
   createdAt: true,
@@ -343,6 +393,9 @@ export type ProductPromotionProduct = typeof productPromotionProducts.$inferSele
 
 export type BulkPricingRule = typeof bulkPricingRules.$inferSelect;
 export type InsertBulkPricingRule = z.infer<typeof insertBulkPricingRuleSchema>;
+
+export type ProductVariant = typeof productVariants.$inferSelect;
+export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
