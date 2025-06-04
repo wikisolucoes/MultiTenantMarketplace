@@ -140,7 +140,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTenantByDomain(domain: string): Promise<Tenant | undefined> {
-    const [tenant] = await db.select().from(tenants).where(eq(tenants.domain, domain));
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.subdomain, domain));
     return tenant || undefined;
   }
 

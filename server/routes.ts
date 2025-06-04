@@ -653,6 +653,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public API routes for storefront
+  app.get("/api/public/tenant/:subdomain", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      
+      // For demo, always use tenant ID 5 or create it if it doesn't exist
+      if (subdomain === "demo") {
+        let tenant = await storage.getTenant(5);
+        
+        if (!tenant) {
+          // Create demo tenant if it doesn't exist
+          tenant = await storage.createTenant({
+            name: "Loja Demo",
+            subdomain: "demo",
+            isActive: true
+          });
+        }
+        
+        res.json(tenant);
+      } else {
+        // For other subdomains, try to find by domain
+        const tenant = await storage.getTenantByDomain(subdomain);
+        if (!tenant) {
+          return res.status(404).json({ message: "Tenant not found" });
+        }
+        res.json(tenant);
+      }
+    } catch (error) {
+      console.error("Error fetching public tenant:", error);
+      res.status(500).json({ message: "Failed to fetch tenant" });
+    }
+  });
+
+  app.get("/api/public/products/:subdomain", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      let tenantId: number;
+      
+      if (subdomain === "demo") {
+        tenantId = 5; // Demo tenant ID
+      } else {
+        const tenant = await storage.getTenantByDomain(subdomain);
+        if (!tenant) {
+          return res.status(404).json({ message: "Tenant not found" });
+        }
+        tenantId = tenant.id;
+      }
+      
+      let products = await storage.getProductsByTenantId(tenantId);
+      
+      // If no products exist for demo, create sample data
+      if (products.length === 0 && subdomain === "demo") {
+        // Create sample brands first
+        const sampleBrands = [
+          { name: "Nike", tenantId, isActive: true },
+          { name: "Adidas", tenantId, isActive: true },
+          { name: "Apple", tenantId, isActive: true }
+        ];
+        
+        for (const brand of sampleBrands) {
+          try {
+            await storage.createBrand(brand);
+          } catch (e) {
+            // Brand might already exist
+          }
+        }
+        
+        // Create sample categories
+        const sampleCategories = [
+          { name: "Esportes", tenantId, isActive: true },
+          { name: "Tecnologia", tenantId, isActive: true },
+          { name: "Moda", tenantId, isActive: true }
+        ];
+        
+        for (const category of sampleCategories) {
+          try {
+            await storage.createCategory(category);
+          } catch (e) {
+            // Category might already exist
+          }
+        }
+        
+        // Get created categories and brands for product creation
+        const brands = await storage.getBrandsByTenantId(tenantId);
+        const categories = await storage.getCategoriesByTenantId(tenantId);
+        
+        // Create sample products
+        const sampleProducts = [
+          {
+            name: "Tênis Nike Air Max",
+            description: "Tênis esportivo confortável para corrida e uso diário",
+            price: "299.90",
+            compareAtPrice: "399.90",
+            costPrice: "150.00",
+            sku: "NIKE-AM-001",
+            stock: 50,
+            minStock: 5,
+            maxStock: 100,
+            isActive: true,
+            isFeatured: true,
+            tenantId,
+            brandId: brands.find(b => b.name === "Nike")?.id || 1,
+            categoryId: categories.find(c => c.name === "Esportes")?.id || 1,
+            tags: ["tênis", "esporte", "nike", "conforto"],
+            images: [{
+              url: "https://via.placeholder.com/400x400/06b6d4/ffffff?text=Tênis+Nike",
+              altText: "Tênis Nike Air Max",
+              isPrimary: true,
+              displayOrder: 1
+            }],
+            specifications: [{
+              name: "Material",
+              value: "Couro sintético e mesh"
+            }, {
+              name: "Sola",
+              value: "Borracha antiderrapante"
+            }]
+          },
+          {
+            name: "iPhone 15 Pro",
+            description: "Smartphone Apple com tecnologia avançada e câmera profissional",
+            price: "7999.00",
+            compareAtPrice: "8999.00",
+            costPrice: "5000.00",
+            sku: "APPLE-IP15P-001",
+            stock: 25,
+            minStock: 3,
+            maxStock: 50,
+            isActive: true,
+            isFeatured: true,
+            tenantId,
+            brandId: brands.find(b => b.name === "Apple")?.id || 1,
+            categoryId: categories.find(c => c.name === "Tecnologia")?.id || 1,
+            tags: ["smartphone", "apple", "iphone", "tecnologia"],
+            images: [{
+              url: "https://via.placeholder.com/400x400/14b8a6/ffffff?text=iPhone+15+Pro",
+              altText: "iPhone 15 Pro",
+              isPrimary: true,
+              displayOrder: 1
+            }],
+            specifications: [{
+              name: "Tela",
+              value: "6.1 polegadas Super Retina XDR"
+            }, {
+              name: "Processador",
+              value: "A17 Pro"
+            }, {
+              name: "Armazenamento",
+              value: "128GB"
+            }]
+          },
+          {
+            name: "Camiseta Adidas Originals",
+            description: "Camiseta casual da linha Originals com design clássico",
+            price: "89.90",
+            compareAtPrice: "129.90",
+            costPrice: "45.00",
+            sku: "ADIDAS-ORIG-001",
+            stock: 75,
+            minStock: 10,
+            maxStock: 150,
+            isActive: true,
+            isFeatured: false,
+            tenantId,
+            brandId: brands.find(b => b.name === "Adidas")?.id || 1,
+            categoryId: categories.find(c => c.name === "Moda")?.id || 1,
+            tags: ["camiseta", "adidas", "moda", "casual"],
+            images: [{
+              url: "https://via.placeholder.com/400x400/06b6d4/ffffff?text=Camiseta+Adidas",
+              altText: "Camiseta Adidas Originals",
+              isPrimary: true,
+              displayOrder: 1
+            }],
+            specifications: [{
+              name: "Material",
+              value: "100% Algodão"
+            }, {
+              name: "Tamanhos",
+              value: "P, M, G, GG"
+            }]
+          }
+        ];
+        
+        for (const productData of sampleProducts) {
+          try {
+            const product = await storage.createProduct(productData);
+            
+            // Create product images
+            for (const imageData of productData.images) {
+              await storage.createProductImage({
+                ...imageData,
+                productId: product.id
+              });
+            }
+            
+            // Create product specifications
+            for (const specData of productData.specifications) {
+              await storage.createProductSpecification({
+                ...specData,
+                productId: product.id
+              });
+            }
+          } catch (e) {
+            console.error("Error creating sample product:", e);
+          }
+        }
+        
+        // Fetch products again after creating samples
+        products = await storage.getProductsByTenantId(tenantId);
+      }
+      
+      res.json(products);
+    } catch (error) {
+      console.error("Error fetching public products:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
   // Demo route to test notifications
   app.post("/api/demo/notification", async (req, res) => {
     try {

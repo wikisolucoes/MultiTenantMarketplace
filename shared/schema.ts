@@ -17,7 +17,7 @@ import { z } from "zod";
 export const tenants = pgTable("tenants", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
-  domain: varchar("domain", { length: 255 }).unique().notNull(),
+  subdomain: varchar("subdomain", { length: 255 }).unique().notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
