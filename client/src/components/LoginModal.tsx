@@ -50,7 +50,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
-      const response = await apiRequest("POST", "/api/auth/login", data);
+      const response = await apiRequest("POST", "/api/login", data);
       return (await response.json()) as AuthResponse;
     },
     onSuccess: (data) => {

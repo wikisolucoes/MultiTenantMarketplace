@@ -35,8 +35,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      res.json({ user: { ...user, password: undefined } });
+      // Create session token
+      const token = `user_${user.id}_${Date.now()}`;
+      
+      res.json({ 
+        user: { ...user, password: undefined },
+        token 
+      });
     } catch (error) {
+      console.error("Login error:", error);
       res.status(400).json({ message: "Invalid request data" });
     }
   });
