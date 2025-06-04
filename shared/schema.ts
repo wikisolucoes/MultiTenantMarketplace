@@ -227,6 +227,37 @@ export const orders = pgTable("orders", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  type: varchar("type", { length: 50 }).notNull(), // 'order', 'payment', 'stock', 'system', 'promotion'
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  data: jsonb("data"), // Additional data for the notification
+  priority: varchar("priority", { length: 20 }).default("normal"), // 'low', 'normal', 'high', 'urgent'
+  isRead: boolean("is_read").default(false),
+  actionUrl: varchar("action_url", { length: 500 }), // URL to redirect when clicked
+  expiresAt: timestamp("expires_at"), // For time-sensitive notifications
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  emailNotifications: boolean("email_notifications").default(true),
+  browserNotifications: boolean("browser_notifications").default(true),
+  orderNotifications: boolean("order_notifications").default(true),
+  paymentNotifications: boolean("payment_notifications").default(true),
+  stockNotifications: boolean("stock_notifications").default(true),
+  systemNotifications: boolean("system_notifications").default(true),
+  promotionNotifications: boolean("promotion_notifications").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+});
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -237,8 +268,20 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   orders: many(orders),
 }));
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   tenant: one(tenants, { fields: [users.tenantId], references: [tenants.id] }),
+  notifications: many(notifications),
+  notificationPreferences: many(notificationPreferences),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  tenant: one(tenants, { fields: [notifications.tenantId], references: [tenants.id] }),
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+export const notificationPreferencesRelations = relations(notificationPreferences, ({ one }) => ({
+  user: one(users, { fields: [notificationPreferences.userId], references: [users.id] }),
+  tenant: one(tenants, { fields: [notificationPreferences.tenantId], references: [tenants.id] }),
 }));
 
 export const brandsRelations = relations(brands, ({ one, many }) => ({

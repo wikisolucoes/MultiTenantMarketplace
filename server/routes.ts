@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import bcrypt from "bcrypt";
 import { 
   insertUserSchema, 
@@ -599,5 +600,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  
+  // WebSocket Server for real-time notifications
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Store connected clients by tenant and user
+  const connectedClients = new Map<string, Set<WebSocket>>();
+  
+  wss.on('connection', (ws: WebSocket, request) => {
+    console.log('New WebSocket connection established');
+    
+    // Handle authentication and tenant/user identification
+    ws.on('message', (message: string) => {
+      try {
+        const data = JSON.parse(message);
+        
+        if (data.type === 'auth') {
+          const { tenantId, userId, userRole } = data;
+          const clientKey = `${tenantId}:${userId}:${userRole}`;
+          
+          // Add client to the appropriate group
+          if (!connectedClients.has(clientKey)) {
+            connectedClients.set(clientKey, new Set());
+          }
+          connectedClients.get(clientKey)!.add(ws);
+          
+          // Store client info on the WebSocket
+          (ws as any).clientKey = clientKey;
+          (ws as any).tenantId = tenantId;
+          (ws as any).userId = userId;
+          (ws as any).userRole = userRole;
+          
+          // Send confirmation
+          ws.send(JSON.stringify({
+            type: 'auth_success',
+            message: 'Connected to notification service'
+          }));
+          
+          console.log(`Client authenticated: ${clientKey}`);
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    });
+    
+    ws.on('close', () => {
+      // Remove client from connected clients
+      const clientKey = (ws as any).clientKey;
+      if (clientKey && connectedClients.has(clientKey)) {
+        connectedClients.get(clientKey)!.delete(ws);
+        if (connectedClients.get(clientKey)!.size === 0) {
+          connectedClients.delete(clientKey);
+        }
+      }
+      console.log('WebSocket connection closed');
+    });
+  });
+  
+  // Notification service functions
+  const sendNotification = (tenantId: number, userId: number, userRole: string, notification: any) => {
+    const clientKey = `${tenantId}:${userId}:${userRole}`;
+    const clients = connectedClients.get(clientKey);
+    
+    if (clients) {
+      const notificationData = JSON.stringify({
+        type: 'notification',
+        ...notification,
+        timestamp: new Date().toISOString()
+      });
+      
+      clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(notificationData);
+        }
+      });
+    }
+  };
+  
+  const broadcastToTenant = (tenantId: number, notification: any) => {
+    connectedClients.forEach((clients, clientKey) => {
+      if (clientKey.startsWith(`${tenantId}:`)) {
+        const notificationData = JSON.stringify({
+          type: 'notification',
+          ...notification,
+          timestamp: new Date().toISOString()
+        });
+        
+        clients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(notificationData);
+          }
+        });
+      }
+    });
+  };
+  
+  // Attach notification functions to the server for use in routes
+  (httpServer as any).sendNotification = sendNotification;
+  (httpServer as any).broadcastToTenant = broadcastToTenant;
+
   return httpServer;
 }
