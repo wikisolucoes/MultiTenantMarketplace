@@ -123,6 +123,7 @@ export const products = pgTable("products", {
 export const productImages = pgTable("product_images", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  variantId: integer("variant_id").references(() => productVariants.id, { onDelete: "cascade" }),
   url: varchar("url", { length: 500 }).notNull(),
   altText: varchar("alt_text", { length: 255 }),
   sortOrder: integer("sort_order").default(0).notNull(),
