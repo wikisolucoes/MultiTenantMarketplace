@@ -40,6 +40,8 @@ import { FinancialStats, Product, Order } from "@/types/api";
 import EnhancedProductManagement from "@/pages/EnhancedProductManagement";
 import ThemeManager from "@/components/storefront/ThemeManager";
 import BannerManager from "@/components/storefront/BannerManager";
+import UserManagement from "@/components/UserManagement";
+import SupportTicketSystem from "@/components/SupportTicketSystem";
 import { 
   LayoutDashboard,
   Package,
@@ -61,7 +63,9 @@ import {
   XCircle,
   Info,
   Palette,
-  Image
+  Image,
+  Users,
+  Ticket
 } from "lucide-react";
 
 const withdrawalSchema = z.object({
@@ -417,6 +421,22 @@ export default function MerchantDashboard() {
               >
                 <Image className="mr-3 h-4 w-4" />
                 Banners
+              </Button>
+              <Button
+                variant="ghost"
+                className={`w-full justify-start ${activeSection === "users" ? "bg-accent" : ""}`}
+                onClick={() => setActiveSection("users")}
+              >
+                <Users className="mr-3 h-4 w-4" />
+                Usuários
+              </Button>
+              <Button
+                variant="ghost"
+                className={`w-full justify-start ${activeSection === "support" ? "bg-accent" : ""}`}
+                onClick={() => setActiveSection("support")}
+              >
+                <Ticket className="mr-3 h-4 w-4" />
+                Suporte
               </Button>
               <Button
                 variant="ghost"
