@@ -14,6 +14,7 @@ import EcommerceAdmin from "@/pages/EcommerceAdmin";
 import TaxConfiguration from "@/pages/TaxConfiguration";
 import PluginSubscriptions from "@/pages/PluginSubscriptions";
 import EnhancedProductManagement from "@/pages/EnhancedProductManagement";
+import NotificationDemo from "@/pages/NotificationDemo";
 
 function AppRouter() {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
@@ -69,6 +70,9 @@ function AppRouter() {
       </Route>
       <Route path="/products">
         {isAuth && userRole === "merchant" ? <EnhancedProductManagement /> : <Home />}
+      </Route>
+      <Route path="/notifications-demo">
+        {isAuth && userRole === "merchant" ? <NotificationDemo /> : <Home />}
       </Route>
       <Route path="/storefront*" component={StorefrontSPA} />
       <Route component={NotFound} />
