@@ -106,11 +106,25 @@ export const orders = pgTable("orders", {
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
+  customerDocument: text("customer_document"), // CPF/CNPJ
+  customerPhone: text("customer_phone"),
+  customerAddress: text("customer_address"),
+  customerCity: text("customer_city"),
+  customerState: text("customer_state"),
+  customerZipCode: text("customer_zip_code"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }).default("0.00"),
   status: text("status", { enum: ["pending", "paid", "shipped", "delivered", "cancelled"] }).notNull().default("pending"),
   paymentMethod: text("payment_method", { enum: ["pix", "credit_card", "boleto"] }).notNull(),
   paymentStatus: text("payment_status", { enum: ["pending", "paid", "failed"] }).notNull().default("pending"),
   celcoinTransactionId: text("celcoin_transaction_id"),
+  // NF-e fields
+  nfeKey: text("nfe_key"), // Chave da NF-e
+  nfeNumber: text("nfe_number"), // Número da NF-e
+  nfeStatus: text("nfe_status", { enum: ["not_issued", "pending", "issued", "cancelled", "error"] }).default("not_issued"),
+  nfeXml: text("nfe_xml"), // XML da NF-e
+  nfeProtocol: text("nfe_protocol"), // Protocolo de autorização
+  nfeErrorMessage: text("nfe_error_message"), // Mensagem de erro se houver
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -726,25 +740,65 @@ export type ReconciliationRecord = typeof reconciliationRecords.$inferSelect;
 export type InsertReconciliationRecord = z.infer<typeof insertReconciliationRecordSchema>;
 export type ApiRateLimit = typeof apiRateLimits.$inferSelect;
 
-// New types for plugin system and LGPD compliance
+// Subscription plans for tenant billing
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
+  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }),
+  features: jsonb("features").notNull(), // JSON array of features
+  maxProducts: integer("max_products").default(100),
+  maxOrders: integer("max_orders").default(1000),
+  maxStorage: integer("max_storage").default(1024), // MB
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Tenant subscriptions
+export const tenantSubscriptions = pgTable("tenant_subscriptions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull().unique(),
+  planId: integer("plan_id").references(() => subscriptionPlans.id).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("active"), // active, cancelled, suspended, past_due
+  billingCycle: varchar("billing_cycle", { length: 10 }).notNull().default("monthly"), // monthly, yearly
+  currentPeriodStart: timestamp("current_period_start").notNull(),
+  currentPeriodEnd: timestamp("current_period_end").notNull(),
+  trialStart: timestamp("trial_start"),
+  trialEnd: timestamp("trial_end"),
+  cancelledAt: timestamp("cancelled_at"),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Enhanced subscription system tables (replacing duplicates)
+
+// New types for enhanced system
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
+export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
+export type InsertTenantSubscription = typeof tenantSubscriptions.$inferInsert;
 export type Plugin = typeof plugins.$inferSelect;
-export type InsertPlugin = z.infer<typeof insertPluginSchema>;
+export type InsertPlugin = typeof plugins.$inferInsert;
 export type TenantPluginSubscription = typeof tenantPluginSubscriptions.$inferSelect;
-export type InsertTenantPluginSubscription = z.infer<typeof insertTenantPluginSubscriptionSchema>;
+export type InsertTenantPluginSubscription = typeof tenantPluginSubscriptions.$inferInsert;
 export type UserSession = typeof userSessions.$inferSelect;
-export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+export type InsertUserSession = typeof userSessions.$inferInsert;
 export type CookieConsent = typeof cookieConsents.$inferSelect;
-export type InsertCookieConsent = z.infer<typeof insertCookieConsentSchema>;
+export type InsertCookieConsent = typeof cookieConsents.$inferInsert;
 export type NfeConfiguration = typeof nfeConfigurations.$inferSelect;
-export type InsertNfeConfiguration = z.infer<typeof insertNfeConfigurationSchema>;
+export type InsertNfeConfiguration = typeof nfeConfigurations.$inferInsert;
 export type NfeDocument = typeof nfeDocuments.$inferSelect;
-export type InsertNfeDocument = z.infer<typeof insertNfeDocumentSchema>;
+export type InsertNfeDocument = typeof nfeDocuments.$inferInsert;
 export type XmlImport = typeof xmlImports.$inferSelect;
-export type InsertXmlImport = z.infer<typeof insertXmlImportSchema>;
+export type InsertXmlImport = typeof xmlImports.$inferInsert;
 export type MarketplaceIntegration = typeof marketplaceIntegrations.$inferSelect;
-export type InsertMarketplaceIntegration = z.infer<typeof insertMarketplaceIntegrationSchema>;
+export type InsertMarketplaceIntegration = typeof marketplaceIntegrations.$inferInsert;
 export type MarketplaceProduct = typeof marketplaceProducts.$inferSelect;
-export type InsertMarketplaceProduct = z.infer<typeof insertMarketplaceProductSchema>;
+export type InsertMarketplaceProduct = typeof marketplaceProducts.$inferInsert;
 
 // Customer tables for storefront functionality
 export const customers = pgTable("customers", {
