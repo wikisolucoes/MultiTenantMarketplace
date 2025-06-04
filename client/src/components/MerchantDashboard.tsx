@@ -60,6 +60,8 @@ type WithdrawalData = z.infer<typeof withdrawalSchema>;
 
 export default function MerchantDashboard() {
   const [activeSection, setActiveSection] = useState("overview");
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showProductForm, setShowProductForm] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getUser();
@@ -100,8 +102,8 @@ export default function MerchantDashboard() {
     },
     onSuccess: () => {
       toast({
-        title: "Saque solicitado com sucesso!",
-        description: "Seu saque será processado em até 2 dias úteis.",
+        title: "Saque solicitado",
+        description: "Seu saque foi solicitado e será processado em 1-2 dias úteis.",
       });
       withdrawalForm.reset();
       queryClient.invalidateQueries({ queryKey: ["/api/tenant/withdrawals"] });
@@ -109,12 +111,64 @@ export default function MerchantDashboard() {
     },
     onError: (error: any) => {
       toast({
-        title: "Erro ao solicitar saque",
-        description: error.message || "Tente novamente.",
+        title: "Erro",
+        description: error.message || "Erro ao solicitar saque",
         variant: "destructive",
       });
     },
   });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      const response = await apiRequest("DELETE", `/api/tenant/products/${productId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Produto excluído",
+        description: "Produto foi excluído com sucesso.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/products"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao excluir produto",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Action handlers
+  const handleNewProduct = () => {
+    setEditingProduct(null);
+    setShowProductForm(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setShowProductForm(true);
+  };
+
+  const handleDeleteProduct = (productId: number) => {
+    if (confirm("Tem certeza que deseja excluir este produto?")) {
+      deleteProductMutation.mutate(productId);
+    }
+  };
+
+  const handleViewOrder = (orderId: number) => {
+    toast({
+      title: "Ver pedido",
+      description: `Abrindo detalhes do pedido #${orderId}`,
+    });
+  };
+
+  const handleEditOrder = (orderId: number) => {
+    toast({
+      title: "Editar pedido",
+      description: `Editando pedido #${orderId}`,
+    });
+  };
 
   const handleLogout = () => {
     removeAuthToken();
@@ -725,7 +779,7 @@ export default function MerchantDashboard() {
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle>Produtos</CardTitle>
-                    <Button>
+                    <Button onClick={handleNewProduct}>
                       <Package className="mr-2 h-4 w-4" />
                       Novo Produto
                     </Button>
@@ -738,7 +792,7 @@ export default function MerchantDashboard() {
                     <div className="text-center py-8 text-muted-foreground">
                       <Package className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
                       <p>Nenhum produto cadastrado</p>
-                      <Button className="mt-4">Cadastrar primeiro produto</Button>
+                      <Button className="mt-4" onClick={handleNewProduct}>Cadastrar primeiro produto</Button>
                     </div>
                   ) : (
                     <Table>
