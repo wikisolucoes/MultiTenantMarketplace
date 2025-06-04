@@ -25,6 +25,7 @@ import {
   type LoginData,
   type TenantRegistrationData 
 } from "@shared/schema";
+import { SessionManager } from "./services/session-manager";
 
 // Rate limiting
 const authLimiter = rateLimit({
