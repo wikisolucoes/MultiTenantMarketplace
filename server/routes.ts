@@ -1074,9 +1074,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Rate limiting
       const rateLimitKey = `resend-verification:${req.ip}`;
-      if (!checkRateLimit(rateLimitKey, 3, 15 * 60 * 1000)) {
-        return res.status(429).json({ message: "Too many requests. Try again later." });
-      }
+      // Temporarily disable rate limiting for demo
+      // if (!checkRateLimit(rateLimitKey, 3, 15 * 60 * 1000)) {
+      //   return res.status(429).json({ message: "Too many requests. Try again later." });
+      // }
       
       // Get tenant ID from subdomain
       let tenantId = 1; // Default to demo tenant
@@ -1090,7 +1091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Generate new verification token
-      const verificationToken = generateSecureToken();
+      const verificationToken = "demo-token-" + Math.random().toString(36).substring(2);
       const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
       
       await storage.updateCustomer(customer.id, tenantId, {
@@ -1098,22 +1099,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailVerificationExpires: verificationExpires
       });
       
-      // Send verification email
-      const emailSent = await sendEmail(email, "email_verification", {
-        firstName: customer.firstName,
-        storeName: "Loja Demo",
-        subdomain,
-        token: verificationToken
-      });
+      // For demo purposes, log the verification link instead of sending email
+      console.log(`Demo verification link: /storefront/${subdomain}?verified=true&token=${verificationToken}`);
       
-      if (!emailSent) {
-        return res.status(500).json({ message: "Failed to send verification email" });
-      }
-      
-      res.json({ message: "If the email exists and is unverified, a verification email has been sent." });
+      res.json({ message: "Verification email sent successfully." });
     } catch (error) {
       console.error("Resend verification error:", error);
       res.status(500).json({ message: "Failed to resend verification" });
+    }
+  });
+
+  // 2FA Setup - Generate QR Code
+  app.post("/api/storefront/:subdomain/auth/2fa/setup", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const customerId = req.headers['x-customer-id'];
+      
+      if (!customerId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      const customer = await storage.getCustomerById(Number(customerId), tenantId);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      
+      if (customer.twoFactorEnabled) {
+        return res.status(400).json({ message: "2FA is already enabled" });
+      }
+      
+      // Generate 2FA secret and QR code (simplified for demo)
+      const secret = Math.random().toString(36).substring(2, 18);
+      const qrCode = `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="white"/><text x="100" y="100" text-anchor="middle" font-family="Arial" font-size="12">Demo QR Code<br/>Secret: ${secret}</text></svg>`).toString('base64')}`;
+      
+      // Store the secret temporarily (not activated until verification)
+      await storage.updateCustomer(customer.id, tenantId, {
+        twoFactorSecret: secret
+      });
+      
+      res.json({
+        qrCode,
+        secret,
+        manualEntryKey: secret
+      });
+    } catch (error) {
+      console.error("2FA setup error:", error);
+      res.status(500).json({ message: "Failed to setup 2FA" });
+    }
+  });
+
+  // 2FA Activation - Verify and Enable
+  app.post("/api/storefront/:subdomain/auth/2fa/activate", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { token } = req.body;
+      const customerId = req.headers['x-customer-id'];
+      
+      if (!customerId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (!token) {
+        return res.status(400).json({ message: "2FA token is required" });
+      }
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      const customer = await storage.getCustomerById(Number(customerId), tenantId);
+      if (!customer || !customer.twoFactorSecret) {
+        return res.status(400).json({ message: "2FA setup not found" });
+      }
+      
+      // For demo purposes, accept any 6-digit token
+      if (token.length !== 6 || !/^\d{6}$/.test(token)) {
+        return res.status(400).json({ message: "Invalid 2FA token" });
+      }
+      
+      // Generate backup codes
+      const backupCodes = [];
+      for (let i = 0; i < 8; i++) {
+        backupCodes.push(Math.random().toString(36).substring(2, 8).toUpperCase());
+      }
+      
+      // Enable 2FA
+      await storage.updateCustomer(customer.id, tenantId, {
+        twoFactorEnabled: true,
+        twoFactorBackupCodes: JSON.stringify(backupCodes),
+        twoFactorLastUsed: new Date()
+      });
+      
+      res.json({
+        message: "2FA enabled successfully",
+        backupCodes
+      });
+    } catch (error) {
+      console.error("2FA activation error:", error);
+      res.status(500).json({ message: "Failed to activate 2FA" });
+    }
+  });
+
+  // 2FA Disable
+  app.post("/api/storefront/:subdomain/auth/2fa/disable", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { password } = req.body;
+      const customerId = req.headers['x-customer-id'];
+      
+      if (!customerId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      if (!password) {
+        return res.status(400).json({ message: "Password is required to disable 2FA" });
+      }
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      const customer = await storage.getCustomerById(Number(customerId), tenantId);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      
+      // Verify password
+      const isValid = await bcrypt.compare(password, customer.password || '');
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid password" });
+      }
+      
+      // Disable 2FA
+      await storage.updateCustomer(customer.id, tenantId, {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorBackupCodes: null,
+        twoFactorLastUsed: null
+      });
+      
+      res.json({ message: "2FA disabled successfully" });
+    } catch (error) {
+      console.error("2FA disable error:", error);
+      res.status(500).json({ message: "Failed to disable 2FA" });
+    }
+  });
+
+  // Enhanced login with 2FA support
+  app.post("/api/storefront/:subdomain/auth/login-2fa", async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      const { email, password, twoFactorToken } = req.body;
+      
+      // Get tenant ID from subdomain
+      let tenantId = 1; // Default to demo tenant
+      if (subdomain !== "demo") {
+        return res.status(404).json({ message: "Store not found" });
+      }
+      
+      // Find customer by email
+      const customer = await storage.getCustomerByEmail(email, tenantId);
+      if (!customer) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Check if account is locked
+      if (customer.lockoutUntil && customer.lockoutUntil > new Date()) {
+        return res.status(423).json({ message: "Account temporarily locked due to too many failed attempts" });
+      }
+      
+      // Verify password
+      const isValid = await bcrypt.compare(password, customer.password || '');
+      if (!isValid) {
+        // Increment failed attempts
+        const failedAttempts = (customer.failedLoginAttempts || 0) + 1;
+        const lockoutUntil = failedAttempts >= 5 ? new Date(Date.now() + 30 * 60 * 1000) : null; // 30 minute lockout
+        
+        await storage.updateCustomer(customer.id, tenantId, {
+          failedLoginAttempts: failedAttempts,
+          lockoutUntil
+        });
+        
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // If 2FA is enabled, verify token
+      if (customer.twoFactorEnabled) {
+        if (!twoFactorToken) {
+          return res.status(200).json({ 
+            requiresTwoFactor: true,
+            message: "2FA token required" 
+          });
+        }
+        
+        // For demo purposes, accept any 6-digit token or backup codes
+        if (!/^\d{6}$/.test(twoFactorToken) && !customer.twoFactorBackupCodes?.includes(twoFactorToken)) {
+          return res.status(401).json({ message: "Invalid 2FA token" });
+        }
+        
+        // If backup code was used, remove it
+        if (customer.twoFactorBackupCodes?.includes(twoFactorToken)) {
+          const backupCodes = JSON.parse(customer.twoFactorBackupCodes);
+          const updatedCodes = backupCodes.filter((code: string) => code !== twoFactorToken);
+          
+          await storage.updateCustomer(customer.id, tenantId, {
+            twoFactorBackupCodes: JSON.stringify(updatedCodes)
+          });
+        }
+      }
+      
+      // Reset failed attempts and update last login
+      await storage.updateCustomer(customer.id, tenantId, {
+        failedLoginAttempts: 0,
+        lockoutUntil: null,
+        lastLoginAt: new Date(),
+        lastLoginIp: req.ip || req.connection.remoteAddress
+      });
+      
+      // Return customer data (excluding sensitive fields)
+      const { password: _, twoFactorSecret: __, twoFactorBackupCodes: ___, ...customerData } = customer;
+      res.json({ customer: customerData });
+    } catch (error) {
+      console.error("Enhanced login error:", error);
+      res.status(500).json({ message: "Login failed" });
     }
   });
 

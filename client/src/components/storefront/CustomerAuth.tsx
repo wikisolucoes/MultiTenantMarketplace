@@ -5,9 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, Mail, Lock, User, Phone, Calendar, Users } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Eye, EyeOff, Mail, Lock, User, Phone, Calendar, Users, Shield, AlertTriangle } from "lucide-react";
 import { FaGoogle, FaApple, FaFacebook } from "react-icons/fa";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import PasswordRecovery from "./PasswordRecovery";
 
 interface CustomerAuthProps {
   onLogin: (customer: any) => void;
@@ -34,6 +36,9 @@ export default function CustomerAuth({ onLogin, onClose, storeName, subdomain }:
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("login");
+  const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [twoFactorToken, setTwoFactorToken] = useState("");
   
   const [loginData, setLoginData] = useState({
     email: "",
@@ -58,18 +63,33 @@ export default function CustomerAuth({ onLogin, onClose, storeName, subdomain }:
     setError("");
 
     try {
-      const response = await fetch(`/api/storefront/${subdomain}/auth/login`, {
+      // Try enhanced login with 2FA support first
+      const response = await fetch(`/api/storefront/${subdomain}/auth/login-2fa`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(loginData),
+        body: JSON.stringify({
+          email: loginData.email,
+          password: loginData.password,
+          twoFactorToken: twoFactorToken || undefined
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 423) {
+          throw new Error("Conta temporariamente bloqueada devido a muitas tentativas de login");
+        }
         throw new Error(data.message || "Login failed");
+      }
+
+      // Check if 2FA is required
+      if (data.requiresTwoFactor) {
+        setRequires2FA(true);
+        setError("");
+        return;
       }
 
       // Store customer data in localStorage
@@ -222,6 +242,20 @@ export default function CustomerAuth({ onLogin, onClose, storeName, subdomain }:
       .replace(/(\d{4,5})(\d{4})$/, '$1-$2');
   };
 
+  // Show password recovery component if requested
+  if (showPasswordRecovery) {
+    return (
+      <PasswordRecovery
+        subdomain={subdomain}
+        onBack={() => setShowPasswordRecovery(false)}
+        onSuccess={() => {
+          setShowPasswordRecovery(false);
+          setActiveTab("login");
+        }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -321,15 +355,46 @@ export default function CustomerAuth({ onLogin, onClose, storeName, subdomain }:
                   </div>
                 </div>
 
-                {error && (
-                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
-                    {error}
+                {requires2FA && (
+                  <div className="space-y-2">
+                    <Label htmlFor="twoFactorToken">Código de Autenticação (6 dígitos)</Label>
+                    <div className="relative">
+                      <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="twoFactorToken"
+                        placeholder="000000"
+                        className="pl-10"
+                        value={twoFactorToken}
+                        onChange={(e) => setTwoFactorToken(e.target.value.replace(/\D/g, '').substring(0, 6))}
+                        maxLength={6}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-600">
+                      Digite o código do seu app autenticador ou use um código de backup
+                    </p>
                   </div>
+                )}
+
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Entrando..." : "Entrar"}
                 </Button>
+
+                <div className="text-center">
+                  <Button 
+                    variant="link" 
+                    onClick={() => setShowPasswordRecovery(true)} 
+                    className="text-sm"
+                  >
+                    Esqueceu sua senha?
+                  </Button>
+                </div>
               </form>
             </TabsContent>
 
