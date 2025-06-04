@@ -2,19 +2,21 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, User, Mail, Phone, MapPin } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Eye, EyeOff, Mail, Lock, User, Phone, Calendar, Users } from "lucide-react";
+import { FaGoogle, FaApple, FaFacebook } from "react-icons/fa";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CustomerAuthProps {
-  onLogin: (email: string, password: string) => void;
-  onRegister: (userData: CustomerRegistrationData) => void;
-  onBack: () => void;
-  isLoading?: boolean;
+  onLogin: (customer: any) => void;
+  onClose: () => void;
+  storeName: string;
+  subdomain: string;
 }
 
-export interface CustomerRegistrationData {
+interface FormData {
   firstName: string;
   lastName: string;
   email: string;
@@ -23,31 +25,22 @@ export interface CustomerRegistrationData {
   phone: string;
   cpf: string;
   birthDate: string;
-  address: {
-    zipCode: string;
-    street: string;
-    number: string;
-    complement?: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-  };
-  acceptTerms: boolean;
-  acceptNewsletter: boolean;
+  gender: string;
 }
 
-export default function CustomerAuth({ onLogin, onRegister, onBack, isLoading }: CustomerAuthProps) {
+export default function CustomerAuth({ onLogin, onClose, storeName, subdomain }: CustomerAuthProps) {
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("login");
   
-  // Login form state
   const [loginData, setLoginData] = useState({
     email: "",
     password: ""
   });
 
-  // Registration form state
-  const [registerData, setRegisterData] = useState<CustomerRegistrationData>({
+  const [registerData, setRegisterData] = useState<FormData>({
     firstName: "",
     lastName: "",
     email: "",
@@ -56,419 +49,483 @@ export default function CustomerAuth({ onLogin, onRegister, onBack, isLoading }:
     phone: "",
     cpf: "",
     birthDate: "",
-    address: {
-      zipCode: "",
-      street: "",
-      number: "",
-      complement: "",
-      neighborhood: "",
-      city: "",
-      state: ""
-    },
-    acceptTerms: false,
-    acceptNewsletter: false
+    gender: ""
   });
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const validateCPF = (cpf: string): boolean => {
-    const cleanCPF = cpf.replace(/\D/g, '');
-    return cleanCPF.length === 11;
-  };
-
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validateRegistration = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!registerData.firstName.trim()) newErrors.firstName = "Nome é obrigatório";
-    if (!registerData.lastName.trim()) newErrors.lastName = "Sobrenome é obrigatório";
-    if (!validateEmail(registerData.email)) newErrors.email = "Email inválido";
-    if (registerData.password.length < 6) newErrors.password = "Senha deve ter pelo menos 6 caracteres";
-    if (registerData.password !== registerData.confirmPassword) newErrors.confirmPassword = "Senhas não coincidem";
-    if (!validateCPF(registerData.cpf)) newErrors.cpf = "CPF inválido";
-    if (!registerData.phone.trim()) newErrors.phone = "Telefone é obrigatório";
-    if (!registerData.address.zipCode.trim()) newErrors.zipCode = "CEP é obrigatório";
-    if (!registerData.acceptTerms) newErrors.acceptTerms = "Você deve aceitar os termos";
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginData.email && loginData.password) {
-      onLogin(loginData.email, loginData.password);
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/storefront/${subdomain}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(loginData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      // Store customer data in localStorage
+      localStorage.setItem("customer", JSON.stringify(data.customer));
+      onLogin(data.customer);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validateRegistration()) {
-      onRegister(registerData);
+    setIsLoading(true);
+    setError("");
+
+    // Validate passwords match
+    if (registerData.password !== registerData.confirmPassword) {
+      setError("As senhas não coincidem");
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate password strength
+    if (registerData.password.length < 6) {
+      setError("A senha deve ter pelo menos 6 caracteres");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/storefront/${subdomain}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firstName: registerData.firstName,
+          lastName: registerData.lastName,
+          email: registerData.email,
+          password: registerData.password,
+          phone: registerData.phone,
+          cpf: registerData.cpf,
+          birthDate: registerData.birthDate,
+          gender: registerData.gender,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Registration failed");
+      }
+
+      // Store customer data in localStorage
+      localStorage.setItem("customer", JSON.stringify(data.customer));
+      onLogin(data.customer);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSocialLogin = async (provider: string) => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      // In a real app, this would integrate with Google/Apple/Facebook SDKs
+      // For demo purposes, we'll simulate the social login flow
+      if (provider === 'google') {
+        // Simulate Google OAuth flow
+        const mockGoogleResponse = {
+          providerId: `google_${Date.now()}`,
+          email: "usuario@gmail.com",
+          firstName: "Usuário",
+          lastName: "Google"
+        };
+
+        const response = await fetch(`/api/storefront/${subdomain}/auth/social`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: 'google',
+            ...mockGoogleResponse
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Social login failed");
+        }
+
+        localStorage.setItem("customer", JSON.stringify(data.customer));
+        onLogin(data.customer);
+      } else if (provider === 'apple') {
+        // Simulate Apple ID flow
+        const mockAppleResponse = {
+          providerId: `apple_${Date.now()}`,
+          email: "usuario@icloud.com",
+          firstName: "Usuário",
+          lastName: "Apple"
+        };
+
+        const response = await fetch(`/api/storefront/${subdomain}/auth/social`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            provider: 'apple',
+            ...mockAppleResponse
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Social login failed");
+        }
+
+        localStorage.setItem("customer", JSON.stringify(data.customer));
+        onLogin(data.customer);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const formatCPF = (value: string) => {
-    const cleanValue = value.replace(/\D/g, '');
-    return cleanValue.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    return value
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1');
   };
 
   const formatPhone = (value: string) => {
-    const cleanValue = value.replace(/\D/g, '');
-    return cleanValue.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-  };
-
-  const formatZipCode = (value: string) => {
-    const cleanValue = value.replace(/\D/g, '');
-    return cleanValue.replace(/(\d{5})(\d{3})/, '$1-$2');
+    return value
+      .replace(/\D/g, '')
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4,5})(\d{4})$/, '$1-$2');
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-md">
-      <div className="mb-6">
-        <Button variant="ghost" onClick={onBack} className="mb-4">
-          ← Voltar
-        </Button>
-        <h1 className="text-2xl font-bold text-center">Minha Conta</h1>
-      </div>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent">
+            {storeName}
+          </CardTitle>
+          <CardDescription>
+            Entre na sua conta ou crie uma nova
+          </CardDescription>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="absolute right-4 top-4"
+          >
+            ✕
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="register">Criar Conta</TabsTrigger>
+            </TabsList>
 
-      <Tabs defaultValue="login" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="login">Entrar</TabsTrigger>
-          <TabsTrigger value="register">Cadastrar</TabsTrigger>
-        </TabsList>
+            <TabsContent value="login" className="space-y-4 mt-6">
+              <div className="space-y-4">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleSocialLogin('google')}
+                  disabled={isLoading}
+                >
+                  <FaGoogle className="mr-2 h-4 w-4" />
+                  Continuar com Google
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleSocialLogin('apple')}
+                  disabled={isLoading}
+                >
+                  <FaApple className="mr-2 h-4 w-4" />
+                  Continuar com Apple ID
+                </Button>
+              </div>
 
-        <TabsContent value="login">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="h-5 w-5 mr-2" />
-                Fazer Login
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <Label htmlFor="loginEmail">Email</Label>
-                  <Input
-                    id="loginEmail"
-                    type="email"
-                    value={loginData.email}
-                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                    placeholder="seu@email.com"
-                    required
-                  />
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
                 </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Ou continue com email
+                  </span>
+                </div>
+              </div>
 
-                <div>
-                  <Label htmlFor="loginPassword">Senha</Label>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
                   <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="loginPassword"
-                      type={showPassword ? "text" : "password"}
-                      value={loginData.password}
-                      onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                      placeholder="••••••••"
+                      id="email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      className="pl-10"
+                      value={loginData.email}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
                       required
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Sua senha"
+                      className="pl-10 pr-10"
+                      value={loginData.password}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                    {error}
+                  </div>
+                )}
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Entrando..." : "Entrar"}
                 </Button>
-
-                <div className="text-center">
-                  <Button variant="link" className="text-sm">
-                    Esqueci minha senha
-                  </Button>
-                </div>
               </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="register">
-          <Card>
-            <CardHeader>
-              <CardTitle>Criar Conta</CardTitle>
-            </CardHeader>
-            <CardContent>
+            <TabsContent value="register" className="space-y-4 mt-6">
+              <div className="space-y-4">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleSocialLogin('google')}
+                  disabled={isLoading}
+                >
+                  <FaGoogle className="mr-2 h-4 w-4" />
+                  Criar conta com Google
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleSocialLogin('apple')}
+                  disabled={isLoading}
+                >
+                  <FaApple className="mr-2 h-4 w-4" />
+                  Criar conta com Apple ID
+                </Button>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Ou preencha os dados
+                  </span>
+                </div>
+              </div>
+
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="firstName">Nome *</Label>
-                    <Input
-                      id="firstName"
-                      value={registerData.firstName}
-                      onChange={(e) => setRegisterData({ ...registerData, firstName: e.target.value })}
-                      placeholder="João"
-                      className={errors.firstName ? "border-red-500" : ""}
-                    />
-                    {errors.firstName && <p className="text-sm text-red-500 mt-1">{errors.firstName}</p>}
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">Nome</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="firstName"
+                        placeholder="João"
+                        className="pl-10"
+                        value={registerData.firstName}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, firstName: e.target.value }))}
+                        required
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="lastName">Sobrenome *</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Sobrenome</Label>
                     <Input
                       id="lastName"
-                      value={registerData.lastName}
-                      onChange={(e) => setRegisterData({ ...registerData, lastName: e.target.value })}
                       placeholder="Silva"
-                      className={errors.lastName ? "border-red-500" : ""}
+                      value={registerData.lastName}
+                      onChange={(e) => setRegisterData(prev => ({ ...prev, lastName: e.target.value }))}
+                      required
                     />
-                    {errors.lastName && <p className="text-sm text-red-500 mt-1">{errors.lastName}</p>}
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="registerEmail">Email *</Label>
-                  <Input
-                    id="registerEmail"
-                    type="email"
-                    value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    placeholder="seu@email.com"
-                    className={errors.email ? "border-red-500" : ""}
-                  />
-                  {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="registerEmail">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="registerEmail"
+                      type="email"
+                      placeholder="seu@email.com"
+                      className="pl-10"
+                      value={registerData.email}
+                      onChange={(e) => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="registerPassword">Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="registerPassword"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Mínimo 6 caracteres"
+                      className="pl-10 pr-10"
+                      value={registerData.password}
+                      onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirmar Senha</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirme sua senha"
+                      className="pl-10 pr-10"
+                      value={registerData.confirmPassword}
+                      onChange={(e) => setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="phone">Telefone *</Label>
-                    <Input
-                      id="phone"
-                      value={registerData.phone}
-                      onChange={(e) => setRegisterData({ ...registerData, phone: formatPhone(e.target.value) })}
-                      placeholder="(11) 99999-9999"
-                      className={errors.phone ? "border-red-500" : ""}
-                    />
-                    {errors.phone && <p className="text-sm text-red-500 mt-1">{errors.phone}</p>}
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefone (opcional)</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="phone"
+                        placeholder="(11) 99999-9999"
+                        className="pl-10"
+                        value={registerData.phone}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
+                        maxLength={15}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="cpf">CPF *</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="cpf">CPF (opcional)</Label>
                     <Input
                       id="cpf"
-                      value={registerData.cpf}
-                      onChange={(e) => setRegisterData({ ...registerData, cpf: formatCPF(e.target.value) })}
                       placeholder="000.000.000-00"
-                      className={errors.cpf ? "border-red-500" : ""}
+                      value={registerData.cpf}
+                      onChange={(e) => setRegisterData(prev => ({ ...prev, cpf: formatCPF(e.target.value) }))}
+                      maxLength={14}
                     />
-                    {errors.cpf && <p className="text-sm text-red-500 mt-1">{errors.cpf}</p>}
                   </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="birthDate">Data de Nascimento</Label>
-                  <Input
-                    id="birthDate"
-                    type="date"
-                    value={registerData.birthDate}
-                    onChange={(e) => setRegisterData({ ...registerData, birthDate: e.target.value })}
-                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="registerPassword">Senha *</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="birthDate">Data de Nascimento</Label>
                     <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        id="registerPassword"
-                        type={showPassword ? "text" : "password"}
-                        value={registerData.password}
-                        onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                        placeholder="••••••••"
-                        className={errors.password ? "border-red-500" : ""}
+                        id="birthDate"
+                        type="date"
+                        className="pl-10"
+                        value={registerData.birthDate}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, birthDate: e.target.value }))}
                       />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
                     </div>
-                    {errors.password && <p className="text-sm text-red-500 mt-1">{errors.password}</p>}
                   </div>
-                  <div>
-                    <Label htmlFor="confirmPassword">Confirmar Senha *</Label>
-                    <div className="relative">
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={registerData.confirmPassword}
-                        onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                        placeholder="••••••••"
-                        className={errors.confirmPassword ? "border-red-500" : ""}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    {errors.confirmPassword && <p className="text-sm text-red-500 mt-1">{errors.confirmPassword}</p>}
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Gênero</Label>
+                    <Select value={registerData.gender} onValueChange={(value) => setRegisterData(prev => ({ ...prev, gender: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="feminino">Feminino</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                {/* Address Section */}
-                <div className="border-t pt-4">
-                  <h3 className="text-lg font-semibold mb-4 flex items-center">
-                    <MapPin className="h-5 w-5 mr-2" />
-                    Endereço
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="zipCode">CEP *</Label>
-                      <Input
-                        id="zipCode"
-                        value={registerData.address.zipCode}
-                        onChange={(e) => setRegisterData({
-                          ...registerData,
-                          address: { ...registerData.address, zipCode: formatZipCode(e.target.value) }
-                        })}
-                        placeholder="00000-000"
-                        className={errors.zipCode ? "border-red-500" : ""}
-                      />
-                      {errors.zipCode && <p className="text-sm text-red-500 mt-1">{errors.zipCode}</p>}
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="col-span-2">
-                        <Label htmlFor="street">Rua</Label>
-                        <Input
-                          id="street"
-                          value={registerData.address.street}
-                          onChange={(e) => setRegisterData({
-                            ...registerData,
-                            address: { ...registerData.address, street: e.target.value }
-                          })}
-                          placeholder="Rua das Flores"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="number">Número</Label>
-                        <Input
-                          id="number"
-                          value={registerData.address.number}
-                          onChange={(e) => setRegisterData({
-                            ...registerData,
-                            address: { ...registerData.address, number: e.target.value }
-                          })}
-                          placeholder="123"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="complement">Complemento</Label>
-                      <Input
-                        id="complement"
-                        value={registerData.address.complement}
-                        onChange={(e) => setRegisterData({
-                          ...registerData,
-                          address: { ...registerData.address, complement: e.target.value }
-                        })}
-                        placeholder="Apto 45, Bloco B"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="neighborhood">Bairro</Label>
-                        <Input
-                          id="neighborhood"
-                          value={registerData.address.neighborhood}
-                          onChange={(e) => setRegisterData({
-                            ...registerData,
-                            address: { ...registerData.address, neighborhood: e.target.value }
-                          })}
-                          placeholder="Centro"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="city">Cidade</Label>
-                        <Input
-                          id="city"
-                          value={registerData.address.city}
-                          onChange={(e) => setRegisterData({
-                            ...registerData,
-                            address: { ...registerData.address, city: e.target.value }
-                          })}
-                          placeholder="São Paulo"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="state">Estado</Label>
-                      <Input
-                        id="state"
-                        value={registerData.address.state}
-                        onChange={(e) => setRegisterData({
-                          ...registerData,
-                          address: { ...registerData.address, state: e.target.value }
-                        })}
-                        placeholder="SP"
-                        maxLength={2}
-                      />
-                    </div>
+                {error && (
+                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+                    {error}
                   </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="acceptTerms"
-                      checked={registerData.acceptTerms}
-                      onCheckedChange={(checked) => setRegisterData({ ...registerData, acceptTerms: !!checked })}
-                    />
-                    <Label htmlFor="acceptTerms" className="text-sm">
-                      Aceito os <Button variant="link" className="p-0 h-auto text-sm">termos de uso</Button> e a <Button variant="link" className="p-0 h-auto text-sm">política de privacidade</Button> *
-                    </Label>
-                  </div>
-                  {errors.acceptTerms && <p className="text-sm text-red-500">{errors.acceptTerms}</p>}
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="acceptNewsletter"
-                      checked={registerData.acceptNewsletter}
-                      onCheckedChange={(checked) => setRegisterData({ ...registerData, acceptNewsletter: !!checked })}
-                    />
-                    <Label htmlFor="acceptNewsletter" className="text-sm">
-                      Quero receber ofertas e novidades por email
-                    </Label>
-                  </div>
-                </div>
+                )}
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Criando conta..." : "Criar Conta"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }

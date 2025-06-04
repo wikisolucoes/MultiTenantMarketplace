@@ -104,39 +104,38 @@ export default function StorefrontSPA() {
     );
   };
 
-  const handleLogin = (email: string, password: string) => {
-    // Mock login - in real app, this would call API
+  const handleLogin = (customer: any) => {
     setIsAuthenticated(true);
-    setCurrentCustomer({
-      id: 1,
-      firstName: "João",
-      lastName: "Silva",
-      email: email,
-      phone: "(11) 99999-9999",
-      cpf: "123.456.789-00"
-    });
+    setCurrentCustomer(customer);
     setCurrentPage("home");
   };
 
-  const handleRegister = (userData: any) => {
-    // Mock registration - in real app, this would call API
+  const handleRegister = (customer: any) => {
     setIsAuthenticated(true);
-    setCurrentCustomer({
-      id: 1,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      email: userData.email,
-      phone: userData.phone,
-      cpf: userData.cpf
-    });
+    setCurrentCustomer(customer);
     setCurrentPage("home");
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     setCurrentCustomer(null);
+    localStorage.removeItem("customer");
     setCurrentPage("home");
   };
+
+  // Check for existing authentication on component mount
+  useEffect(() => {
+    const savedCustomer = localStorage.getItem("customer");
+    if (savedCustomer) {
+      try {
+        const customer = JSON.parse(savedCustomer);
+        setIsAuthenticated(true);
+        setCurrentCustomer(customer);
+      } catch (error) {
+        localStorage.removeItem("customer");
+      }
+    }
+  }, []);
 
   const handleNavigation = (page: string, productId?: number, filters?: any) => {
     console.log("Navigating to:", page); // Debug log
