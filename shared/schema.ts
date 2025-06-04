@@ -37,6 +37,52 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Customer accounts for storefront
+export const customers = pgTable("customers", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  password: varchar("password", { length: 255 }),
+  firstName: varchar("first_name", { length: 255 }).notNull(),
+  lastName: varchar("last_name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }),
+  cpf: varchar("cpf", { length: 20 }),
+  birthDate: timestamp("birth_date"),
+  gender: varchar("gender", { length: 20 }), // 'masculino', 'feminino', 'outro'
+  isActive: boolean("is_active").default(true).notNull(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  emailVerificationToken: varchar("email_verification_token", { length: 255 }),
+  passwordResetToken: varchar("password_reset_token", { length: 255 }),
+  passwordResetExpires: timestamp("password_reset_expires"),
+  // Social login fields
+  googleId: varchar("google_id", { length: 255 }),
+  appleId: varchar("apple_id", { length: 255 }),
+  facebookId: varchar("facebook_id", { length: 255 }),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Customer addresses
+export const customerAddresses = pgTable("customer_addresses", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // 'billing', 'shipping', 'both'
+  isDefault: boolean("is_default").default(false).notNull(),
+  firstName: varchar("first_name", { length: 255 }).notNull(),
+  lastName: varchar("last_name", { length: 255 }).notNull(),
+  company: varchar("company", { length: 255 }),
+  address1: varchar("address1", { length: 255 }).notNull(),
+  address2: varchar("address2", { length: 255 }),
+  city: varchar("city", { length: 255 }).notNull(),
+  state: varchar("state", { length: 100 }).notNull(),
+  zipCode: varchar("zip_code", { length: 20 }).notNull(),
+  country: varchar("country", { length: 100 }).default("Brasil").notNull(),
+  phone: varchar("phone", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const brands = pgTable("brands", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
@@ -261,6 +307,7 @@ export const notificationPreferences = pgTable("notification_preferences", {
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
+  customers: many(customers),
   brands: many(brands),
   categories: many(productCategories),
   products: many(products),
@@ -282,6 +329,21 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
 export const notificationPreferencesRelations = relations(notificationPreferences, ({ one }) => ({
   user: one(users, { fields: [notificationPreferences.userId], references: [users.id] }),
   tenant: one(tenants, { fields: [notificationPreferences.tenantId], references: [tenants.id] }),
+}));
+
+export const customersRelations = relations(customers, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [customers.tenantId],
+    references: [tenants.id],
+  }),
+  addresses: many(customerAddresses),
+}));
+
+export const customerAddressesRelations = relations(customerAddresses, ({ one }) => ({
+  customer: one(customers, {
+    fields: [customerAddresses.customerId],
+    references: [customers.id],
+  }),
 }));
 
 export const brandsRelations = relations(brands, ({ one, many }) => ({
@@ -431,6 +493,44 @@ export const tenantRegistrationSchema = z.object({
   adminPhone: z.string().min(10).max(15),
 });
 
+// Customer schemas
+export const insertCustomerSchema = createInsertSchema(customers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+});
+
+export const insertCustomerAddressSchema = createInsertSchema(customerAddresses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const customerLoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+export const customerRegisterSchema = z.object({
+  firstName: z.string().min(2),
+  lastName: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(6),
+  phone: z.string().optional(),
+  cpf: z.string().optional(),
+  birthDate: z.string().optional(),
+  gender: z.enum(["masculino", "feminino", "outro"]).optional(),
+});
+
+export const socialLoginSchema = z.object({
+  provider: z.enum(["google", "apple", "facebook"]),
+  providerId: z.string(),
+  email: z.string().email(),
+  firstName: z.string(),
+  lastName: z.string(),
+});
+
 // Type exports
 export type Tenant = typeof tenants.$inferSelect;
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
@@ -473,5 +573,14 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
 
+export type Customer = typeof customers.$inferSelect;
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+
+export type CustomerAddress = typeof customerAddresses.$inferSelect;
+export type InsertCustomerAddress = z.infer<typeof insertCustomerAddressSchema>;
+
 export type LoginData = z.infer<typeof loginSchema>;
 export type TenantRegistrationData = z.infer<typeof tenantRegistrationSchema>;
+export type CustomerLoginData = z.infer<typeof customerLoginSchema>;
+export type CustomerRegisterData = z.infer<typeof customerRegisterSchema>;
+export type SocialLoginData = z.infer<typeof socialLoginSchema>;
