@@ -12,6 +12,7 @@ import CustomerAccount from "../components/storefront/CustomerAccount";
 import About from "../components/storefront/About";
 import Contact from "../components/storefront/Contact";
 import Privacy from "../components/storefront/Privacy";
+import CookieConsent from "../components/CookieConsent";
 import { Tenant, Product } from "../types/api";
 
 export default function StorefrontSPA() {
@@ -287,6 +288,9 @@ export default function StorefrontSPA() {
         {renderCurrentPage()}
       </main>
       <StorefrontFooter tenant={tenant} onNavigate={handleNavigation} />
+      
+      {/* LGPD-compliant Cookie Consent Banner */}
+      {tenant && <CookieConsent tenantId={tenant.id} />}
     </div>
   );
 }
