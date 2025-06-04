@@ -9,6 +9,7 @@ import ProductDetailAdvanced from "../components/storefront/ProductDetailAdvance
 import Cart from "../components/storefront/Cart";
 import CheckoutAdvanced from "../components/storefront/CheckoutAdvanced";
 import CustomerAuth from "../components/storefront/CustomerAuth";
+import CustomerSecurity from "../components/storefront/CustomerSecurity";
 import CustomerAccount from "../components/storefront/CustomerAccount";
 import About from "../components/storefront/About";
 import Contact from "../components/storefront/Contact";
@@ -27,6 +28,7 @@ export default function StorefrontSPA() {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [brandFilter, setBrandFilter] = useState<string>("");
   const [showPromotions, setShowPromotions] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
   
   // Extract subdomain from URL path
   const pathParts = location.split('/');
