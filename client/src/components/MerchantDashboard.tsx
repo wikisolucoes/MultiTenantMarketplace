@@ -64,7 +64,17 @@ const withdrawalSchema = z.object({
   bankAccountId: z.string().min(1, "Conta bancária é obrigatória"),
 });
 
+const productSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório"),
+  description: z.string().min(1, "Descrição é obrigatória"),
+  price: z.string().min(1, "Preço é obrigatório"),
+  stock: z.string().min(0, "Estoque deve ser um número positivo"),
+  category: z.string().min(1, "Categoria é obrigatória"),
+  isActive: z.boolean().default(true),
+});
+
 type WithdrawalData = z.infer<typeof withdrawalSchema>;
+type ProductData = z.infer<typeof productSchema>;
 
 export default function MerchantDashboard() {
   const [activeSection, setActiveSection] = useState("overview");
@@ -79,6 +89,18 @@ export default function MerchantDashboard() {
     defaultValues: {
       amount: "",
       bankAccountId: "1", // Default bank account
+    },
+  });
+
+  const productForm = useForm<ProductData>({
+    resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      price: "",
+      stock: "0",
+      category: "",
+      isActive: true,
     },
   });
 
@@ -147,6 +169,36 @@ export default function MerchantDashboard() {
     },
   });
 
+  const productMutation = useMutation({
+    mutationFn: async (data: ProductData) => {
+      const method = editingProduct ? "PUT" : "POST";
+      const url = editingProduct ? `/api/tenant/products/${editingProduct.id}` : "/api/tenant/products";
+      const response = await apiRequest(method, url, {
+        ...data,
+        price: parseFloat(data.price),
+        stock: parseInt(data.stock),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: editingProduct ? "Produto atualizado" : "Produto criado",
+        description: editingProduct ? "Produto foi atualizado com sucesso." : "Produto foi criado com sucesso.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/products"] });
+      setShowProductForm(false);
+      setEditingProduct(null);
+      productForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao salvar produto",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Action handlers
   const handleNewProduct = () => {
     setEditingProduct(null);
@@ -155,6 +207,14 @@ export default function MerchantDashboard() {
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
+    productForm.reset({
+      name: product.name,
+      description: product.description || "",
+      price: product.price.toString(),
+      stock: product.stock.toString(),
+      category: "outros", // Default category since it's not in the Product type
+      isActive: product.isActive,
+    });
     setShowProductForm(true);
   };
 
@@ -934,6 +994,124 @@ export default function MerchantDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Product Form Dialog */}
+      <Dialog open={showProductForm} onOpenChange={setShowProductForm}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingProduct ? "Editar Produto" : "Novo Produto"}
+            </DialogTitle>
+          </DialogHeader>
+          <Form {...productForm}>
+            <form onSubmit={productForm.handleSubmit((data) => productMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={productForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome do produto" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={productForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Descrição</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Descrição do produto" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={productForm.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Preço</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={productForm.control}
+                  name="stock"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estoque</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={productForm.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma categoria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="eletronicos">Eletrônicos</SelectItem>
+                        <SelectItem value="roupas">Roupas</SelectItem>
+                        <SelectItem value="casa">Casa e Jardim</SelectItem>
+                        <SelectItem value="esportes">Esportes</SelectItem>
+                        <SelectItem value="livros">Livros</SelectItem>
+                        <SelectItem value="outros">Outros</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex items-center justify-between pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowProductForm(false);
+                    setEditingProduct(null);
+                    productForm.reset();
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={productMutation.isPending}
+                >
+                  {productMutation.isPending 
+                    ? "Salvando..." 
+                    : editingProduct 
+                      ? "Atualizar" 
+                      : "Criar"
+                  }
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
