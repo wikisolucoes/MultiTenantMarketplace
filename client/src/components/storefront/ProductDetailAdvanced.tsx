@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Product, Tenant } from "@/types/api";
-import { Star, Heart, Share2, ShoppingCart, Truck, Shield, RotateCcw } from "lucide-react";
+import { Star, Heart, Share2, ShoppingCart, Truck, Shield, RotateCcw, Gift, Calendar, Award } from "lucide-react";
 
 interface ProductDetailAdvancedProps {
   product: Product;
@@ -12,6 +14,8 @@ interface ProductDetailAdvancedProps {
   onAddToCart: (productId: number, quantity: number) => void;
   onBackToCatalog: () => void;
   onAddToWishlist?: (productId: number) => void;
+  customerType?: 'B2B' | 'B2C';
+  isAuthenticated?: boolean;
 }
 
 export default function ProductDetailAdvanced({ 
@@ -19,19 +23,119 @@ export default function ProductDetailAdvanced({
   tenant, 
   onAddToCart, 
   onBackToCatalog,
-  onAddToWishlist 
+  onAddToWishlist,
+  customerType = 'B2C',
+  isAuthenticated = false
 }: ProductDetailAdvancedProps) {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const [isInWishlist, setIsInWishlist] = useState(false);
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [currentPrice, setCurrentPrice] = useState(product.price);
+  const [rewardPoints, setRewardPoints] = useState(0);
 
-  // Mock images for demonstration
+  // Product variants with different types and images
+  const productVariants = [
+    { type: "Cor", options: [
+      { value: "Azul", priceAdjustment: 0, stock: 15, image: "https://via.placeholder.com/600x600/3B82F6/FFFFFF?text=Azul" },
+      { value: "Vermelho", priceAdjustment: 5, stock: 8, image: "https://via.placeholder.com/600x600/DC2626/FFFFFF?text=Vermelho" },
+      { value: "Verde", priceAdjustment: 0, stock: 12, image: "https://via.placeholder.com/600x600/059669/FFFFFF?text=Verde" }
+    ]},
+    { type: "Tamanho", options: [
+      { value: "P", priceAdjustment: -10, stock: 20, image: null },
+      { value: "M", priceAdjustment: 0, stock: 25, image: null },
+      { value: "G", priceAdjustment: 15, stock: 18, image: null },
+      { value: "GG", priceAdjustment: 25, stock: 10, image: null }
+    ]}
+  ];
+
+  // Product images (general or variant-specific)
   const productImages = [
     "https://via.placeholder.com/600x600/3B82F6/FFFFFF?text=Produto+Principal",
     "https://via.placeholder.com/600x600/059669/FFFFFF?text=Vista+Lateral",
     "https://via.placeholder.com/600x600/DC2626/FFFFFF?text=Detalhes",
     "https://via.placeholder.com/600x600/7C3AED/FFFFFF?text=Embalagem"
   ];
+
+  // Calculate current price based on customer type, promotions, and variants
+  useEffect(() => {
+    let basePrice = parseFloat(product.price);
+    
+    // Apply customer type pricing
+    if (customerType === 'B2B' && product.priceB2B) {
+      basePrice = parseFloat(product.priceB2B);
+    } else if (customerType === 'B2C' && product.priceB2C) {
+      basePrice = parseFloat(product.priceB2C);
+    }
+    
+    // Apply promotional pricing if active
+    const now = new Date();
+    if (product.promotionalPrice && 
+        product.promotionalStartDate && 
+        product.promotionalEndDate &&
+        now >= new Date(product.promotionalStartDate) && 
+        now <= new Date(product.promotionalEndDate)) {
+      basePrice = parseFloat(product.promotionalPrice);
+    }
+    
+    // Apply variant price adjustments
+    let variantAdjustment = 0;
+    Object.entries(selectedVariants).forEach(([type, value]) => {
+      const variant = productVariants.find(v => v.type === type);
+      const option = variant?.options.find(o => o.value === value);
+      if (option?.priceAdjustment) {
+        variantAdjustment += option.priceAdjustment;
+      }
+    });
+    
+    setCurrentPrice((basePrice + variantAdjustment).toFixed(2));
+    
+    // Set reward points based on customer type
+    if (customerType === 'B2B' && product.rewardPointsB2B) {
+      setRewardPoints(product.rewardPointsB2B);
+    } else if (customerType === 'B2C' && product.rewardPointsB2C) {
+      setRewardPoints(product.rewardPointsB2C);
+    }
+  }, [product, customerType, selectedVariants]);
+
+  // Update selected image when variant changes
+  useEffect(() => {
+    const colorVariant = selectedVariants["Cor"];
+    if (colorVariant) {
+      const variant = productVariants.find(v => v.type === "Cor");
+      const option = variant?.options.find(o => o.value === colorVariant);
+      if (option?.image) {
+        setSelectedImage(0); // Reset to first image which will be the variant image
+        // In a real implementation, you would update the productImages array
+      }
+    }
+  }, [selectedVariants]);
+
+  // Check if product is available
+  const isAvailable = () => {
+    if (product.availabilityDate && new Date(product.availabilityDate) > new Date()) {
+      return false;
+    }
+    return product.stock > 0 || product.hasUnlimitedStock;
+  };
+
+  // Get availability date message
+  const getAvailabilityMessage = () => {
+    if (product.availabilityDate && new Date(product.availabilityDate) > new Date()) {
+      return `Disponível a partir de ${new Date(product.availabilityDate).toLocaleDateString('pt-BR')}`;
+    }
+    return null;
+  };
+
+  // Check if promotional pricing is active
+  const isPromotionalActive = () => {
+    const now = new Date();
+    return product.promotionalPrice && 
+           product.promotionalStartDate && 
+           product.promotionalEndDate &&
+           now >= new Date(product.promotionalStartDate) && 
+           now <= new Date(product.promotionalEndDate);
+  };
 
   // Mock specifications
   const specifications = [
@@ -165,22 +269,136 @@ export default function ProductDetailAdvanced({
             <p className="text-muted-foreground mb-4">{product.description}</p>
           </div>
 
-          <div className="border-t border-b py-4">
-            <div className="text-3xl font-bold text-primary mb-2">
-              R$ {parseFloat(product.price).toFixed(2)}
-            </div>
+          {/* Advanced Pricing Display */}
+          <div className="border-t border-b py-4 space-y-3">
+            {/* Promotional Pricing */}
+            {isPromotionalActive() && (
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Badge variant="destructive" className="text-xs">
+                    <Gift className="w-3 h-3 mr-1" />
+                    PROMOÇÃO
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    até {new Date(product.promotionalEndDate!).toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-lg text-muted-foreground line-through">
+                    R$ {parseFloat(product.price).toFixed(2)}
+                  </span>
+                  <div className="text-3xl font-bold text-red-600">
+                    R$ {currentPrice}
+                  </div>
+                  <Badge variant="destructive" className="text-xs">
+                    {Math.round(((parseFloat(product.price) - parseFloat(currentPrice)) / parseFloat(product.price)) * 100)}% OFF
+                  </Badge>
+                </div>
+              </div>
+            )}
+
+            {/* Regular Pricing */}
+            {!isPromotionalActive() && (
+              <div className="space-y-2">
+                {/* Customer Type Badge */}
+                <div className="flex items-center space-x-2">
+                  <Badge variant={customerType === 'B2B' ? "default" : "secondary"} className="text-xs">
+                    {customerType === 'B2B' ? 'PREÇO EMPRESARIAL' : 'PREÇO CONSUMIDOR'}
+                  </Badge>
+                  {customerType === 'B2B' && product.priceB2B && parseFloat(product.priceB2B) < parseFloat(product.price) && (
+                    <Badge variant="outline" className="text-xs text-green-600">
+                      DESCONTO ESPECIAL
+                    </Badge>
+                  )}
+                </div>
+                
+                <div className="text-3xl font-bold text-primary">
+                  R$ {currentPrice}
+                </div>
+
+                {/* Compare at Price */}
+                {product.compareAtPrice && parseFloat(product.compareAtPrice) > parseFloat(currentPrice) && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-muted-foreground line-through">
+                      De: R$ {parseFloat(product.compareAtPrice).toFixed(2)}
+                    </span>
+                    <Badge variant="outline" className="text-xs text-green-600">
+                      ECONOMIZE R$ {(parseFloat(product.compareAtPrice) - parseFloat(currentPrice)).toFixed(2)}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Installments */}
             <div className="text-sm text-muted-foreground">
-              ou 12x de R$ {(parseFloat(product.price) / 12).toFixed(2)} sem juros
+              ou 12x de R$ {(parseFloat(currentPrice) / 12).toFixed(2)} sem juros
             </div>
+
+            {/* Reward Points */}
+            {rewardPoints > 0 && isAuthenticated && (
+              <div className="flex items-center space-x-2 text-sm">
+                <Award className="w-4 h-4 text-yellow-500" />
+                <span className="text-muted-foreground">
+                  Ganhe <span className="font-medium text-yellow-600">{rewardPoints} pontos</span> nesta compra
+                </span>
+              </div>
+            )}
+
+            {/* Availability Message */}
+            {getAvailabilityMessage() && (
+              <div className="flex items-center space-x-2 text-sm text-orange-600">
+                <Calendar className="w-4 h-4" />
+                <span>{getAvailabilityMessage()}</span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4">
+            {/* Product Variants Selection */}
+            {productVariants.map((variant) => (
+              <div key={variant.type} className="space-y-2">
+                <label className="text-sm font-medium">{variant.type}:</label>
+                <Select
+                  value={selectedVariants[variant.type] || ""}
+                  onValueChange={(value) => 
+                    setSelectedVariants(prev => ({ ...prev, [variant.type]: value }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={`Selecione ${variant.type.toLowerCase()}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {variant.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{option.value}</span>
+                          <div className="flex items-center space-x-2 ml-4">
+                            {option.priceAdjustment !== 0 && (
+                              <span className={`text-xs ${option.priceAdjustment > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {option.priceAdjustment > 0 ? '+' : ''}R$ {option.priceAdjustment.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              ({option.stock} em estoque)
+                            </span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+
+            {/* Quantity Selection */}
             <div className="flex items-center space-x-4">
               <label className="text-sm font-medium">Quantidade:</label>
               <div className="flex items-center border rounded-lg">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   className="px-3 py-2 hover:bg-gray-100"
+                  disabled={!isAvailable()}
                 >
                   -
                 </button>
@@ -188,10 +406,16 @@ export default function ProductDetailAdvanced({
                 <button
                   onClick={() => setQuantity(quantity + 1)}
                   className="px-3 py-2 hover:bg-gray-100"
+                  disabled={!isAvailable()}
                 >
                   +
                 </button>
               </div>
+              {product.hasUnlimitedStock && (
+                <Badge variant="outline" className="text-xs text-green-600">
+                  ESTOQUE ILIMITADO
+                </Badge>
+              )}
             </div>
 
             <div className="flex space-x-3">

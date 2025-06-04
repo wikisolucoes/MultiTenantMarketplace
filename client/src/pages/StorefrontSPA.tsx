@@ -198,6 +198,8 @@ export default function StorefrontSPA() {
             onAddToCart={addToCart}
             onBackToCatalog={() => handleNavigation("produtos")}
             onAddToWishlist={addToWishlist}
+            customerType={currentCustomer?.type || 'B2C'}
+            isAuthenticated={isAuthenticated}
           />
         ) : (
           <div className="container mx-auto px-4 py-8 text-center">
