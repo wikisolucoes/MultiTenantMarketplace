@@ -8,6 +8,59 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Product, Tenant } from "@/types/api";
 import { Star, Heart, Share2, ShoppingCart, Truck, Shield, RotateCcw, Gift, Calendar, Award } from "lucide-react";
 
+// SEO Meta Tags Hook
+const useSEOMetaTags = (product: Product, tenant: Tenant | null) => {
+  useEffect(() => {
+    if (product && tenant) {
+      // Update page title
+      const title = product.metaTitle || `${product.name} | ${tenant.name}`;
+      document.title = title;
+
+      // Update meta description
+      const description = product.metaDescription || product.description || `Compre ${product.name} na ${tenant.name}. Melhor preço e qualidade garantida.`;
+      let metaDescription = document.querySelector('meta[name="description"]');
+      if (!metaDescription) {
+        metaDescription = document.createElement('meta');
+        metaDescription.setAttribute('name', 'description');
+        document.head.appendChild(metaDescription);
+      }
+      metaDescription.setAttribute('content', description);
+
+      // Update meta keywords
+      if (product.metaKeywords) {
+        let metaKeywords = document.querySelector('meta[name="keywords"]');
+        if (!metaKeywords) {
+          metaKeywords = document.createElement('meta');
+          metaKeywords.setAttribute('name', 'keywords');
+          document.head.appendChild(metaKeywords);
+        }
+        metaKeywords.setAttribute('content', product.metaKeywords);
+      }
+
+      // Update Open Graph tags
+      const ogTitle = document.querySelector('meta[property="og:title"]') || document.createElement('meta');
+      ogTitle.setAttribute('property', 'og:title');
+      ogTitle.setAttribute('content', title);
+      document.head.appendChild(ogTitle);
+
+      const ogDescription = document.querySelector('meta[property="og:description"]') || document.createElement('meta');
+      ogDescription.setAttribute('property', 'og:description');
+      ogDescription.setAttribute('content', description);
+      document.head.appendChild(ogDescription);
+
+      const ogUrl = document.querySelector('meta[property="og:url"]') || document.createElement('meta');
+      ogUrl.setAttribute('property', 'og:url');
+      ogUrl.setAttribute('content', window.location.href);
+      document.head.appendChild(ogUrl);
+
+      // Clean up on unmount
+      return () => {
+        document.title = tenant.name;
+      };
+    }
+  }, [product, tenant]);
+};
+
 interface ProductDetailAdvancedProps {
   product: Product;
   tenant: Tenant | null;
@@ -33,6 +86,9 @@ export default function ProductDetailAdvanced({
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [currentPrice, setCurrentPrice] = useState(product.price);
   const [rewardPoints, setRewardPoints] = useState(0);
+
+  // Apply SEO meta tags for this product
+  useSEOMetaTags(product, tenant);
 
   // Product variants with different types and images
   const productVariants = [
