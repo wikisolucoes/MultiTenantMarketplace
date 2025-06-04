@@ -13,6 +13,7 @@ import StorefrontSPA from "@/pages/StorefrontSPA";
 import EcommerceAdmin from "@/pages/EcommerceAdmin";
 import TaxConfiguration from "@/pages/TaxConfiguration";
 import PluginSubscriptions from "@/pages/PluginSubscriptions";
+import EnhancedProductManagement from "@/pages/EnhancedProductManagement";
 
 function AppRouter() {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
@@ -65,6 +66,9 @@ function AppRouter() {
       </Route>
       <Route path="/plugins">
         {isAuth && userRole === "merchant" ? <PluginSubscriptions /> : <Home />}
+      </Route>
+      <Route path="/products">
+        {isAuth && userRole === "merchant" ? <EnhancedProductManagement /> : <Home />}
       </Route>
       <Route path="/storefront*" component={StorefrontSPA} />
       <Route component={NotFound} />
