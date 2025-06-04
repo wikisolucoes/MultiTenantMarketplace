@@ -4,9 +4,10 @@ import { Store, CreditCard, TrendingUp } from "lucide-react";
 interface LandingPageProps {
   onShowRegistration: () => void;
   onShowLogin: () => void;
+  onShowDemo?: () => void;
 }
 
-export default function LandingPage({ onShowRegistration, onShowLogin }: LandingPageProps) {
+export default function LandingPage({ onShowRegistration, onShowLogin, onShowDemo }: LandingPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
       {/* Navigation */}
@@ -49,7 +50,12 @@ export default function LandingPage({ onShowRegistration, onShowLogin }: Landing
             >
               Começar Agora
             </Button>
-            <Button variant="outline" size="lg" className="text-lg px-8 py-3">
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="text-lg px-8 py-3"
+              onClick={onShowDemo}
+            >
               Ver Demo
             </Button>
           </div>
