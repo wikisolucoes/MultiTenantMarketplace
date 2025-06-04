@@ -228,13 +228,33 @@ export default function EnhancedProductManagement() {
   const handleEdit = (product: any) => {
     setSelectedProduct(product);
     form.reset({
-      ...product,
-      price: product.price.toString(),
-      compareAtPrice: product.compareAtPrice?.toString() || "",
-      costPrice: product.costPrice.toString(),
-      images: product.images || [],
-      specifications: product.specifications || [],
-      bulkPricingRules: product.bulkPricingRules || []
+      name: product.name || "",
+      description: product.description || "",
+      price: product.price?.toString() || "",
+      stock: product.stock || 0,
+      categoryId: product.categoryId || "",
+      brandId: product.brandId || "",
+      isActive: product.isActive || true,
+      ncm: product.ncm || "",
+      cest: product.cest || "",
+      cfop: product.cfop || "",
+      icmsOrigin: product.icmsOrigin || "",
+      icmsCst: product.icmsCst || "",
+      icmsRate: product.icmsRate?.toString() || "",
+      ipiCst: product.ipiCst || "",
+      ipiRate: product.ipiRate?.toString() || "",
+      pisCst: product.pisCst || "",
+      pisRate: product.pisRate?.toString() || "",
+      cofinsCst: product.cofinsCst || "",
+      cofinsRate: product.cofinsRate?.toString() || "",
+      productUnit: product.productUnit || "",
+      grossWeight: product.grossWeight?.toString() || "",
+      netWeight: product.netWeight?.toString() || "",
+      compareAtPrice: "",
+      costPrice: "",
+      images: [],
+      specifications: [],
+      bulkPricingRules: []
     });
     setIsProductDialogOpen(true);
   };
