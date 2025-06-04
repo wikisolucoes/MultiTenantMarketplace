@@ -196,11 +196,13 @@ export default function Cart({ cartItems, products, onUpdateQuantity, onRemoveIt
                 </div>
               </div>
               
-              <Link href="/checkout">
-                <Button className="w-full" size="lg">
-                  Finalizar Compra
-                </Button>
-              </Link>
+              <Button 
+                className="w-full" 
+                size="lg"
+                onClick={onCheckout}
+              >
+                Finalizar Compra
+              </Button>
               
               <div className="text-center text-sm text-muted-foreground">
                 <p>Pagamento seguro com:</p>
