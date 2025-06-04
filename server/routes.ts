@@ -43,7 +43,7 @@ const withdrawalLimiter = rateLimit({
 export async function registerRoutes(app: Express): Promise<Server> {
   
   // Auth routes
-  app.post("/api/auth/login", authLimiter, async (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password }: LoginData = loginSchema.parse(req.body);
       
