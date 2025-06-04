@@ -15,10 +15,12 @@ interface CartProps {
   products: Product[];
   onUpdateQuantity: (productId: number, quantity: number) => void;
   onRemoveItem: (productId: number) => void;
+  onContinueShopping: () => void;
+  onCheckout: () => void;
   total: number;
 }
 
-export default function Cart({ cartItems, products, onUpdateQuantity, onRemoveItem, total }: CartProps) {
+export default function Cart({ cartItems, products, onUpdateQuantity, onRemoveItem, onContinueShopping, onCheckout, total }: CartProps) {
   const formatCurrency = (value: string | number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
@@ -53,11 +55,9 @@ export default function Cart({ cartItems, products, onUpdateQuantity, onRemoveIt
           <p className="text-muted-foreground mb-8">
             Adicione produtos ao seu carrinho para continuar comprando
           </p>
-          <Link href="/produtos">
-            <Button size="lg">
-              Continuar comprando
-            </Button>
-          </Link>
+          <Button size="lg" onClick={onContinueShopping}>
+            Continuar comprando
+          </Button>
         </div>
       </div>
     );
@@ -75,12 +75,10 @@ export default function Cart({ cartItems, products, onUpdateQuantity, onRemoveIt
             {itemCount} {itemCount === 1 ? 'item' : 'itens'} no seu carrinho
           </p>
         </div>
-        <Link href="/produtos">
-          <Button variant="ghost">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Continuar comprando
-          </Button>
-        </Link>
+        <Button variant="ghost" onClick={onContinueShopping}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Continuar comprando
+        </Button>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
