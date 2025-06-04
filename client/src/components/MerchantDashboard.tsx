@@ -38,6 +38,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { FinancialStats, Product, Order } from "@/types/api";
 import EnhancedProductManagement from "@/pages/EnhancedProductManagement";
+import ThemeManager from "@/components/storefront/ThemeManager";
+import BannerManager from "@/components/storefront/BannerManager";
 import { 
   LayoutDashboard,
   Package,
@@ -83,6 +85,24 @@ export default function MerchantDashboard() {
   const [activeSection, setActiveSection] = useState("overview");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState("modern");
+  const [banners, setBanners] = useState([
+    {
+      id: 1,
+      title: "Grande Liquidação de Verão",
+      description: "Até 70% de desconto em toda a coleção de verão. Ofertas limitadas!",
+      imageUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&h=600&fit=crop",
+      mobileImageUrl: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=400&fit=crop",
+      linkUrl: "/promocoes",
+      buttonText: "Ver Ofertas",
+      isActive: true,
+      position: 1,
+      displayOrder: 1,
+      impressions: 15420,
+      clicks: 890,
+      conversionRate: 5.8
+    }
+  ]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getUser();
@@ -928,6 +948,22 @@ export default function MerchantDashboard() {
                   )}
                 </CardContent>
               </Card>
+            )}
+
+            {/* Theme Management Section */}
+            {activeSection === "themes" && (
+              <ThemeManager 
+                currentTheme={currentTheme}
+                onThemeChange={setCurrentTheme}
+              />
+            )}
+
+            {/* Banner Management Section */}
+            {activeSection === "banners" && (
+              <BannerManager 
+                banners={banners}
+                onUpdateBanners={setBanners}
+              />
             )}
 
             {/* Settings Section */}
