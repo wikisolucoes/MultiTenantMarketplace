@@ -19,6 +19,21 @@ export const tenants = pgTable("tenants", {
   name: varchar("name", { length: 255 }).notNull(),
   subdomain: varchar("subdomain", { length: 255 }).unique().notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  // Theme and customization settings
+  activeTheme: varchar("active_theme", { length: 50 }).default("modern").notNull(),
+  logo: text("logo"), // Logo URL
+  favicon: text("favicon"), // Favicon URL
+  primaryColor: varchar("primary_color", { length: 7 }).default("#0891b2"), // Hex color
+  secondaryColor: varchar("secondary_color", { length: 7 }).default("#0e7490"),
+  accentColor: varchar("accent_color", { length: 7 }).default("#06b6d4"),
+  // Store configuration
+  storeDescription: text("store_description"),
+  contactEmail: varchar("contact_email", { length: 255 }),
+  contactPhone: varchar("contact_phone", { length: 20 }),
+  whatsappNumber: varchar("whatsapp_number", { length: 20 }),
+  address: jsonb("address"), // Full address object
+  socialLinks: jsonb("social_links"), // Instagram, Facebook, etc.
+  businessHours: jsonb("business_hours"), // Opening hours
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -98,6 +113,39 @@ export const customerSecurityEvents = pgTable("customer_security_events", {
   metadata: jsonb("metadata"), // Additional event-specific data
   severity: varchar("severity", { length: 20 }).default("info").notNull(), // 'info', 'warning', 'critical'
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Theme banners/carousel management
+export const storefrontBanners = pgTable("storefront_banners", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  imageUrl: text("image_url").notNull(),
+  mobileImageUrl: text("mobile_image_url"), // Optional mobile-specific image
+  linkUrl: text("link_url"), // Where banner links to
+  linkText: varchar("link_text", { length: 100 }), // CTA text
+  position: integer("position").default(0).notNull(), // Display order
+  isActive: boolean("is_active").default(true).notNull(),
+  showOnThemes: jsonb("show_on_themes").default(['modern', 'classic', 'minimal', 'bold', 'elegant']), // Which themes to show on
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  clickCount: integer("click_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Theme customization sections
+export const themeCustomizations = pgTable("theme_customizations", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  themeName: varchar("theme_name", { length: 50 }).notNull(), // 'modern', 'classic', etc.
+  sectionName: varchar("section_name", { length: 50 }).notNull(), // 'hero', 'features', 'testimonials', etc.
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  position: integer("position").default(0).notNull(),
+  content: jsonb("content").notNull(), // Section-specific content and settings
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Customer addresses
@@ -615,6 +663,12 @@ export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 
 export type CustomerAddress = typeof customerAddresses.$inferSelect;
 export type InsertCustomerAddress = z.infer<typeof insertCustomerAddressSchema>;
+
+export type StorefrontBanner = typeof storefrontBanners.$inferSelect;
+export type InsertStorefrontBanner = typeof storefrontBanners.$inferInsert;
+
+export type ThemeCustomization = typeof themeCustomizations.$inferSelect;
+export type InsertThemeCustomization = typeof themeCustomizations.$inferInsert;
 
 export type LoginData = z.infer<typeof loginSchema>;
 export type TenantRegistrationData = z.infer<typeof tenantRegistrationSchema>;
