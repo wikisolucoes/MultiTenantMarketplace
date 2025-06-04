@@ -57,7 +57,9 @@ import {
   AlertCircle,
   CheckCircle2,
   XCircle,
-  Info
+  Info,
+  Palette,
+  Image
 } from "lucide-react";
 
 const withdrawalSchema = z.object({
@@ -382,6 +384,22 @@ export default function MerchantDashboard() {
               </Button>
               <Button
                 variant="ghost"
+                className={`w-full justify-start ${activeSection === "themes" ? "bg-accent" : ""}`}
+                onClick={() => setActiveSection("themes")}
+              >
+                <Palette className="mr-3 h-4 w-4" />
+                Temas da Loja
+              </Button>
+              <Button
+                variant="ghost"
+                className={`w-full justify-start ${activeSection === "banners" ? "bg-accent" : ""}`}
+                onClick={() => setActiveSection("banners")}
+              >
+                <Image className="mr-3 h-4 w-4" />
+                Banners
+              </Button>
+              <Button
+                variant="ghost"
                 className={`w-full justify-start ${activeSection === "settings" ? "bg-accent" : ""}`}
                 onClick={() => setActiveSection("settings")}
               >
@@ -403,6 +421,8 @@ export default function MerchantDashboard() {
                 {activeSection === "orders" && "Pedidos"}
                 {activeSection === "financial" && "Financeiro"}
                 {activeSection === "withdrawals" && "Saques"}
+                {activeSection === "themes" && "Temas da Loja"}
+                {activeSection === "banners" && "Banners"}
                 {activeSection === "settings" && "Configurações"}
               </h2>
               <div className="flex items-center space-x-4">
