@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import AdminHeader from "./AdminHeader";
@@ -50,7 +51,12 @@ import {
   XCircle,
   FileBarChart,
   ArrowUpRight,
-  Info
+  Info,
+  Puzzle,
+  MoreHorizontal,
+  MoreVertical,
+  Code,
+  User
 } from "lucide-react";
 
 interface AdminStats {
@@ -938,6 +944,15 @@ export default function AdminDashboard() {
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [isCreateNotificationOpen, setIsCreateNotificationOpen] = useState(false);
+  
+  // Plugin management states
+  const [isCreatePluginOpen, setIsCreatePluginOpen] = useState(false);
+  const [isViewPluginOpen, setIsViewPluginOpen] = useState(false);
+  const [isEditPluginOpen, setIsEditPluginOpen] = useState(false);
+  const [selectedPlugin, setSelectedPlugin] = useState<any>(null);
+  const [pluginSearchTerm, setPluginSearchTerm] = useState('');
+  const [pluginCategoryFilter, setPluginCategoryFilter] = useState('all');
+  const [pluginStatusFilter, setPluginStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
@@ -1480,40 +1495,297 @@ export default function AdminDashboard() {
           {/* Plugins Tab */}
           {activeTab === "plugins" && (
             <div className="space-y-6">
+              {/* Plugin Management Header */}
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight">Marketplace de Plugins</h2>
+                  <p className="text-muted-foreground">Gerencie plugins disponíveis na plataforma</p>
+                </div>
+                <div className="flex gap-2">
+                  <Dialog open={isCreatePluginOpen} onOpenChange={setIsCreatePluginOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Plugin
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Adicionar Novo Plugin</DialogTitle>
+                      </DialogHeader>
+                      <PluginFormComponent onClose={() => setIsCreatePluginOpen(false)} />
+                    </DialogContent>
+                  </Dialog>
+                  <Button variant="outline">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Importar
+                  </Button>
+                </div>
+              </div>
+
+              {/* Plugin Filters */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                      <Input
+                        placeholder="Buscar plugins..."
+                        value={pluginSearchTerm}
+                        onChange={(e) => setPluginSearchTerm(e.target.value)}
+                        className="max-w-sm"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Select value={pluginCategoryFilter} onValueChange={setPluginCategoryFilter}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas as Categorias</SelectItem>
+                          <SelectItem value="pagamento">Pagamento</SelectItem>
+                          <SelectItem value="fiscal">Fiscal</SelectItem>
+                          <SelectItem value="marketing">Marketing</SelectItem>
+                          <SelectItem value="integracao">Integração</SelectItem>
+                          <SelectItem value="relatorios">Relatórios</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={pluginStatusFilter} onValueChange={setPluginStatusFilter}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="active">Ativos</SelectItem>
+                          <SelectItem value="inactive">Inativos</SelectItem>
+                          <SelectItem value="pending">Pendentes</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Plugin Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Puzzle className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-muted-foreground">Total de Plugins</p>
+                        <p className="text-2xl font-bold">{(plugins as any[])?.length || 0}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <CheckCircle className="w-6 h-6 text-green-600" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-muted-foreground">Plugins Ativos</p>
+                        <p className="text-2xl font-bold">
+                          {(plugins as any[])?.filter(p => p.isActive).length || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Download className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-muted-foreground">Total de Instalações</p>
+                        <p className="text-2xl font-bold">
+                          {(plugins as any[])?.reduce((acc, p) => acc + (p.installations || 0), 0) || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <DollarSign className="w-6 h-6 text-orange-600" />
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-muted-foreground">Receita Total</p>
+                        <p className="text-2xl font-bold">R$ 15.400</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Plugin List */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Marketplace de Plugins</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Plugins Disponíveis</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm">
+                        <Filter className="w-4 h-4 mr-2" />
+                        Filtros Avançados
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {(plugins as Plugin[] || []).map((plugin: Plugin) => (
-                      <Card key={plugin.id}>
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">{plugin.name}</CardTitle>
-                            <Badge variant={plugin.isActive ? 'default' : 'secondary'}>
-                              {plugin.isActive ? 'Ativo' : 'Inativo'}
-                            </Badge>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {((plugins as any[]) || [])
+                      .filter((plugin: any) => {
+                        const matchesSearch = plugin.name.toLowerCase().includes(pluginSearchTerm.toLowerCase()) ||
+                                            plugin.description.toLowerCase().includes(pluginSearchTerm.toLowerCase());
+                        const matchesCategory = pluginCategoryFilter === 'all' || plugin.category === pluginCategoryFilter;
+                        const matchesStatus = pluginStatusFilter === 'all' || 
+                                            (pluginStatusFilter === 'active' && plugin.isActive) ||
+                                            (pluginStatusFilter === 'inactive' && !plugin.isActive);
+                        return matchesSearch && matchesCategory && matchesStatus;
+                      })
+                      .map((plugin: any) => (
+                      <Card key={plugin.id} className="relative group hover:shadow-lg transition-shadow">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <CardTitle className="text-lg">{plugin.name}</CardTitle>
+                                <Badge variant={plugin.isActive ? 'default' : 'secondary'}>
+                                  {plugin.isActive ? 'Ativo' : 'Inativo'}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{plugin.category}</p>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => {
+                                  setSelectedPlugin(plugin);
+                                  setIsViewPluginOpen(true);
+                                }}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Ver Detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  setSelectedPlugin(plugin);
+                                  setIsEditPluginOpen(true);
+                                }}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                  <Settings className="mr-2 h-4 w-4" />
+                                  Configurações
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-red-600">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Remover
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground mb-4">{plugin.description}</p>
-                          <div className="flex items-center justify-between text-sm">
-                            <span>v{plugin.version}</span>
-                            <span>{plugin.installations} instalações</span>
-                          </div>
-                          <div className="flex items-center justify-between mt-4">
-                            <span className="font-medium">{plugin.price}</span>
-                            <Button size="sm">
-                              {plugin.isActive ? 'Desativar' : 'Ativar'}
-                            </Button>
+                        <CardContent className="pt-0">
+                          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{plugin.description}</p>
+                          
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-1">
+                                <Code className="w-4 h-4" />
+                                v{plugin.version}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Download className="w-4 h-4" />
+                                {plugin.installations} instalações
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-1">
+                                <User className="w-4 h-4" />
+                                {plugin.developer}
+                              </span>
+                              <span className="font-medium text-lg">{plugin.price}</span>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                variant={plugin.isActive ? "outline" : "default"}
+                                className="flex-1"
+                                onClick={() => togglePluginStatus(plugin.id, !plugin.isActive)}
+                              >
+                                {plugin.isActive ? 'Desativar' : 'Ativar'}
+                              </Button>
+                              <Button size="sm" variant="outline">
+                                <Settings className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
                     ))}
                   </div>
+                  
+                  {((plugins as any[]) || []).length === 0 && (
+                    <div className="text-center py-12">
+                      <Puzzle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">Nenhum plugin encontrado</h3>
+                      <p className="text-muted-foreground mb-4">Comece adicionando plugins ao marketplace</p>
+                      <Button onClick={() => setIsCreatePluginOpen(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Primeiro Plugin
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {/* Plugin Details Modal */}
+              <Dialog open={isViewPluginOpen} onOpenChange={setIsViewPluginOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Detalhes do Plugin - {selectedPlugin?.name}</DialogTitle>
+                  </DialogHeader>
+                  {selectedPlugin && (
+                    <PluginDetailsView plugin={selectedPlugin} />
+                  )}
+                </DialogContent>
+              </Dialog>
+
+              {/* Edit Plugin Modal */}
+              <Dialog open={isEditPluginOpen} onOpenChange={setIsEditPluginOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Editar Plugin - {selectedPlugin?.name}</DialogTitle>
+                  </DialogHeader>
+                  {selectedPlugin && (
+                    <PluginFormComponent 
+                      plugin={selectedPlugin}
+                      onClose={() => setIsEditPluginOpen(false)} 
+                    />
+                  )}
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 
