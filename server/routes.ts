@@ -97,6 +97,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get tenant details with real metrics
+  app.get("/api/admin/tenants/:id/details", async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.id);
+      const tenant = await storage.getTenant(tenantId);
+      
+      if (!tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+
+      // Get real data from database
+      const orders = await storage.getOrdersByTenantId(tenantId);
+      const products = await storage.getProductsByTenantId(tenantId);
+      
+      const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.total || '0'), 0);
+      const activeProducts = products.filter(p => p.isActive).length;
+      const uniqueCustomers = new Set(orders.map(order => order.customerEmail)).size;
+      const conversionRate = uniqueCustomers > 0 ? ((orders.length / uniqueCustomers) * 100).toFixed(1) : '0.0';
+      
+      const details = {
+        ...tenant,
+        metrics: {
+          totalRevenue: totalRevenue.toFixed(2),
+          monthlyRevenue: totalRevenue.toFixed(2),
+          totalOrders: orders.length,
+          activeProducts,
+          customers: uniqueCustomers,
+          averageOrderValue: orders.length > 0 ? (totalRevenue / orders.length).toFixed(2) : '0.00',
+          conversionRate: `${conversionRate}%`,
+          lastActivity: orders.length > 0 ? orders[orders.length - 1].createdAt : new Date().toISOString()
+        },
+        recentOrders: orders.slice(-5).reverse().map(order => ({
+          id: order.id,
+          customerName: order.customerName || order.customerEmail?.split('@')[0] || 'Cliente',
+          customerEmail: order.customerEmail,
+          value: `R$ ${parseFloat(order.total || '0').toFixed(2)}`,
+          status: order.status === 'completed' ? 'Entregue' : 
+                  order.status === 'processing' ? 'Processando' : 
+                  order.status === 'shipped' ? 'Enviado' : 'Pendente',
+          date: new Date(order.createdAt).toLocaleDateString('pt-BR')
+        }))
+      };
+
+      res.json(details);
+    } catch (error) {
+      console.error('Error fetching tenant details:', error);
+      res.status(500).json({ message: 'Failed to fetch tenant details' });
+    }
+  });
+
   // Brand management
   app.get("/api/brands/:tenantId", async (req, res) => {
     try {

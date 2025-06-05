@@ -643,7 +643,15 @@ export default function AdminDashboard() {
 }
 
 // Tenant Details View Component
-function TenantDetailsView({ tenant }: { tenant: Tenant }) {
+function TenantDetailsView({ 
+  tenant, 
+  setSelectedTenant, 
+  setActiveTab 
+}: { 
+  tenant: Tenant;
+  setSelectedTenant: (tenant: Tenant | null) => void;
+  setActiveTab: (tab: string) => void;
+}) {
   const { data: tenantDetails, isLoading } = useQuery({
     queryKey: ['/api/admin/tenants', tenant.id, 'details'],
   });
@@ -891,18 +899,39 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
       </Card>
 
       {/* Action Buttons */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
-        <Button variant="outline">
-          <Download className="w-4 h-4 mr-2" />
-          Exportar Dados
-        </Button>
-        <Button variant="outline">
-          <Mail className="w-4 h-4 mr-2" />
-          Enviar Relatório
-        </Button>
-        <Button>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+        <Button 
+          className="w-full" 
+          variant="outline"
+          onClick={() => {
+            setSelectedTenant(null);
+            setActiveTab('tenants');
+          }}
+        >
           <Settings className="w-4 h-4 mr-2" />
-          Gerenciar Loja
+          Configurações da Loja
+        </Button>
+        <Button 
+          className="w-full" 
+          variant="outline"
+          onClick={() => {
+            setSelectedTenant(null);
+            setActiveTab('reports');
+          }}
+        >
+          <FileBarChart className="w-4 h-4 mr-2" />
+          Relatórios Detalhados
+        </Button>
+        <Button 
+          className="w-full" 
+          variant="outline"
+          onClick={() => {
+            setSelectedTenant(null);
+            setActiveTab('dashboard');
+          }}
+        >
+          <Package className="w-4 h-4 mr-2" />
+          Gerenciar Produtos
         </Button>
       </div>
     </div>
