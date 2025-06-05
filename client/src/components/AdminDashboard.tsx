@@ -1071,7 +1071,7 @@ function TenantDetailsView({
 // Store Products Tab Component
 function StoreProductsTab({ tenantId, activeProducts }: { tenantId: number; activeProducts: number }) {
   const { data: products, isLoading } = useQuery({
-    queryKey: ['/api/products', tenantId],
+    queryKey: [`/api/products/${tenantId}`],
   });
 
   if (isLoading) {
