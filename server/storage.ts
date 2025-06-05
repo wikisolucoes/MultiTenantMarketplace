@@ -632,7 +632,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUserWithProfile(userData: CreateUserData, tenantId: number, createdById: number): Promise<{ user: User; profile: UserProfile }> {
-    const hashedPassword = await Bun.password.hash(userData.email + "_temp_password"); // Generate temporary password
+    const bcrypt = require('bcrypt');
+    const hashedPassword = await bcrypt.hash(userData.email + "_temp_password", 10); // Generate temporary password
     
     const [user] = await db
       .insert(users)
