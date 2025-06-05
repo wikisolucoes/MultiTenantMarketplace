@@ -130,6 +130,294 @@ interface UserEditFormProps {
   onClose: () => void;
 }
 
+interface CreateUserFormProps {
+  onClose: () => void;
+}
+
+function CreateUserFormComponent({ onClose }: CreateUserFormProps) {
+  const [newUser, setNewUser] = useState({
+    email: '',
+    fullName: '',
+    document: '',
+    documentType: 'cpf',
+    phone: '',
+    role: 'merchant',
+    tenantId: undefined as number | undefined,
+    profileImage: '',
+    isActive: true,
+    permissions: [] as string[],
+    password: '',
+    adminNotes: ''
+  });
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: any) => {
+      return await apiRequest("POST", `/api/admin/users`, userData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Usuário criado",
+        description: "Usuário foi criado com sucesso",
+      });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewUser({ ...newUser, password });
+  };
+
+  return (
+    <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+      {/* Informações Básicas */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Informações Básicas</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="fullName">Nome Completo *</Label>
+            <Input
+              id="fullName"
+              value={newUser.fullName}
+              onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
+              placeholder="Nome completo do usuário"
+            />
+          </div>
+          <div>
+            <Label htmlFor="email">Email *</Label>
+            <Input
+              id="email"
+              type="email"
+              value={newUser.email}
+              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              placeholder="email@exemplo.com"
+            />
+          </div>
+          <div>
+            <Label htmlFor="document">Documento (CPF/CNPJ)</Label>
+            <Input
+              id="document"
+              value={newUser.document}
+              onChange={(e) => setNewUser({ ...newUser, document: e.target.value })}
+              placeholder="000.000.000-00"
+            />
+          </div>
+          <div>
+            <Label htmlFor="documentType">Tipo de Documento</Label>
+            <Select 
+              value={newUser.documentType} 
+              onValueChange={(value) => setNewUser({ ...newUser, documentType: value })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cpf">CPF</SelectItem>
+                <SelectItem value="cnpj">CNPJ</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="phone">Telefone</Label>
+            <Input
+              id="phone"
+              value={newUser.phone}
+              onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+              placeholder="(11) 99999-9999"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Acesso e Segurança */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Acesso e Segurança</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="password">Senha *</Label>
+            <div className="flex gap-2">
+              <Input
+                id="password"
+                type="password"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                placeholder="Senha do usuário"
+              />
+              <Button type="button" variant="outline" onClick={generatePassword}>
+                Gerar
+              </Button>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="role">Função/Role *</Label>
+            <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="merchant">Comerciante</SelectItem>
+                <SelectItem value="manager">Gerente</SelectItem>
+                <SelectItem value="employee">Funcionário</SelectItem>
+                <SelectItem value="user">Usuário</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="tenantId">ID da Loja</Label>
+            <Input
+              id="tenantId"
+              type="number"
+              value={newUser.tenantId || ''}
+              onChange={(e) => setNewUser({ ...newUser, tenantId: parseInt(e.target.value) || undefined })}
+              placeholder="ID da loja (opcional)"
+            />
+          </div>
+          <div>
+            <Label htmlFor="profileImage">URL da Imagem de Perfil</Label>
+            <Input
+              id="profileImage"
+              value={newUser.profileImage}
+              onChange={(e) => setNewUser({ ...newUser, profileImage: e.target.value })}
+              placeholder="https://exemplo.com/avatar.jpg"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Permissões */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Permissões</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageProducts"
+                checked={newUser.permissions.includes('manage_products')}
+                onCheckedChange={(checked) => {
+                  const permissions = checked 
+                    ? [...newUser.permissions, 'manage_products']
+                    : newUser.permissions.filter(p => p !== 'manage_products');
+                  setNewUser({ ...newUser, permissions });
+                }}
+              />
+              <Label htmlFor="canManageProducts">Gerenciar Produtos</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageOrders"
+                checked={newUser.permissions.includes('manage_orders')}
+                onCheckedChange={(checked) => {
+                  const permissions = checked 
+                    ? [...newUser.permissions, 'manage_orders']
+                    : newUser.permissions.filter(p => p !== 'manage_orders');
+                  setNewUser({ ...newUser, permissions });
+                }}
+              />
+              <Label htmlFor="canManageOrders">Gerenciar Pedidos</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canViewFinancials"
+                checked={newUser.permissions.includes('view_financials')}
+                onCheckedChange={(checked) => {
+                  const permissions = checked 
+                    ? [...newUser.permissions, 'view_financials']
+                    : newUser.permissions.filter(p => p !== 'view_financials');
+                  setNewUser({ ...newUser, permissions });
+                }}
+              />
+              <Label htmlFor="canViewFinancials">Ver Financeiro</Label>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageUsers"
+                checked={newUser.permissions.includes('manage_users')}
+                onCheckedChange={(checked) => {
+                  const permissions = checked 
+                    ? [...newUser.permissions, 'manage_users']
+                    : newUser.permissions.filter(p => p !== 'manage_users');
+                  setNewUser({ ...newUser, permissions });
+                }}
+              />
+              <Label htmlFor="canManageUsers">Gerenciar Usuários</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageSettings"
+                checked={newUser.permissions.includes('manage_settings')}
+                onCheckedChange={(checked) => {
+                  const permissions = checked 
+                    ? [...newUser.permissions, 'manage_settings']
+                    : newUser.permissions.filter(p => p !== 'manage_settings');
+                  setNewUser({ ...newUser, permissions });
+                }}
+              />
+              <Label htmlFor="canManageSettings">Gerenciar Configurações</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageThemes"
+                checked={newUser.permissions.includes('manage_themes')}
+                onCheckedChange={(checked) => {
+                  const permissions = checked 
+                    ? [...newUser.permissions, 'manage_themes']
+                    : newUser.permissions.filter(p => p !== 'manage_themes');
+                  setNewUser({ ...newUser, permissions });
+                }}
+              />
+              <Label htmlFor="canManageThemes">Gerenciar Temas</Label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Observações */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Observações</h3>
+        <div>
+          <Label htmlFor="adminNotes">Notas do Administrador</Label>
+          <Textarea
+            id="adminNotes"
+            value={newUser.adminNotes}
+            onChange={(e) => setNewUser({ ...newUser, adminNotes: e.target.value })}
+            placeholder="Observações internas sobre este usuário..."
+            rows={3}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button 
+          onClick={() => createUserMutation.mutate(newUser)}
+          disabled={createUserMutation.isPending || !newUser.email || !newUser.fullName || !newUser.password}
+        >
+          {createUserMutation.isPending ? "Criando..." : "Criar Usuário"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function UserEditFormComponent({ user, onClose }: UserEditFormProps) {
   const [editingUser, setEditingUser] = useState(user);
   const { toast } = useToast();
@@ -405,6 +693,7 @@ export default function AdminDashboard() {
   const [isViewTenantOpen, setIsViewTenantOpen] = useState(false);
   const [isViewUserOpen, setIsViewUserOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
@@ -745,8 +1034,22 @@ export default function AdminDashboard() {
           {activeTab === "users" && (
             <div className="space-y-6">
               <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Gerenciamento de Usuários</CardTitle>
+                  <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Criar Usuário
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Criar Novo Usuário</DialogTitle>
+                      </DialogHeader>
+                      <CreateUserFormComponent onClose={() => setIsCreateUserOpen(false)} />
+                    </DialogContent>
+                  </Dialog>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto">

@@ -1918,6 +1918,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new user endpoint
+  app.post("/api/admin/users", async (req, res) => {
+    try {
+      const {
+        email,
+        fullName,
+        document,
+        documentType,
+        phone,
+        role,
+        tenantId,
+        profileImage,
+        isActive = true,
+        permissions = [],
+        password,
+        adminNotes
+      } = req.body;
+
+      // Validate required fields
+      if (!email || !fullName || !password) {
+        return res.status(400).json({ message: "Email, fullName, and password are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await db.execute(sql`
+        SELECT id FROM users WHERE email = ${email}
+      `);
+
+      if (existingUser.rows.length > 0) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user
+      const result = await db.execute(sql`
+        INSERT INTO users (
+          email, password, full_name, document, document_type, phone,
+          role, tenant_id, profile_image, is_active, permissions,
+          created_at, updated_at
+        )
+        VALUES (
+          ${email}, ${hashedPassword}, ${fullName}, ${document || ''}, ${documentType || 'cpf'}, ${phone || ''},
+          ${role}, ${tenantId || null}, ${profileImage || null}, ${isActive}, ${JSON.stringify(permissions)},
+          NOW(), NOW()
+        )
+        RETURNING id, email, full_name, document, document_type, phone, role, tenant_id, 
+                  profile_image, is_active, permissions, created_at, updated_at
+      `);
+
+      const newUser = result.rows[0];
+      const userResponse = {
+        id: newUser.id,
+        email: newUser.email,
+        fullName: newUser.full_name,
+        document: newUser.document,
+        documentType: newUser.document_type,
+        phone: newUser.phone,
+        role: newUser.role,
+        tenantId: newUser.tenant_id,
+        profileImage: newUser.profile_image,
+        isActive: newUser.is_active,
+        permissions: newUser.permissions,
+        createdAt: newUser.created_at,
+        updatedAt: newUser.updated_at
+      };
+
+      res.status(201).json(userResponse);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
   app.get("/api/admin/system-metrics", async (req, res) => {
     try {
       // Get database size
