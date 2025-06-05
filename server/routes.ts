@@ -1993,6 +1993,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email notifications endpoints
+  app.get("/api/admin/notifications", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          en.*,
+          u.full_name as created_by_name
+        FROM email_notifications en
+        LEFT JOIN users u ON en.created_by = u.id
+        ORDER BY en.created_at DESC
+        LIMIT 50
+      `);
+
+      const notifications = result.rows.map((row: any) => ({
+        id: row.id,
+        title: row.title,
+        message: row.message,
+        recipientType: row.recipient_type,
+        recipientIds: row.recipient_ids,
+        sentCount: row.sent_count,
+        failedCount: row.failed_count,
+        status: row.status,
+        createdBy: row.created_by,
+        createdByName: row.created_by_name,
+        createdAt: row.created_at,
+        sentAt: row.sent_at
+      }));
+
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.post("/api/admin/notifications", async (req, res) => {
+    try {
+      const {
+        title,
+        message,
+        recipientType,
+        recipientIds = [],
+        buttonText,
+        buttonUrl
+      } = req.body;
+
+      if (!title || !message || !recipientType) {
+        return res.status(400).json({ message: "Title, message, and recipient type are required" });
+      }
+
+      // Create notification record
+      const notificationResult = await db.execute(sql`
+        INSERT INTO email_notifications (
+          title, message, recipient_type, recipient_ids, created_by, created_at, status
+        )
+        VALUES (
+          ${title}, ${message}, ${recipientType}, ${JSON.stringify(recipientIds)}, 
+          ${1}, NOW(), 'pending'
+        )
+        RETURNING id
+      `);
+
+      const notificationId = notificationResult.rows[0].id;
+
+      // Get recipients based on type
+      let recipients: string[] = [];
+      
+      if (recipientType === 'all') {
+        // Get all active users
+        const usersResult = await db.execute(sql`
+          SELECT email FROM users WHERE is_active = true AND email IS NOT NULL
+        `);
+        recipients = usersResult.rows.map((row: any) => row.email);
+      } else if (recipientType === 'specific' && recipientIds.length > 0) {
+        // Get specific users by ID
+        const usersResult = await db.execute(sql`
+          SELECT email FROM users 
+          WHERE id = ANY(${recipientIds}) AND is_active = true AND email IS NOT NULL
+        `);
+        recipients = usersResult.rows.map((row: any) => row.email);
+      } else if (recipientType === 'tenant' && recipientIds.length > 0) {
+        // Get all users from specific tenants
+        const usersResult = await db.execute(sql`
+          SELECT email FROM users 
+          WHERE tenant_id = ANY(${recipientIds}) AND is_active = true AND email IS NOT NULL
+        `);
+        recipients = usersResult.rows.map((row: any) => row.email);
+      }
+
+      if (recipients.length === 0) {
+        await db.execute(sql`
+          UPDATE email_notifications 
+          SET status = 'failed', sent_at = NOW()
+          WHERE id = ${notificationId}
+        `);
+        return res.status(400).json({ message: "No valid recipients found" });
+      }
+
+      // Update status to sending
+      await db.execute(sql`
+        UPDATE email_notifications 
+        SET status = 'sending'
+        WHERE id = ${notificationId}
+      `);
+
+      // Send emails asynchronously
+      setTimeout(async () => {
+        try {
+          const { sendBulkEmails, createNotificationTemplate } = await import('./email-service');
+          
+          const htmlContent = createNotificationTemplate(title, message, buttonText, buttonUrl);
+          const textContent = message;
+
+          const result = await sendBulkEmails({
+            recipients,
+            subject: title,
+            htmlContent,
+            textContent
+          });
+
+          // Update notification with results
+          await db.execute(sql`
+            UPDATE email_notifications 
+            SET 
+              sent_count = ${result.success},
+              failed_count = ${result.failed},
+              status = 'completed',
+              sent_at = NOW()
+            WHERE id = ${notificationId}
+          `);
+
+          console.log(`Notification ${notificationId} sent: ${result.success} success, ${result.failed} failed`);
+        } catch (error) {
+          console.error(`Failed to send notification ${notificationId}:`, error);
+          await db.execute(sql`
+            UPDATE email_notifications 
+            SET status = 'failed', sent_at = NOW()
+            WHERE id = ${notificationId}
+          `);
+        }
+      }, 100);
+
+      res.json({
+        id: notificationId,
+        message: `Notification queued for ${recipients.length} recipients`,
+        recipientCount: recipients.length
+      });
+
+    } catch (error) {
+      console.error("Error creating notification:", error);
+      res.status(500).json({ message: "Failed to create notification" });
+    }
+  });
+
+  app.get("/api/admin/notification-recipients", async (req, res) => {
+    try {
+      const { type, tenantId } = req.query;
+
+      let query = sql`SELECT id, email, full_name, role, tenant_id FROM users WHERE is_active = true`;
+      
+      if (type === 'tenant' && tenantId) {
+        query = sql`
+          SELECT u.id, u.email, u.full_name, u.role, u.tenant_id, t.name as tenant_name
+          FROM users u
+          LEFT JOIN tenants t ON u.tenant_id = t.id
+          WHERE u.is_active = true AND u.tenant_id = ${tenantId}
+        `;
+      } else {
+        query = sql`
+          SELECT u.id, u.email, u.full_name, u.role, u.tenant_id, t.name as tenant_name
+          FROM users u
+          LEFT JOIN tenants t ON u.tenant_id = t.id
+          WHERE u.is_active = true
+          ORDER BY u.full_name
+        `;
+      }
+
+      const result = await db.execute(query);
+      
+      const users = result.rows.map((row: any) => ({
+        id: row.id,
+        email: row.email,
+        fullName: row.full_name,
+        role: row.role,
+        tenantId: row.tenant_id,
+        tenantName: row.tenant_name
+      }));
+
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching recipients:", error);
+      res.status(500).json({ message: "Failed to fetch recipients" });
+    }
+  });
+
   app.get("/api/admin/system-metrics", async (req, res) => {
     try {
       // Get database size

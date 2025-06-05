@@ -697,6 +697,30 @@ export const customerLoginSchema = z.object({
   password: z.string().min(6),
 });
 
+// Email notifications table
+export const emailNotifications = pgTable("email_notifications", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  recipientType: varchar("recipient_type", { length: 50 }).notNull(), // 'all', 'specific', 'tenant'
+  recipientIds: jsonb("recipient_ids"), // Array of user IDs or tenant IDs
+  sentCount: integer("sent_count").default(0),
+  failedCount: integer("failed_count").default(0),
+  status: varchar("status", { length: 20 }).default("pending"), // 'pending', 'sending', 'completed', 'failed'
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  sentAt: timestamp("sent_at"),
+});
+
+export type EmailNotification = typeof emailNotifications.$inferSelect;
+export type InsertEmailNotification = typeof emailNotifications.$inferInsert;
+
+export const insertEmailNotificationSchema = createInsertSchema(emailNotifications).omit({
+  id: true,
+  createdAt: true,
+  sentAt: true,
+});
+
 export const customerRegisterSchema = z.object({
   firstName: z.string().min(2),
   lastName: z.string().min(2),
