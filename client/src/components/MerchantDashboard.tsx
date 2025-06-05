@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -1041,15 +1042,15 @@ export default function MerchantDashboard() {
                       <div>
                         <Label>Pagamento</Label>
                         <div className="flex items-center gap-2 mt-1">
-                          {getPaymentMethodIcon(order.paymentMethod)}
-                          <span className="capitalize">{order.paymentMethod}</span>
+                          {getPaymentMethodIcon(order.paymentMethod || "")}
+                          <span className="capitalize">{order.paymentMethod || "N/A"}</span>
                         </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Valor Total</Label>
-                        <p className="font-medium text-lg">{formatCurrency(order.total)}</p>
+                        <p className="font-medium text-lg">{formatCurrency(order.total || "0")}</p>
                       </div>
                       <div>
                         <Label>Data do Pedido</Label>

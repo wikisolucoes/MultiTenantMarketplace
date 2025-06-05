@@ -426,6 +426,8 @@ export const orders = pgTable("orders", {
   nfeXml: text("nfe_xml"),
   nfeProtocol: text("nfe_protocol"),
   nfeErrorMessage: text("nfe_error_message"),
+  trackingCode: text("tracking_code"),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
