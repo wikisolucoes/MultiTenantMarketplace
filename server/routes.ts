@@ -1790,7 +1790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phone = ${updateData.phone},
           email = ${updateData.email},
           contact_person = ${updateData.contactPerson},
-          is_active = ${updateData.status === 'active'},
+          status = ${updateData.status},
           updated_at = NOW()
         WHERE id = ${tenantId}
         RETURNING *
