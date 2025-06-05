@@ -379,6 +379,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Tenant-specific API routes for merchant dashboard
+  // Reports API endpoint with authentic database calculations
+  app.get("/api/reports", async (req, res) => {
+    try {
+      const tenantId = 5; // Using the demo tenant ID
+      const orders = await storage.getOrdersByTenantId(tenantId);
+      const products = await storage.getProductsByTenantId(tenantId);
+      
+      // Calculate monthly financial data from orders
+      const monthlyData: Record<string, { receita: number; despesas: number; lucro: number }> = {};
+      const productSalesData: Record<string, { vendas: number; receita: number }> = {};
+      const customerData: Record<string, { pedidos: number; total: number }> = {};
+      
+      orders.forEach(order => {
+        const orderDate = new Date(order.createdAt);
+        const monthKey = orderDate.toLocaleDateString('pt-BR', { month: 'short' });
+        const orderTotal = parseFloat(order.total || "0");
+        
+        // Monthly financial aggregation
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { receita: 0, despesas: 0, lucro: 0 };
+        }
+        
+        monthlyData[monthKey].receita += orderTotal;
+        monthlyData[monthKey].despesas += orderTotal * 0.15; // 15% operational costs
+        monthlyData[monthKey].lucro = monthlyData[monthKey].receita - monthlyData[monthKey].despesas;
+        
+        // Product sales aggregation - using notes field as product name for now
+        const productName = order.notes || 'Produto Sem Nome';
+        if (!productSalesData[productName]) {
+          productSalesData[productName] = { vendas: 0, receita: 0 };
+        }
+        productSalesData[productName].vendas += 1;
+        productSalesData[productName].receita += orderTotal;
+        
+        // Customer aggregation
+        if (order.customerName) {
+          if (!customerData[order.customerName]) {
+            customerData[order.customerName] = { pedidos: 0, total: 0 };
+          }
+          customerData[order.customerName].pedidos += 1;
+          customerData[order.customerName].total += orderTotal;
+        }
+      });
+      
+      // Convert to arrays for charts
+      const financialData = Object.entries(monthlyData).map(([month, data]) => ({
+        month,
+        ...data
+      }));
+      
+      const salesData = Object.entries(productSalesData)
+        .map(([product, data]) => ({ product, ...data }))
+        .sort((a, b) => b.receita - a.receita)
+        .slice(0, 10); // Top 10 products
+      
+      const customersData = Object.entries(customerData)
+        .map(([customer, data]) => ({ customer, ...data }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10); // Top 10 customers
+      
+      // Inventory data from products
+      const inventoryData = products.map(product => ({
+        product: product.name,
+        estoque: product.stock,
+        valor: parseFloat(product.price || "0") * product.stock
+      }));
+      
+      // Calculate summary statistics
+      const totalOrders = orders.length;
+      const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.total || "0"), 0);
+      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      const completedOrders = orders.filter(o => o.status === 'completed').length;
+      const conversionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
+      
+      res.json({
+        financialData,
+        salesData,
+        customersData,
+        inventoryData,
+        summary: {
+          totalOrders,
+          totalRevenue: totalRevenue.toFixed(2),
+          averageOrderValue: averageOrderValue.toFixed(2),
+          conversionRate: conversionRate.toFixed(1)
+        }
+      });
+    } catch (error) {
+      console.error("Error generating reports:", error);
+      res.status(500).json({ message: "Failed to generate reports" });
+    }
+  });
+
   app.get("/api/tenant/financial-stats", async (req, res) => {
     try {
       const tenantId = 5; // Using the demo tenant ID

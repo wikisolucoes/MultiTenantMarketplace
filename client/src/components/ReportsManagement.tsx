@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar, DateRange } from "react-day-picker";
+import { DateRange } from "react-day-picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -57,28 +57,16 @@ export default function ReportsManagement() {
   });
 
   // Query para dados dos relatórios
-  const { data: reportsData } = useQuery({
+  const { data: reportsData, isLoading } = useQuery({
     queryKey: ['/api/reports', filters],
     enabled: true
   });
 
-  // Dados simulados para demonstração - em produção viriam da API
-  const financialData = [
-    { month: 'Jan', receita: 15000, despesas: 8000, lucro: 7000 },
-    { month: 'Fev', receita: 18000, despesas: 9000, lucro: 9000 },
-    { month: 'Mar', receita: 22000, despesas: 10000, lucro: 12000 },
-    { month: 'Abr', receita: 19000, despesas: 8500, lucro: 10500 },
-    { month: 'Mai', receita: 25000, despesas: 11000, lucro: 14000 },
-    { month: 'Jun', receita: 28000, despesas: 12000, lucro: 16000 }
-  ];
-
-  const salesData = [
-    { product: 'Smartphone XYZ', vendas: 145, receita: 28900 },
-    { product: 'Fone Bluetooth', vendas: 89, receita: 11543 },
-    { product: 'Capinha Protetora', vendas: 234, receita: 11700 },
-    { product: 'Carregador USB', vendas: 67, receita: 5353 },
-    { product: 'Película de Vidro', vendas: 156, receita: 4680 }
-  ];
+  // Use authentic database data from API
+  const financialData = reportsData?.financialData || [];
+  const salesData = reportsData?.salesData || [];
+  const customersData = reportsData?.customersData || [];
+  const inventoryData = reportsData?.inventoryData || [];
 
   const customerData = [
     { segment: 'Novos', quantidade: 45, percentual: 35 },
