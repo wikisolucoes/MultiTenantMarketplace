@@ -9,6 +9,8 @@ import {
   serial,
   jsonb,
   foreignKey,
+  date,
+  bigint,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -489,6 +491,100 @@ export const notificationPreferences = pgTable("notification_preferences", {
   updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
 
+// Plugins table
+export const plugins = pgTable("plugins", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  displayName: varchar("display_name", { length: 255 }),
+  description: text("description"),
+  version: varchar("version", { length: 50 }).default("1.0.0").notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).default("0.00"),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).default("0.00"),
+  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }).default("0.00"),
+  features: jsonb("features"),
+  icon: varchar("icon", { length: 255 }),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  developer: varchar("developer", { length: 255 }).default("WikiStore Team"),
+  supportUrl: varchar("support_url", { length: 500 }),
+  documentationUrl: varchar("documentation_url", { length: 500 }),
+  minimumRequirements: jsonb("minimum_requirements"),
+  metadata: jsonb("metadata"),
+  isPublic: boolean("is_public").default(true).notNull(),
+  downloadCount: integer("download_count").default(0).notNull(),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0.00"),
+  ratingCount: integer("rating_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Plugin subscription plans
+export const pluginPlans = pgTable("plugin_plans", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
+  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }),
+  maxTenants: integer("max_tenants").default(1).notNull(), // How many stores can use this plan
+  features: jsonb("features").notNull(), // List of included plugin IDs and features
+  isActive: boolean("is_active").default(true).notNull(),
+  displayOrder: integer("display_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Individual plugin subscriptions and plan subscriptions
+export const pluginSubscriptions = pgTable("plugin_subscriptions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  pluginId: integer("plugin_id").references(() => plugins.id), // NULL for plan subscriptions
+  planId: integer("plan_id").references(() => pluginPlans.id), // NULL for individual plugin subscriptions
+  subscriptionType: varchar("subscription_type", { length: 20 }).notNull(), // 'plugin' or 'plan'
+  status: varchar("status", { length: 20 }).default("active").notNull(), // 'active', 'cancelled', 'expired', 'suspended'
+  billingCycle: varchar("billing_cycle", { length: 20 }).notNull(), // 'monthly', 'yearly', 'lifetime'
+  currentPrice: decimal("current_price", { precision: 10, scale: 2 }).notNull(),
+  nextBillingDate: timestamp("next_billing_date"),
+  lastBillingDate: timestamp("last_billing_date"),
+  cancelledAt: timestamp("cancelled_at"),
+  expiresAt: timestamp("expires_at"),
+  autoRenew: boolean("auto_renew").default(true).notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  paymentMethod: varchar("payment_method", { length: 50 }).default("stripe"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Plugin subscription history for billing tracking
+export const pluginSubscriptionHistory = pgTable("plugin_subscription_history", {
+  id: serial("id").primaryKey(),
+  subscriptionId: integer("subscription_id").notNull().references(() => pluginSubscriptions.id),
+  action: varchar("action", { length: 50 }).notNull(), // 'created', 'renewed', 'cancelled', 'suspended', 'reactivated'
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  paymentStatus: varchar("payment_status", { length: 50 }), // 'pending', 'succeeded', 'failed'
+  description: text("description"),
+  metadata: jsonb("metadata"), // Additional data for the transaction
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Plugin usage analytics
+export const pluginUsage = pgTable("plugin_usage", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  pluginId: integer("plugin_id").notNull().references(() => plugins.id),
+  usageDate: date("usage_date").notNull(),
+  usageCount: integer("usage_count").default(0).notNull(),
+  apiCalls: integer("api_calls").default(0).notNull(),
+  dataProcessed: bigint("data_processed", { mode: "number" }).default(0), // in bytes
+  metadata: jsonb("metadata"), // Plugin-specific usage data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -582,6 +678,27 @@ export const productVariantsRelations = relations(productVariants, ({ one }) => 
 
 export const ordersRelations = relations(orders, ({ one }) => ({
   tenant: one(tenants, { fields: [orders.tenantId], references: [tenants.id] }),
+}));
+
+// Plugin subscription relations
+export const pluginPlansRelations = relations(pluginPlans, ({ many }) => ({
+  subscriptions: many(pluginSubscriptions),
+}));
+
+export const pluginSubscriptionsRelations = relations(pluginSubscriptions, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [pluginSubscriptions.tenantId], references: [tenants.id] }),
+  plugin: one(plugins, { fields: [pluginSubscriptions.pluginId], references: [plugins.id] }),
+  plan: one(pluginPlans, { fields: [pluginSubscriptions.planId], references: [pluginPlans.id] }),
+  history: many(pluginSubscriptionHistory),
+}));
+
+export const pluginSubscriptionHistoryRelations = relations(pluginSubscriptionHistory, ({ one }) => ({
+  subscription: one(pluginSubscriptions, { fields: [pluginSubscriptionHistory.subscriptionId], references: [pluginSubscriptions.id] }),
+}));
+
+export const pluginUsageRelations = relations(pluginUsage, ({ one }) => ({
+  tenant: one(tenants, { fields: [pluginUsage.tenantId], references: [tenants.id] }),
+  plugin: one(plugins, { fields: [pluginUsage.pluginId], references: [plugins.id] }),
 }));
 
 // Zod schemas for validation
