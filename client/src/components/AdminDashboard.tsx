@@ -2108,7 +2108,7 @@ function FinancialManagement() {
               <CardContent>
                 <div className="text-2xl font-bold">{formatCurrency(platformRevenue?.totalRevenue || 0)}</div>
                 <p className="text-xs text-muted-foreground">
-                  +12.5% em relação ao mês anterior
+                  {platformRevenue?.totalTransactions || 0} transações processadas
                 </p>
               </CardContent>
             </Card>
@@ -2161,8 +2161,15 @@ function FinancialManagement() {
                 <CardDescription>Evolução da receita nos últimos 12 meses</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  Gráfico de receita mensal será exibido aqui
+                <div className="h-[300px] flex items-center justify-center">
+                  {revenueLoading ? (
+                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-2xl font-bold">{formatCurrency(platformRevenue?.totalRevenue || 0)}</p>
+                      <p className="text-muted-foreground">Receita Total da Plataforma</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -2173,8 +2180,25 @@ function FinancialManagement() {
                 <CardDescription>Breakdown por fonte de receita</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                  Gráfico de distribuição será exibido aqui
+                <div className="h-[300px] flex items-center justify-center">
+                  {subscriptionLoading ? (
+                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                  ) : (
+                    <div className="space-y-4 w-full p-4">
+                      <div className="flex justify-between">
+                        <span>Receita de Assinaturas:</span>
+                        <span className="font-bold">{formatCurrency(platformRevenue?.subscriptionRevenue || 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Taxa de Transações:</span>
+                        <span className="font-bold">{formatCurrency(platformRevenue?.transactionFees || 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Saldo Disponível:</span>
+                        <span className="font-bold">{formatCurrency(platformRevenue?.availableBalance || 0)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -2260,29 +2284,44 @@ function FinancialManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {subscriptionAnalytics?.subscriptions?.map((sub: any) => (
-                      <tr key={sub.id} className="border-b">
-                        <td className="p-4">{sub.tenantName}</td>
-                        <td className="p-4">
-                          <Badge variant="outline">
-                            {sub.subscriptionType === 'plugin' ? 'Plugin' : 'Plano'}
-                          </Badge>
-                        </td>
-                        <td className="p-4">{sub.productName}</td>
-                        <td className="p-4">
-                          <Badge className={sub.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                            {sub.status === 'active' ? 'Ativo' : 'Cancelado'}
-                          </Badge>
-                        </td>
-                        <td className="p-4">{formatCurrency(sub.currentPrice)}</td>
-                        <td className="p-4">{new Date(sub.nextBillingDate).toLocaleDateString('pt-BR')}</td>
-                        <td className="p-4">
-                          <Button variant="outline" size="sm">
-                            Gerenciar
-                          </Button>
+                    {subscriptionLoading ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center">
+                          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+                          <p className="mt-2 text-muted-foreground">Carregando assinaturas...</p>
                         </td>
                       </tr>
-                    )) || []}
+                    ) : subscriptionAnalytics?.subscriptions?.length ? (
+                      subscriptionAnalytics.subscriptions.map((sub: any) => (
+                        <tr key={sub.id} className="border-b">
+                          <td className="p-4">{sub.tenantName}</td>
+                          <td className="p-4">
+                            <Badge variant="outline">
+                              {sub.subscriptionType === 'plugin' ? 'Plugin' : 'Plano'}
+                            </Badge>
+                          </td>
+                          <td className="p-4">{sub.productName}</td>
+                          <td className="p-4">
+                            <Badge className={sub.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                              {sub.status === 'active' ? 'Ativo' : 'Cancelado'}
+                            </Badge>
+                          </td>
+                          <td className="p-4">{formatCurrency(sub.currentPrice)}</td>
+                          <td className="p-4">{new Date(sub.nextBillingDate).toLocaleDateString('pt-BR')}</td>
+                          <td className="p-4">
+                            <Button variant="outline" size="sm">
+                              Gerenciar
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                          Nenhuma assinatura encontrada
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -2644,24 +2683,38 @@ function FinancialManagement() {
                     <CardTitle>Resumo Financeiro</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">{formatCurrency(1250000)}</div>
-                        <p className="text-sm text-muted-foreground">Receita Total</p>
+                    {(revenueLoading || subscriptionLoading) ? (
+                      <div className="flex justify-center items-center h-32">
+                        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">847</div>
-                        <p className="text-sm text-muted-foreground">Assinaturas Ativas</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {formatCurrency(platformRevenue?.totalRevenue || 0)}
+                          </div>
+                          <p className="text-sm text-muted-foreground">Receita Total</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {subscriptionAnalytics?.activeSubscriptions || 0}
+                          </div>
+                          <p className="text-sm text-muted-foreground">Assinaturas Ativas</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {subscriptionAnalytics?.churnRate || 0}%
+                          </div>
+                          <p className="text-sm text-muted-foreground">Taxa de Churn</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-orange-600">
+                            {formatCurrency(subscriptionAnalytics?.mrr || 0)}
+                          </div>
+                          <p className="text-sm text-muted-foreground">MRR</p>
+                        </div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-purple-600">2.3%</div>
-                        <p className="text-sm text-muted-foreground">Taxa de Churn</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-orange-600">{formatCurrency(89500)}</div>
-                        <p className="text-sm text-muted-foreground">MRR</p>
-                      </div>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
