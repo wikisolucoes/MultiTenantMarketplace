@@ -413,12 +413,16 @@ export const orders = pgTable("orders", {
   customerState: text("customer_state"),
   customerZipCode: text("customer_zip_code"),
   total: decimal("total", { precision: 10, scale: 2 }),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }),
   taxTotal: decimal("tax_total", { precision: 10, scale: 2 }),
+  shippingTotal: decimal("shipping_total", { precision: 10, scale: 2 }),
+  discountTotal: decimal("discount_total", { precision: 10, scale: 2 }),
   status: text("status").default("pending").notNull(),
   paymentMethod: text("payment_method"),
   paymentStatus: text("payment_status"),
   celcoinTransactionId: text("celcoin_transaction_id"),
   shippingAddress: jsonb("shipping_address"),
+  billingAddress: jsonb("billing_address"),
   items: jsonb("items"),
   nfeKey: text("nfe_key"),
   nfeNumber: text("nfe_number"),
@@ -427,9 +431,40 @@ export const orders = pgTable("orders", {
   nfeProtocol: text("nfe_protocol"),
   nfeErrorMessage: text("nfe_error_message"),
   trackingCode: text("tracking_code"),
+  carrier: text("carrier"),
+  affiliateCode: text("affiliate_code"),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }),
+  commissionValue: decimal("commission_value", { precision: 10, scale: 2 }),
+  commissionPaid: boolean("commission_paid").default(false),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  productName: text("product_name").notNull(),
+  productSku: text("product_sku"),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const orderHistory = pgTable("order_history", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  status: text("status").notNull(),
+  comment: text("comment"),
+  userId: integer("user_id").references(() => users.id),
+  userType: text("user_type").default("admin"),
+  notifyCustomer: boolean("notify_customer").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const notifications = pgTable("notifications", {

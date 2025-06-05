@@ -123,8 +123,20 @@ export interface IStorage {
   
   // Orders (tenant-scoped)
   getOrdersByTenantId(tenantId: number): Promise<Order[]>;
+  getOrderWithDetails(id: number, tenantId: number): Promise<Order & { 
+    items: OrderItem[];
+    history: OrderHistory[];
+  } | undefined>;
   createOrder(order: InsertOrder): Promise<Order>;
+  updateOrder(id: number, tenantId: number, order: Partial<InsertOrder>): Promise<Order>;
   updateOrderStatus(id: number, status: string): Promise<Order>;
+  
+  // Order items
+  getOrderItems(orderId: number): Promise<OrderItem[]>;
+  
+  // Order history
+  getOrderHistory(orderId: number): Promise<OrderHistory[]>;
+  addOrderHistory(history: InsertOrderHistory): Promise<OrderHistory>;
   
   // Notifications
   getNotificationsByUserId(userId: number, tenantId: number): Promise<Notification[]>;
