@@ -89,6 +89,10 @@ export default function MerchantDashboard() {
   const [activeSection, setActiveSection] = useState("overview");
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showProductForm, setShowProductForm] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<number | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [showOrderEdit, setShowOrderEdit] = useState(false);
   const [currentTheme, setCurrentTheme] = useState("modern");
   const [banners, setBanners] = useState([
     {
@@ -252,17 +256,16 @@ export default function MerchantDashboard() {
   };
 
   const handleViewOrder = (orderId: number) => {
-    toast({
-      title: "Ver pedido",
-      description: `Abrindo detalhes do pedido #${orderId}`,
-    });
+    setSelectedOrder(orderId);
+    setShowOrderDetails(true);
   };
 
   const handleEditOrder = (orderId: number) => {
-    toast({
-      title: "Editar pedido",
-      description: `Editando pedido #${orderId}`,
-    });
+    const order = orders?.find(o => o.id === orderId);
+    if (order) {
+      setEditingOrder(order);
+      setShowOrderEdit(true);
+    }
   };
 
   const handleLogout = () => {
