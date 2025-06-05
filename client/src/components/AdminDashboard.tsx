@@ -522,6 +522,31 @@ function SubscriptionManagement() {
     }
   };
 
+  // Delete plan function
+  const deletePlan = async (planId: number) => {
+    if (!confirm("Tem certeza que deseja excluir este plano? Esta ação não pode ser desfeita.")) {
+      return;
+    }
+
+    try {
+      await apiRequest('DELETE', `/api/admin/plugin-plans/${planId}`);
+      
+      toast({
+        title: "Plano Excluído",
+        description: "Plano excluído com sucesso",
+      });
+      
+      // Refresh plans
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugin-plans"] });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao Excluir Plano",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -602,7 +627,10 @@ function SubscriptionManagement() {
                           Editar
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={() => deletePlan(plan.id)}
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir
                         </DropdownMenuItem>
