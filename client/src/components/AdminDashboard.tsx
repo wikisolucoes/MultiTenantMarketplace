@@ -148,12 +148,16 @@ interface NotificationFormProps {
 // Plugin Form Component
 function PluginFormComponent({ onClose, plugin }: { onClose: () => void; plugin?: any }) {
   const [formData, setFormData] = useState({
-    name: plugin?.name || '',
+    name: plugin?.displayName || plugin?.name || '',
     description: plugin?.description || '',
     version: plugin?.version || '1.0.0',
     category: plugin?.category || 'pagamento',
-    price: plugin?.price || 'Gratuito',
-    developer: plugin?.developer || '',
+    price: plugin?.price || plugin?.monthlyPrice || 'Gratuito',
+    monthlyPrice: plugin?.monthlyPrice || '',
+    yearlyPrice: plugin?.yearlyPrice || '',
+    developer: plugin?.developer || 'WikiStore Team',
+    icon: plugin?.icon || 'package',
+    slug: plugin?.slug || '',
     isActive: plugin?.isActive || false
   });
   const { toast } = useToast();
@@ -236,34 +240,81 @@ function PluginFormComponent({ onClose, plugin }: { onClose: () => void; plugin?
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="nfe">NF-e / Fiscal</SelectItem>
               <SelectItem value="pagamento">Pagamento</SelectItem>
-              <SelectItem value="fiscal">Fiscal</SelectItem>
-              <SelectItem value="marketing">Marketing</SelectItem>
-              <SelectItem value="integracao">Integração</SelectItem>
-              <SelectItem value="relatorios">Relatórios</SelectItem>
+              <SelectItem value="marketplace">Marketplace</SelectItem>
+              <SelectItem value="social">Social / Marketing</SelectItem>
+              <SelectItem value="inventory">Estoque</SelectItem>
+              <SelectItem value="loyalty">Fidelidade</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="analytics">Analytics</SelectItem>
+              <SelectItem value="import">Importação</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label htmlFor="price">Preço</Label>
+          <Label htmlFor="slug">Slug</Label>
           <Input
-            id="price"
-            value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-            placeholder="R$ 29,90 ou Gratuito"
+            id="slug"
+            value={formData.slug}
+            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+            placeholder="slug-do-plugin"
           />
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="developer">Desenvolvedor</Label>
-        <Input
-          id="developer"
-          value={formData.developer}
-          onChange={(e) => setFormData({ ...formData, developer: e.target.value })}
-          placeholder="Nome do desenvolvedor"
-        />
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="price">Preço Único</Label>
+          <Input
+            id="price"
+            value={formData.price}
+            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+            placeholder="29.90"
+          />
+        </div>
+        <div>
+          <Label htmlFor="monthlyPrice">Preço Mensal</Label>
+          <Input
+            id="monthlyPrice"
+            value={formData.monthlyPrice}
+            onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })}
+            placeholder="29.90"
+          />
+        </div>
+        <div>
+          <Label htmlFor="yearlyPrice">Preço Anual</Label>
+          <Input
+            id="yearlyPrice"
+            value={formData.yearlyPrice}
+            onChange={(e) => setFormData({ ...formData, yearlyPrice: e.target.value })}
+            placeholder="299.00"
+          />
+        </div>
       </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="icon">Ícone</Label>
+          <Input
+            id="icon"
+            value={formData.icon}
+            onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+            placeholder="file-text"
+          />
+        </div>
+        <div>
+          <Label htmlFor="developer">Desenvolvedor</Label>
+          <Input
+            id="developer"
+            value={formData.developer}
+            onChange={(e) => setFormData({ ...formData, developer: e.target.value })}
+            placeholder="Nome do desenvolvedor"
+          />
+        </div>
+      </div>
+
+
 
       <div className="flex items-center space-x-2">
         <Switch
@@ -287,6 +338,21 @@ function PluginFormComponent({ onClose, plugin }: { onClose: () => void; plugin?
 
 // Plugin Details Component
 function PluginDetailsView({ plugin }: { plugin: any }) {
+  const getCategoryLabel = (category: string) => {
+    const categories: { [key: string]: string } = {
+      'nfe': 'NF-e / Fiscal',
+      'pagamento': 'Pagamento',
+      'marketplace': 'Marketplace',
+      'social': 'Social / Marketing',
+      'inventory': 'Estoque',
+      'loyalty': 'Fidelidade',
+      'email': 'Email',
+      'analytics': 'Analytics',
+      'import': 'Importação'
+    };
+    return categories[category] || category;
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-6">
@@ -295,36 +361,57 @@ function PluginDetailsView({ plugin }: { plugin: any }) {
           <div className="space-y-2">
             <div>
               <span className="text-sm text-muted-foreground">Nome:</span>
-              <p className="font-medium">{plugin.name}</p>
+              <p className="font-medium">{plugin.displayName || plugin.name}</p>
             </div>
             <div>
-              <span className="text-sm text-muted-foreground">Versão:</span>
-              <p>{plugin.version}</p>
+              <span className="text-sm text-muted-foreground">Slug:</span>
+              <p className="text-xs text-cyan-600 bg-cyan-50 px-2 py-1 rounded">{plugin.slug}</p>
             </div>
             <div>
               <span className="text-sm text-muted-foreground">Categoria:</span>
-              <Badge variant="outline">{plugin.category}</Badge>
+              <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">
+                {getCategoryLabel(plugin.category)}
+              </Badge>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Ícone:</span>
+              <p className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">{plugin.icon}</p>
             </div>
             <div>
               <span className="text-sm text-muted-foreground">Desenvolvedor:</span>
-              <p>{plugin.developer}</p>
+              <p>{plugin.developer || 'WikiStore Team'}</p>
             </div>
           </div>
         </div>
         <div>
-          <h3 className="font-semibold mb-2">Estatísticas</h3>
+          <h3 className="font-semibold mb-2">Preços e Status</h3>
           <div className="space-y-2">
+            {plugin.price && (
+              <div>
+                <span className="text-sm text-muted-foreground">Preço Único:</span>
+                <p className="font-medium text-green-600">R$ {plugin.price}</p>
+              </div>
+            )}
+            {plugin.monthlyPrice && (
+              <div>
+                <span className="text-sm text-muted-foreground">Preço Mensal:</span>
+                <p className="font-medium text-blue-600">R$ {plugin.monthlyPrice}/mês</p>
+              </div>
+            )}
+            {plugin.yearlyPrice && (
+              <div>
+                <span className="text-sm text-muted-foreground">Preço Anual:</span>
+                <p className="font-medium text-purple-600">R$ {plugin.yearlyPrice}/ano</p>
+              </div>
+            )}
             <div>
               <span className="text-sm text-muted-foreground">Instalações:</span>
-              <p className="font-medium">{plugin.installations}</p>
-            </div>
-            <div>
-              <span className="text-sm text-muted-foreground">Preço:</span>
-              <p className="font-medium">{plugin.price}</p>
+              <p className="font-medium">{plugin.installations || 0}</p>
             </div>
             <div>
               <span className="text-sm text-muted-foreground">Status:</span>
-              <Badge variant={plugin.isActive ? 'default' : 'secondary'}>
+              <Badge variant={plugin.isActive ? 'default' : 'secondary'} 
+                     className={plugin.isActive ? 'bg-green-500' : 'bg-gray-500'}>
                 {plugin.isActive ? 'Ativo' : 'Inativo'}
               </Badge>
             </div>
@@ -334,13 +421,34 @@ function PluginDetailsView({ plugin }: { plugin: any }) {
 
       <div>
         <h3 className="font-semibold mb-2">Descrição</h3>
-        <p className="text-sm text-muted-foreground">{plugin.description}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">{plugin.description}</p>
       </div>
 
+      {plugin.features && Array.isArray(plugin.features) && plugin.features.length > 0 && (
+        <div>
+          <h3 className="font-semibold mb-2">Funcionalidades</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {plugin.features.map((feature: string, index: number) => (
+              <div key={index} className="flex items-center gap-2 text-sm">
+                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full"></div>
+                <span>{feature}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
-        <h3 className="font-semibold mb-2">Configurações</h3>
-        <div className="p-4 bg-muted rounded-lg">
-          <p className="text-sm">Este plugin não possui configurações específicas disponíveis.</p>
+        <h3 className="font-semibold mb-2">Informações Técnicas</h3>
+        <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg text-sm">
+          <div>
+            <span className="text-muted-foreground">Criado em:</span>
+            <p>{plugin.createdAt ? new Date(plugin.createdAt).toLocaleDateString('pt-BR') : 'N/A'}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Atualizado em:</span>
+            <p>{plugin.updatedAt ? new Date(plugin.updatedAt).toLocaleDateString('pt-BR') : 'N/A'}</p>
+          </div>
         </div>
       </div>
     </div>
