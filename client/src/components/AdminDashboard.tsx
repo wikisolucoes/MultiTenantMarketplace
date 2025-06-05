@@ -2382,28 +2382,43 @@ function FinancialManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {transactionHistory?.map((transaction: any) => (
-                        <tr key={transaction.id} className="border-b">
-                          <td className="p-4 font-mono text-sm">{transaction.id}</td>
-                          <td className="p-4">{new Date(transaction.createdAt).toLocaleDateString('pt-BR')}</td>
-                          <td className="p-4">{transaction.tenantName}</td>
-                          <td className="p-4">
-                            <Badge variant="outline">{transaction.type}</Badge>
+                      {transactionLoading ? (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center">
+                            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto" />
+                            <p className="mt-2 text-muted-foreground">Carregando histórico de transações...</p>
                           </td>
-                          <td className="p-4">{formatCurrency(transaction.amount)}</td>
-                          <td className="p-4">
-                            <Badge className={
-                              transaction.status === 'succeeded' ? 'bg-green-100 text-green-800' :
-                              transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }>
-                              {transaction.status === 'succeeded' ? 'Aprovado' :
-                               transaction.status === 'pending' ? 'Pendente' : 'Falhou'}
-                            </Badge>
-                          </td>
-                          <td className="p-4">{transaction.paymentMethod}</td>
                         </tr>
-                      )) || []}
+                      ) : transactionHistory?.length ? (
+                        transactionHistory.map((transaction: any) => (
+                          <tr key={transaction.id} className="border-b">
+                            <td className="p-4 font-mono text-sm">{transaction.id}</td>
+                            <td className="p-4">{new Date(transaction.createdAt).toLocaleDateString('pt-BR')}</td>
+                            <td className="p-4">{transaction.tenantName}</td>
+                            <td className="p-4">
+                              <Badge variant="outline">{transaction.type}</Badge>
+                            </td>
+                            <td className="p-4">{formatCurrency(transaction.amount)}</td>
+                            <td className="p-4">
+                              <Badge className={
+                                transaction.status === 'succeeded' ? 'bg-green-100 text-green-800' :
+                                transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }>
+                                {transaction.status === 'succeeded' ? 'Aprovado' :
+                                 transaction.status === 'pending' ? 'Pendente' : 'Falhou'}
+                              </Badge>
+                            </td>
+                            <td className="p-4">{transaction.paymentMethod}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                            Nenhuma transação encontrada
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2519,68 +2534,76 @@ function FinancialManagement() {
               <div className="space-y-6">
                 {/* Payment Methods Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <Card>
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <CreditCard className="w-5 h-5" />
-                        Cartão de Crédito
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Status:</span>
-                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Taxa:</span>
-                          <span className="text-sm">3.99%</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {celcoinLoading ? (
+                    <div className="col-span-full flex justify-center items-center h-32">
+                      <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                    </div>
+                  ) : (
+                    <>
+                      <Card>
+                        <CardHeader className="pb-4">
+                          <CardTitle className="flex items-center gap-2">
+                            <CreditCard className="w-5 h-5" />
+                            Cartão de Crédito
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm">Status:</span>
+                              <Badge className={celcoinIntegration?.successRate > 90 ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                                {celcoinIntegration?.successRate > 90 ? "Ativo" : "Degradado"}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">Taxa de Sucesso:</span>
+                              <span className="text-sm">{celcoinIntegration?.successRate || 0}%</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                  <Card>
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <Smartphone className="w-5 h-5" />
-                        PIX
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Status:</span>
-                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Taxa:</span>
-                          <span className="text-sm">0.99%</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      <Card>
+                        <CardHeader className="pb-4">
+                          <CardTitle className="flex items-center gap-2">
+                            <Smartphone className="w-5 h-5" />
+                            PIX
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm">Volume Total:</span>
+                              <span className="text-sm">{formatCurrency(celcoinIntegration?.totalVolume || 0)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-sm">Transações:</span>
+                              <span className="text-sm">{celcoinIntegration?.totalTransactions || 0}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                  <Card>
-                    <CardHeader className="pb-4">
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="w-5 h-5" />
-                        Boleto
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Status:</span>
-                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Taxa:</span>
-                          <span className="text-sm">R$ 3.49</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      <Card>
+                        <CardHeader className="pb-4">
+                          <CardTitle className="flex items-center gap-2">
+                            <FileText className="w-5 h-5" />
+                            Configurações
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <Button className="w-full" variant="outline">
+                              Configurar Métodos
+                            </Button>
+                            <Button className="w-full" variant="outline">
+                              Logs de Integração
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </>
+                  )}
                 </div>
 
                 {/* Payment Configuration */}
