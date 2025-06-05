@@ -1671,6 +1671,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Update plugin subscription
+  app.patch("/api/admin/plugin-subscriptions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, auto_renew, notes } = req.body;
+
+      // Update subscription
+      const result = await db.execute(sql`
+        UPDATE plugin_subscriptions 
+        SET status = ${status}, auto_renew = ${auto_renew}, notes = ${notes}, updated_at = NOW()
+        WHERE id = ${parseInt(id)}
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Subscription not found" });
+      }
+
+      // Record in history
+      await db.execute(sql`
+        INSERT INTO plugin_subscription_history (
+          subscription_id, action, description
+        ) VALUES (
+          ${parseInt(id)}, 'updated', 
+          'Subscription updated by admin'
+        )
+      `);
+
+      res.json({ 
+        message: "Subscription updated successfully",
+        subscription: result.rows[0]
+      });
+    } catch (error) {
+      console.error("Error updating subscription:", error);
+      res.status(500).json({ message: "Failed to update subscription" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // WebSocket Server for real-time notifications

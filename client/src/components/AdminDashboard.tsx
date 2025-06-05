@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -900,6 +900,21 @@ function SubscriptionManagement() {
           </div>
         </div>
       )}
+
+      {/* Subscription Details Modal */}
+      <SubscriptionDetailsModal 
+        subscription={selectedSubscription}
+        isOpen={isViewSubscriptionOpen}
+        onClose={() => setIsViewSubscriptionOpen(false)}
+      />
+
+      {/* Edit Subscription Modal */}
+      <EditSubscriptionModal 
+        subscription={selectedSubscription}
+        isOpen={isEditSubscriptionOpen}
+        onClose={() => setIsEditSubscriptionOpen(false)}
+        onSave={handleUpdateSubscription}
+      />
 
       {/* Create Plan Modal */}
       <Dialog open={isCreatePlanOpen} onOpenChange={setIsCreatePlanOpen}>
@@ -1994,6 +2009,31 @@ export default function AdminDashboard() {
     if (confirm(`Tem certeza que deseja cancelar a assinatura de ${subscription.tenant_name}?`)) {
       cancelSubscriptionMutation.mutate(subscription.id);
     }
+  };
+
+  // Update subscription mutation
+  const updateSubscriptionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("PATCH", `/api/admin/plugin-subscriptions/${data.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugin-subscriptions"] });
+      toast({
+        title: "Assinatura atualizada",
+        description: "As alterações foram salvas com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar assinatura",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleUpdateSubscription = (updatedSubscription: any) => {
+    updateSubscriptionMutation.mutate(updatedSubscription);
   };
 
   // Fetch current user data
@@ -3639,5 +3679,179 @@ function TenantForm({ tenant, onSubmit, isLoading }: {
         </Button>
       </div>
     </form>
+  );
+}
+
+// Subscription Details Modal Component
+function SubscriptionDetailsModal({ 
+  subscription, 
+  isOpen, 
+  onClose 
+}: { 
+  subscription: any; 
+  isOpen: boolean; 
+  onClose: () => void; 
+}) {
+  if (!subscription) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Detalhes da Assinatura</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Loja</Label>
+              <p className="text-sm">{subscription.tenant_name}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">ID do Tenant</Label>
+              <p className="text-sm">{subscription.tenant_id}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Plano</Label>
+              <p className="text-sm">{subscription.plan_name || 'Plugin Individual'}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+              <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
+                {subscription.status}
+              </Badge>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Ciclo de Cobrança</Label>
+              <p className="text-sm">{subscription.billing_cycle}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Valor Atual</Label>
+              <p className="text-sm">R$ {Number(subscription.current_price || 0).toFixed(2)}</p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Próxima Cobrança</Label>
+              <p className="text-sm">
+                {subscription.next_billing_date ? 
+                  new Date(subscription.next_billing_date).toLocaleDateString('pt-BR') : 
+                  'N/A'
+                }
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Auto Renovar</Label>
+              <p className="text-sm">{subscription.auto_renew ? 'Sim' : 'Não'}</p>
+            </div>
+          </div>
+          
+          {subscription.notes && (
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">Observações</Label>
+              <p className="text-sm bg-muted p-3 rounded">{subscription.notes}</p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Edit Subscription Modal Component
+function EditSubscriptionModal({ 
+  subscription, 
+  isOpen, 
+  onClose,
+  onSave
+}: { 
+  subscription: any; 
+  isOpen: boolean; 
+  onClose: () => void;
+  onSave: (updatedSubscription: any) => void;
+}) {
+  const [editData, setEditData] = useState({
+    status: subscription?.status || 'active',
+    auto_renew: subscription?.auto_renew || false,
+    notes: subscription?.notes || ''
+  });
+
+  useEffect(() => {
+    if (subscription) {
+      setEditData({
+        status: subscription.status || 'active',
+        auto_renew: subscription.auto_renew || false,
+        notes: subscription.notes || ''
+      });
+    }
+  }, [subscription]);
+
+  const handleSave = () => {
+    onSave({ ...subscription, ...editData });
+    onClose();
+  };
+
+  if (!subscription) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Editar Assinatura</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="subscription-status">Status</Label>
+            <Select 
+              value={editData.status} 
+              onValueChange={(value) => setEditData({...editData, status: value})}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Ativo</SelectItem>
+                <SelectItem value="suspended">Suspenso</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div>
+            <Label htmlFor="auto-renew">Auto Renovar</Label>
+            <Select 
+              value={editData.auto_renew ? 'true' : 'false'} 
+              onValueChange={(value) => setEditData({...editData, auto_renew: value === 'true'})}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">Sim</SelectItem>
+                <SelectItem value="false">Não</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="subscription-notes">Observações</Label>
+            <textarea 
+              id="subscription-notes"
+              className="w-full p-2 border rounded"
+              rows={3}
+              value={editData.notes}
+              onChange={(e) => setEditData({...editData, notes: e.target.value})}
+              placeholder="Adicione observações sobre esta assinatura..."
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave}>
+              Salvar Alterações
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
