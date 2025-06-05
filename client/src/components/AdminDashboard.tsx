@@ -145,6 +145,208 @@ interface NotificationFormProps {
   tenants: any[];
 }
 
+// Plugin Form Component
+function PluginFormComponent({ onClose, plugin }: { onClose: () => void; plugin?: any }) {
+  const [formData, setFormData] = useState({
+    name: plugin?.name || '',
+    description: plugin?.description || '',
+    version: plugin?.version || '1.0.0',
+    category: plugin?.category || 'pagamento',
+    price: plugin?.price || 'Gratuito',
+    developer: plugin?.developer || '',
+    isActive: plugin?.isActive || false
+  });
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (data: any) => {
+      const endpoint = plugin ? `/api/admin/plugins/${plugin.id}` : '/api/admin/plugins';
+      const method = plugin ? 'PATCH' : 'POST';
+      return await apiRequest(method, endpoint, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugins"] });
+      toast({
+        title: plugin ? "Plugin atualizado" : "Plugin criado",
+        description: plugin ? "Plugin foi atualizado com sucesso." : "Plugin foi criado com sucesso.",
+      });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!formData.name || !formData.description) {
+      toast({
+        title: "Erro",
+        description: "Nome e descrição são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+    mutation.mutate(formData);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="name">Nome do Plugin *</Label>
+          <Input
+            id="name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Nome do plugin"
+          />
+        </div>
+        <div>
+          <Label htmlFor="version">Versão</Label>
+          <Input
+            id="version"
+            value={formData.version}
+            onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+            placeholder="1.0.0"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="description">Descrição *</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Descrição do plugin..."
+          rows={4}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="category">Categoria</Label>
+          <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pagamento">Pagamento</SelectItem>
+              <SelectItem value="fiscal">Fiscal</SelectItem>
+              <SelectItem value="marketing">Marketing</SelectItem>
+              <SelectItem value="integracao">Integração</SelectItem>
+              <SelectItem value="relatorios">Relatórios</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="price">Preço</Label>
+          <Input
+            id="price"
+            value={formData.price}
+            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+            placeholder="R$ 29,90 ou Gratuito"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="developer">Desenvolvedor</Label>
+        <Input
+          id="developer"
+          value={formData.developer}
+          onChange={(e) => setFormData({ ...formData, developer: e.target.value })}
+          placeholder="Nome do desenvolvedor"
+        />
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          checked={formData.isActive}
+          onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+        />
+        <Label>Plugin ativo</Label>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button onClick={handleSubmit} disabled={mutation.isPending}>
+          {mutation.isPending ? "Salvando..." : (plugin ? "Atualizar" : "Criar")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Plugin Details Component
+function PluginDetailsView({ plugin }: { plugin: any }) {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-6">
+        <div>
+          <h3 className="font-semibold mb-2">Informações Básicas</h3>
+          <div className="space-y-2">
+            <div>
+              <span className="text-sm text-muted-foreground">Nome:</span>
+              <p className="font-medium">{plugin.name}</p>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Versão:</span>
+              <p>{plugin.version}</p>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Categoria:</span>
+              <Badge variant="outline">{plugin.category}</Badge>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Desenvolvedor:</span>
+              <p>{plugin.developer}</p>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h3 className="font-semibold mb-2">Estatísticas</h3>
+          <div className="space-y-2">
+            <div>
+              <span className="text-sm text-muted-foreground">Instalações:</span>
+              <p className="font-medium">{plugin.installations}</p>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Preço:</span>
+              <p className="font-medium">{plugin.price}</p>
+            </div>
+            <div>
+              <span className="text-sm text-muted-foreground">Status:</span>
+              <Badge variant={plugin.isActive ? 'default' : 'secondary'}>
+                {plugin.isActive ? 'Ativo' : 'Inativo'}
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-2">Descrição</h3>
+        <p className="text-sm text-muted-foreground">{plugin.description}</p>
+      </div>
+
+      <div>
+        <h3 className="font-semibold mb-2">Configurações</h3>
+        <div className="p-4 bg-muted rounded-lg">
+          <p className="text-sm">Este plugin não possui configurações específicas disponíveis.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NotificationFormComponent({ onClose, tenants }: NotificationFormProps) {
   const [notification, setNotification] = useState({
     title: '',
@@ -957,6 +1159,24 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Plugin management function
+  const togglePluginStatus = async (pluginId: number, isActive: boolean) => {
+    try {
+      await apiRequest("PATCH", `/api/admin/plugins/${pluginId}`, { isActive });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugins"] });
+      toast({
+        title: "Plugin atualizado",
+        description: "Status do plugin foi atualizado com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   // Fetch current user data
   const { data: currentUser } = useQuery({

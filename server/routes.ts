@@ -2300,6 +2300,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new plugin
+  app.post("/api/admin/plugins", async (req, res) => {
+    try {
+      const { name, description, category, price, developer, isActive } = req.body;
+      
+      const result = await db.execute(sql`
+        INSERT INTO plugins (name, display_name, description, category, price, is_active)
+        VALUES (${name.toLowerCase().replace(/\s+/g, '_')}, ${name}, ${description}, ${category}, ${price}, ${isActive})
+        RETURNING *
+      `);
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error creating plugin:", error);
+      res.status(500).json({ message: "Failed to create plugin" });
+    }
+  });
+
+  // Update plugin
+  app.patch("/api/admin/plugins/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, category, price, developer, isActive } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE plugins 
+        SET 
+          display_name = COALESCE(${name}, display_name),
+          description = COALESCE(${description}, description),
+          category = COALESCE(${category}, category),
+          price = COALESCE(${price}, price),
+          is_active = COALESCE(${isActive}, is_active),
+          updated_at = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Plugin not found" });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error updating plugin:", error);
+      res.status(500).json({ message: "Failed to update plugin" });
+    }
+  });
+
+  // Delete plugin
+  app.delete("/api/admin/plugins/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const result = await db.execute(sql`
+        DELETE FROM plugins WHERE id = ${id}
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Plugin not found" });
+      }
+
+      res.json({ message: "Plugin deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting plugin:", error);
+      res.status(500).json({ message: "Failed to delete plugin" });
+    }
+  });
+
   app.put("/api/admin/plugins/:id", async (req, res) => {
     try {
       const pluginId = parseInt(req.params.id);
