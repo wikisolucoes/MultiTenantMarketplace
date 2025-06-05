@@ -2437,11 +2437,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY pp.display_order ASC, pp.monthly_price ASC
       `);
 
-      const plans = result.rows.map((row: any) => ({
-        ...row,
-        features: row.features ? JSON.parse(row.features) : [],
-        activeSubscriptions: row.active_subscriptions || 0
-      }));
+      const plans = result.rows.map((row: any) => {
+        let features = [];
+        try {
+          if (row.features) {
+            // Handle escaped JSON from database
+            let featuresStr = row.features;
+            if (typeof featuresStr === 'string') {
+              // Remove outer quotes if present and unescape
+              featuresStr = featuresStr.replace(/^"(.*)"$/, '$1').replace(/\\"/g, '"');
+              features = JSON.parse(featuresStr);
+            } else {
+              features = featuresStr;
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing features for plan', row.id, ':', error);
+          features = [];
+        }
+        
+        return {
+          ...row,
+          features: Array.isArray(features) ? features : [],
+          activeSubscriptions: parseInt(row.active_subscriptions) || 0
+        };
+      });
 
       res.json(plans);
     } catch (error) {
