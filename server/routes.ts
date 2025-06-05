@@ -2291,25 +2291,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY p.created_at DESC
       `);
 
-      const plugins = result.rows.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        displayName: row.name,
-        description: row.description,
-        version: "1.0.0",
-        isActive: row.is_active,
-        installations: row.installations || 0,
-        category: row.category,
-        icon: row.icon,
-        slug: row.slug,
-        developer: "WikiStore Team",
-        price: row.price,
-        monthlyPrice: row.monthly_price,
-        yearlyPrice: row.yearly_price,
-        features: row.features ? JSON.parse(row.features) : [],
-        createdAt: row.created_at,
-        updatedAt: row.updated_at
-      }));
+      const plugins = result.rows.map((row: any) => {
+        let features = [];
+        try {
+          if (row.features) {
+            features = typeof row.features === 'string' ? JSON.parse(row.features) : row.features;
+          }
+        } catch (e) {
+          console.warn(`Failed to parse features for plugin ${row.id}:`, e);
+          features = [];
+        }
+
+        return {
+          id: row.id,
+          name: row.name,
+          displayName: row.name,
+          description: row.description,
+          version: "1.0.0",
+          isActive: row.is_active,
+          installations: row.installations || 0,
+          category: row.category,
+          icon: row.icon,
+          slug: row.slug,
+          developer: "WikiStore Team",
+          price: row.price,
+          monthlyPrice: row.monthly_price,
+          yearlyPrice: row.yearly_price,
+          features: features,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at
+        };
+      });
 
       res.json(plugins);
     } catch (error) {
