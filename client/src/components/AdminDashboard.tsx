@@ -134,6 +134,248 @@ interface CreateUserFormProps {
   onClose: () => void;
 }
 
+interface NotificationFormProps {
+  onClose: () => void;
+}
+
+function NotificationFormComponent({ onClose }: NotificationFormProps) {
+  const [notification, setNotification] = useState({
+    title: '',
+    message: '',
+    recipientType: 'all',
+    recipientIds: [] as number[],
+    buttonText: '',
+    buttonUrl: ''
+  });
+  const [selectedTenant, setSelectedTenant] = useState<number | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: availableUsers } = useQuery({
+    queryKey: ['/api/admin/notification-recipients', notification.recipientType, selectedTenant],
+    enabled: notification.recipientType === 'specific' || notification.recipientType === 'tenant'
+  });
+
+  const createNotificationMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("POST", "/api/admin/notifications", data);
+    },
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/notifications"] });
+      toast({
+        title: "Informativo enviado",
+        description: `Informativo enviado para ${response.recipientCount} destinatários`,
+      });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!notification.title || !notification.message) {
+      toast({
+        title: "Erro",
+        description: "Título e mensagem são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let recipientIds: number[] = [];
+    if (notification.recipientType === 'specific') {
+      recipientIds = selectedUsers;
+    } else if (notification.recipientType === 'tenant' && selectedTenant) {
+      recipientIds = [selectedTenant];
+    }
+
+    createNotificationMutation.mutate({
+      ...notification,
+      recipientIds
+    });
+  };
+
+  return (
+    <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+      {/* Informações do Informativo */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Informações do Informativo</h3>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="title">Título *</Label>
+            <Input
+              id="title"
+              value={notification.title}
+              onChange={(e) => setNotification({ ...notification, title: e.target.value })}
+              placeholder="Título do informativo"
+            />
+          </div>
+          <div>
+            <Label htmlFor="message">Mensagem *</Label>
+            <Textarea
+              id="message"
+              value={notification.message}
+              onChange={(e) => setNotification({ ...notification, message: e.target.value })}
+              placeholder="Conteúdo da mensagem..."
+              rows={5}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="buttonText">Texto do Botão (Opcional)</Label>
+              <Input
+                id="buttonText"
+                value={notification.buttonText}
+                onChange={(e) => setNotification({ ...notification, buttonText: e.target.value })}
+                placeholder="Ex: Acessar Plataforma"
+              />
+            </div>
+            <div>
+              <Label htmlFor="buttonUrl">URL do Botão (Opcional)</Label>
+              <Input
+                id="buttonUrl"
+                value={notification.buttonUrl}
+                onChange={(e) => setNotification({ ...notification, buttonUrl: e.target.value })}
+                placeholder="https://exemplo.com"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Destinatários */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Destinatários</h3>
+        <div className="space-y-4">
+          <div>
+            <Label>Tipo de Destinatário</Label>
+            <Select 
+              value={notification.recipientType} 
+              onValueChange={(value) => {
+                setNotification({ ...notification, recipientType: value });
+                setSelectedUsers([]);
+                setSelectedTenant(null);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os usuários</SelectItem>
+                <SelectItem value="tenant">Usuários de uma loja específica</SelectItem>
+                <SelectItem value="specific">Usuários específicos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {notification.recipientType === 'tenant' && (
+            <div>
+              <Label>Selecionar Loja</Label>
+              <Select 
+                value={selectedTenant?.toString() || ''} 
+                onValueChange={(value) => setSelectedTenant(parseInt(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha uma loja" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(tenants as any[])?.map((tenant: any) => (
+                    <SelectItem key={tenant.id} value={tenant.id.toString()}>
+                      {tenant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {notification.recipientType === 'specific' && (
+            <div>
+              <Label>Selecionar Usuários</Label>
+              <div className="border rounded-lg p-4 max-h-64 overflow-y-auto">
+                {(availableUsers as any[])?.map((user: any) => (
+                  <div key={user.id} className="flex items-center space-x-2 py-2">
+                    <input
+                      type="checkbox"
+                      id={`user-${user.id}`}
+                      checked={selectedUsers.includes(user.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedUsers([...selectedUsers, user.id]);
+                        } else {
+                          setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                        }
+                      }}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor={`user-${user.id}`} className="flex-1 cursor-pointer">
+                      <div>
+                        <div className="font-medium">{user.fullName}</div>
+                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                        {user.tenantName && (
+                          <div className="text-xs text-muted-foreground">Loja: {user.tenantName}</div>
+                        )}
+                      </div>
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {notification.recipientType === 'all' && (
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                Este informativo será enviado para todos os usuários ativos da plataforma.
+              </p>
+            </div>
+          )}
+
+          {notification.recipientType === 'tenant' && selectedTenant && (
+            <div className="p-4 bg-green-50 rounded-lg">
+              <p className="text-sm text-green-800">
+                Este informativo será enviado para todos os usuários da loja selecionada.
+              </p>
+            </div>
+          )}
+
+          {notification.recipientType === 'specific' && selectedUsers.length > 0 && (
+            <div className="p-4 bg-purple-50 rounded-lg">
+              <p className="text-sm text-purple-800">
+                Este informativo será enviado para {selectedUsers.length} usuário(s) selecionado(s).
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button 
+          onClick={handleSubmit}
+          disabled={
+            createNotificationMutation.isPending || 
+            !notification.title || 
+            !notification.message ||
+            (notification.recipientType === 'specific' && selectedUsers.length === 0) ||
+            (notification.recipientType === 'tenant' && !selectedTenant)
+          }
+        >
+          {createNotificationMutation.isPending ? "Enviando..." : "Enviar Informativo"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function CreateUserFormComponent({ onClose }: CreateUserFormProps) {
   const [newUser, setNewUser] = useState({
     email: '',
@@ -729,6 +971,10 @@ export default function AdminDashboard() {
 
   const { data: reports } = useQuery({
     queryKey: ['/api/admin/reports'],
+  });
+
+  const { data: notifications, isLoading: notificationsLoading } = useQuery({
+    queryKey: ['/api/admin/notifications'],
   });
 
   // Mutations
