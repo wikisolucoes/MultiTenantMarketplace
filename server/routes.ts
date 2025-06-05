@@ -2596,6 +2596,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Toggle plugin plan status
+  app.patch("/api/admin/plugin-plans/:id/toggle-status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE plugin_plans 
+        SET 
+          is_active = ${isActive},
+          updated_at = NOW()
+        WHERE id = ${parseInt(id)}
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Plan not found" });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error toggling plugin plan status:", error);
+      res.status(500).json({ message: "Failed to toggle plugin plan status" });
+    }
+  });
+
   // Get all plugin subscriptions (Admin)
   app.get("/api/admin/plugin-subscriptions", async (req, res) => {
     try {
