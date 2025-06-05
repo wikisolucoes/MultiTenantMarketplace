@@ -3196,14 +3196,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ps.subscription_type,
           t.name as tenant_name,
           CASE 
-            WHEN ps.subscription_type = 'plan' THEN p.name
+            WHEN ps.subscription_type = 'plan' THEN sp.name
             WHEN ps.subscription_type = 'plugin' THEN pl.name
             ELSE 'Produto Desconhecido'
           END as product_name
         FROM plugin_subscription_history psh
         JOIN plugin_subscriptions ps ON psh.subscription_id = ps.id
         LEFT JOIN tenants t ON ps.tenant_id = t.id
-        LEFT JOIN plans p ON ps.plan_id = p.id
+        LEFT JOIN subscription_plans sp ON ps.plan_id = sp.id
         LEFT JOIN plugins pl ON ps.plugin_id = pl.id
         WHERE psh.action IN ('created', 'renewed', 'upgraded', 'downgraded', 'cancelled')
         ORDER BY psh.created_at DESC
@@ -3294,6 +3294,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching Celcoin integration data:", error);
       res.status(500).json({ message: "Failed to fetch Celcoin integration data" });
+    }
+  });
+
+  // Ledger Entries - Extrato da Conta Celcoin
+  app.get('/api/admin/financial/ledger', async (req, res) => {
+    try {
+      const { tenant_id, start_date, end_date, type } = req.query;
+      
+      let whereClause = 'WHERE 1=1';
+      const params: any[] = [];
+      
+      if (tenant_id) {
+        whereClause += ' AND le.tenant_id = $' + (params.length + 1);
+        params.push(tenant_id);
+      }
+      
+      if (start_date) {
+        whereClause += ' AND le.created_at >= $' + (params.length + 1);
+        params.push(start_date);
+      }
+      
+      if (end_date) {
+        whereClause += ' AND le.created_at <= $' + (params.length + 1);
+        params.push(end_date);
+      }
+      
+      if (type) {
+        whereClause += ' AND le.transaction_type = $' + (params.length + 1);
+        params.push(type);
+      }
+
+      const ledgerResult = await db.execute(sql`
+        SELECT 
+          le.*,
+          t.name as tenant_name,
+          o.id as order_id,
+          o.total as order_total
+        FROM ledger_entries le
+        LEFT JOIN tenants t ON le.tenant_id = t.id
+        LEFT JOIN orders o ON le.reference_id = o.id AND le.reference_type = 'order'
+        ${sql.raw(whereClause)}
+        ORDER BY le.created_at DESC
+        LIMIT 100
+      `);
+
+      // Calculate running balance
+      let runningBalance = 0;
+      const entries = ledgerResult.rows.map((entry: any) => {
+        if (entry.transaction_type === 'credit') {
+          runningBalance += parseFloat(entry.amount || '0');
+        } else {
+          runningBalance -= parseFloat(entry.amount || '0');
+        }
+        
+        return {
+          id: entry.id,
+          tenantId: entry.tenant_id,
+          tenantName: entry.tenant_name || `Loja ${entry.tenant_id}`,
+          transactionType: entry.transaction_type,
+          amount: parseFloat(entry.amount || '0').toFixed(2),
+          runningBalance: runningBalance.toFixed(2),
+          description: entry.description,
+          referenceType: entry.reference_type,
+          referenceId: entry.reference_id,
+          celcoinTransactionId: entry.celcoin_transaction_id,
+          metadata: entry.metadata,
+          createdAt: entry.created_at,
+          orderTotal: entry.order_total ? parseFloat(entry.order_total).toFixed(2) : null
+        };
+      });
+
+      // Calculate summary
+      const summary = {
+        totalCredits: 0,
+        totalDebits: 0,
+        netBalance: 0,
+        transactionCount: entries.length
+      };
+
+      entries.forEach(entry => {
+        const amount = parseFloat(entry.amount);
+        if (entry.transactionType === 'credit') {
+          summary.totalCredits += amount;
+        } else {
+          summary.totalDebits += amount;
+        }
+      });
+
+      summary.netBalance = summary.totalCredits - summary.totalDebits;
+
+      res.json({
+        entries,
+        summary,
+        filters: { tenant_id, start_date, end_date, type }
+      });
+    } catch (error) {
+      console.error("Error fetching ledger entries:", error);
+      res.status(500).json({ message: "Failed to fetch ledger entries" });
     }
   });
 

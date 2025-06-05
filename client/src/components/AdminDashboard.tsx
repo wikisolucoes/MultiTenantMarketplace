@@ -2009,6 +2009,11 @@ function FinancialManagement() {
     queryKey: ['/api/admin/financial/celcoin-integration'],
   });
 
+  const { data: ledgerData, isLoading: ledgerLoading } = useQuery({
+    queryKey: ['/api/admin/financial/ledger'],
+    enabled: activeFinancialTab === 'ledger'
+  });
+
   const formatCurrency = (value: string | number) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat('pt-BR', {
@@ -2061,6 +2066,16 @@ function FinancialManagement() {
             }`}
           >
             Histórico de Transações
+          </button>
+          <button
+            onClick={() => setActiveFinancialTab('ledger')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeFinancialTab === 'ledger'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Extrato Celcoin
           </button>
           <button
             onClick={() => setActiveFinancialTab('celcoin')}
