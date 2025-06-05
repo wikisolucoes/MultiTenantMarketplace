@@ -131,7 +131,7 @@ export default function UserManagement() {
 
   // Fetch users
   const { data: users = [], isLoading: usersLoading } = useQuery({
-    queryKey: ["/api/users"],
+    queryKey: ["/api/admin/users"],
   });
 
   // Create user mutation
@@ -140,7 +140,7 @@ export default function UserManagement() {
       return await apiRequest("POST", "/api/users", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setShowCreateForm(false);
       createUserForm.reset();
       toast({
@@ -163,10 +163,31 @@ export default function UserManagement() {
       return await apiRequest("PATCH", `/api/users/${userId}/permissions`, permissions);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({
         title: "Permissões atualizadas",
         description: "Permissões do usuário foram atualizadas",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update user mutation
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, userData }: { userId: number; userData: Partial<User> }) => {
+      return await apiRequest("PATCH", `/api/admin/users/${userId}`, userData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Usuário atualizado",
+        description: "As alterações foram salvas com sucesso",
       });
     },
     onError: (error: Error) => {
@@ -184,7 +205,7 @@ export default function UserManagement() {
       return await apiRequest("PATCH", `/api/users/${userId}/deactivate`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({
         title: "Usuário desativado",
         description: "Usuário foi desativado com sucesso",
@@ -1048,16 +1069,17 @@ export default function UserManagement() {
                 </Button>
                 <Button 
                   onClick={() => {
-                    // TODO: Implement update user API call
-                    toast({
-                      title: "Usuário atualizado",
-                      description: "As alterações foram salvas com sucesso",
-                    });
-                    setEditingUser(null);
-                    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                    if (editingUser) {
+                      updateUserMutation.mutate({
+                        userId: editingUser.id,
+                        userData: editingUser
+                      });
+                      setEditingUser(null);
+                    }
                   }}
+                  disabled={updateUserMutation.isPending}
                 >
-                  Salvar Alterações
+                  {updateUserMutation.isPending ? "Salvando..." : "Salvar Alterações"}
                 </Button>
               </div>
             </div>
