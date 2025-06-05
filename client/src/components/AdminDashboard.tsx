@@ -783,26 +783,26 @@ function SubscriptionManagement() {
                       <tr key={subscription.id} className="border-b hover:bg-muted/50">
                         <td className="p-4">
                           <div>
-                            <p className="font-medium">{subscription.tenantName || 'N/A'}</p>
-                            <p className="text-sm text-muted-foreground">ID: {subscription.tenantId}</p>
+                            <p className="font-medium">{subscription.tenant_name || 'N/A'}</p>
+                            <p className="text-sm text-muted-foreground">ID: {subscription.tenant_id}</p>
                           </div>
                         </td>
                         <td className="p-4">
-                          <Badge variant="outline">{subscription.planName || 'Individual'}</Badge>
+                          <Badge variant="outline">{subscription.plan_name || 'Individual'}</Badge>
                         </td>
                         <td className="p-4">
                           <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
                             {subscription.status}
                           </Badge>
                         </td>
-                        <td className="p-4">{subscription.billingCycle}</td>
+                        <td className="p-4">{subscription.billing_cycle}</td>
                         <td className="p-4">
-                          {subscription.nextBillingDate ? 
-                            new Date(subscription.nextBillingDate).toLocaleDateString('pt-BR') : 
+                          {subscription.next_billing_date ? 
+                            new Date(subscription.next_billing_date).toLocaleDateString('pt-BR') : 
                             'N/A'
                           }
                         </td>
-                        <td className="p-4">R$ {subscription.currentPrice}</td>
+                        <td className="p-4">R$ {Number(subscription.current_price || 0).toFixed(2)}</td>
                         <td className="p-4">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
