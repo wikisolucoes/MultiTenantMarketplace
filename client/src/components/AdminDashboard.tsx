@@ -901,20 +901,7 @@ function SubscriptionManagement() {
         </div>
       )}
 
-      {/* Subscription Details Modal */}
-      <SubscriptionDetailsModal 
-        subscription={selectedSubscription}
-        isOpen={isViewSubscriptionOpen}
-        onClose={() => setIsViewSubscriptionOpen(false)}
-      />
 
-      {/* Edit Subscription Modal */}
-      <EditSubscriptionModal 
-        subscription={selectedSubscription}
-        isOpen={isEditSubscriptionOpen}
-        onClose={() => setIsEditSubscriptionOpen(false)}
-        onSave={handleUpdateSubscription}
-      />
 
       {/* Create Plan Modal */}
       <Dialog open={isCreatePlanOpen} onOpenChange={setIsCreatePlanOpen}>
@@ -3064,6 +3051,21 @@ export default function AdminDashboard() {
           
         </div>
       </main>
+      
+      {/* Subscription Details Modal */}
+      <SubscriptionDetailsModal 
+        subscription={selectedSubscription}
+        isOpen={isViewSubscriptionOpen}
+        onClose={() => setIsViewSubscriptionOpen(false)}
+      />
+
+      {/* Edit Subscription Modal */}
+      <EditSubscriptionModal 
+        subscription={selectedSubscription}
+        isOpen={isEditSubscriptionOpen}
+        onClose={() => setIsEditSubscriptionOpen(false)}
+        onSave={handleUpdateSubscription}
+      />
     </div>
   );
 }
