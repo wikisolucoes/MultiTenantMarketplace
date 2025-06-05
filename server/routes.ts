@@ -2334,20 +2334,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/plugins/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, category, price, developer, isActive } = req.body;
+      const { isActive } = req.body;
       
-      console.log("Updating plugin:", { id, isActive, name, description, category, price });
+      console.log("Updating plugin:", { id, isActive });
       
-      // Use direct SQL for more control
+      // Simple update for is_active field
       const result = await db.execute(sql`
         UPDATE plugins 
-        SET 
-          display_name = CASE WHEN ${name} IS NOT NULL THEN ${name} ELSE display_name END,
-          description = CASE WHEN ${description} IS NOT NULL THEN ${description} ELSE description END,
-          category = CASE WHEN ${category} IS NOT NULL THEN ${category} ELSE category END,
-          price = CASE WHEN ${price} IS NOT NULL THEN ${price} ELSE price END,
-          is_active = CASE WHEN ${isActive} IS NOT NULL THEN ${isActive} ELSE is_active END,
-          updated_at = NOW()
+        SET is_active = ${isActive}, updated_at = NOW()
         WHERE id = ${parseInt(id)}
         RETURNING *
       `);
@@ -2357,7 +2351,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Plugin updated successfully:", result.rows[0]);
-      res.json(result.rows[0]);
+      res.json({ 
+        success: true, 
+        plugin: result.rows[0],
+        message: `Plugin ${isActive ? 'activated' : 'deactivated'} successfully`
+      });
     } catch (error) {
       console.error("Error updating plugin:", error);
       res.status(500).json({ message: "Failed to update plugin" });
