@@ -2071,7 +2071,15 @@ export default function AdminDashboard() {
                               >
                                 {plugin.isActive ? 'Desativar' : 'Ativar'}
                               </Button>
-                              <Button size="sm" variant="outline">
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedPlugin(plugin);
+                                  setIsEditPluginOpen(true);
+                                }}
+                                title="Configurar Plugin"
+                              >
                                 <Settings className="w-4 h-4" />
                               </Button>
                             </div>
