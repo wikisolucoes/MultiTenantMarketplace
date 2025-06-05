@@ -4174,8 +4174,8 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{adminStats.totalOrders}</div>
                     <p className="text-xs text-muted-foreground">
-                      {reportsData?.paymentMethodData ? 
-                        `${reportsData.paymentMethodData.length} métodos` : 
+                      {(reportsData as any)?.paymentMethodData ? 
+                        `${(reportsData as any).paymentMethodData.length} métodos` : 
                         'Pedidos totais'
                       }
                     </p>
