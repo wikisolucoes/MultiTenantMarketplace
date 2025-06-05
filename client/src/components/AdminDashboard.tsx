@@ -660,6 +660,7 @@ function TenantDetailsView({
   const [activeStoreTab, setActiveStoreTab] = useState('overview');
   const { data: tenantDetails, isLoading } = useQuery({
     queryKey: ['/api/admin/tenants', tenant.id, 'details'],
+    enabled: !!tenant.id,
   });
 
   // Use real data from API or fallback to tenant data
