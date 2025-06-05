@@ -42,6 +42,7 @@ import ThemeManager from "@/components/storefront/ThemeManager";
 import BannerManager from "@/components/storefront/BannerManager";
 import UserManagement from "@/components/UserManagement";
 import SupportTicketSystem from "@/components/SupportTicketSystem";
+import StoreSettings from "@/components/StoreSettings";
 import { 
   LayoutDashboard,
   Package,
@@ -1001,23 +1002,142 @@ export default function MerchantDashboard() {
 
             {/* Settings Section */}
             {activeSection === "settings" && (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Configurações da Loja</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Settings className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <p>Configurações em desenvolvimento</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <StoreSettings />
             )}
           </div>
         </div>
       </div>
+
+      {/* Order Details Dialog */}
+      <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Pedido #{selectedOrder}</DialogTitle>
+          </DialogHeader>
+          {selectedOrder && orders && (
+            <div className="space-y-4">
+              {(() => {
+                const order = orders.find(o => o.id === selectedOrder);
+                if (!order) return <p>Pedido não encontrado</p>;
+                return (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Cliente</Label>
+                        <p className="font-medium">{order.customerName || "N/A"}</p>
+                      </div>
+                      <div>
+                        <Label>Email</Label>
+                        <p className="font-medium">{order.customerEmail || "N/A"}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Status</Label>
+                        <div className="mt-1">
+                          {getOrderStatusBadge(order.status)}
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Pagamento</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          {getPaymentMethodIcon(order.paymentMethod)}
+                          <span className="capitalize">{order.paymentMethod}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Valor Total</Label>
+                        <p className="font-medium text-lg">{formatCurrency(order.total)}</p>
+                      </div>
+                      <div>
+                        <Label>Data do Pedido</Label>
+                        <p className="font-medium">{formatDate(order.createdAt.toString())}</p>
+                      </div>
+                    </div>
+                    {order.trackingCode && (
+                      <div>
+                        <Label>Código de Rastreamento</Label>
+                        <p className="font-medium">{order.trackingCode}</p>
+                      </div>
+                    )}
+                    {order.notes && (
+                      <div>
+                        <Label>Observações</Label>
+                        <p className="text-muted-foreground">{order.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Edit Dialog */}
+      <Dialog open={showOrderEdit} onOpenChange={setShowOrderEdit}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Pedido #{editingOrder?.id}</DialogTitle>
+          </DialogHeader>
+          {editingOrder && (
+            <div className="space-y-4">
+              <div>
+                <Label>Status do Pedido</Label>
+                <Select defaultValue={editingOrder.status}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="confirmed">Confirmado</SelectItem>
+                    <SelectItem value="processing">Processando</SelectItem>
+                    <SelectItem value="shipped">Enviado</SelectItem>
+                    <SelectItem value="delivered">Entregue</SelectItem>
+                    <SelectItem value="cancelled">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Código de Rastreamento</Label>
+                <Input 
+                  placeholder="Insira o código de rastreamento"
+                  defaultValue={editingOrder.trackingCode || ""}
+                />
+              </div>
+              <div>
+                <Label>Observações</Label>
+                <Textarea 
+                  placeholder="Adicione observações sobre o pedido"
+                  defaultValue={editingOrder.notes || ""}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => {
+                    toast({
+                      title: "Pedido atualizado",
+                      description: "As informações do pedido foram atualizadas com sucesso.",
+                    });
+                    setShowOrderEdit(false);
+                  }}
+                  className="flex-1"
+                >
+                  Salvar Alterações
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowOrderEdit(false)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Product Form Dialog */}
       <Dialog open={showProductForm} onOpenChange={setShowProductForm}>
