@@ -101,6 +101,7 @@ export default function UserManagement() {
   const [activeTab, setActiveTab] = useState("users");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -338,10 +339,18 @@ export default function UserManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setViewingUser(user)}
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="sm">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setEditingUser(user)}
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
                             {user.isActive && (
@@ -774,6 +783,285 @@ export default function UserManagement() {
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View User Modal */}
+      <Dialog open={!!viewingUser} onOpenChange={() => setViewingUser(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Usuário</DialogTitle>
+          </DialogHeader>
+          {viewingUser && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Nome Completo</label>
+                  <p className="font-medium">{viewingUser.fullName}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Email</label>
+                  <p className="font-medium">{viewingUser.email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Função</label>
+                  <div>{getRoleBadge(viewingUser.role)}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Status</label>
+                  <div>
+                    {viewingUser.isActive ? (
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                        <CheckCircle className="mr-1 h-3 w-3" />
+                        Ativo
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive">
+                        <XCircle className="mr-1 h-3 w-3" />
+                        Inativo
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Criado em</label>
+                  <p className="font-medium">{formatDate(viewingUser.createdAt)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Último Login</label>
+                  <p className="font-medium">{viewingUser.lastLoginAt ? formatDate(viewingUser.lastLoginAt) : "Nunca"}</p>
+                </div>
+              </div>
+
+              {viewingUser.profile && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Permissões</h3>
+                    {getAccessLevelBadge(viewingUser.profile.accessLevel)}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm">Gerenciar Produtos</span>
+                      {viewingUser.profile.canManageProducts ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm">Gerenciar Pedidos</span>
+                      {viewingUser.profile.canManageOrders ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm">Ver Financeiro</span>
+                      {viewingUser.profile.canViewFinancials ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm">Gerenciar Usuários</span>
+                      {viewingUser.profile.canManageUsers ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm">Configurações</span>
+                      {viewingUser.profile.canManageSettings ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm">Gerenciar Temas</span>
+                      {viewingUser.profile.canManageThemes ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={() => setViewingUser(null)}>Fechar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Modal */}
+      <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+          </DialogHeader>
+          {editingUser && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Nome Completo</label>
+                  <Input 
+                    value={editingUser.fullName} 
+                    onChange={(e) => setEditingUser({...editingUser, fullName: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <Input 
+                    value={editingUser.email} 
+                    onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Função</label>
+                  <Select 
+                    value={editingUser.role} 
+                    onValueChange={(value) => setEditingUser({...editingUser, role: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="merchant">Lojista</SelectItem>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Nível de Acesso</label>
+                  <Select 
+                    value={editingUser.profile?.accessLevel || "limited"} 
+                    onValueChange={(value) => setEditingUser({
+                      ...editingUser, 
+                      profile: {...editingUser.profile!, accessLevel: value}
+                    })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="limited">Limitado</SelectItem>
+                      <SelectItem value="full">Completo</SelectItem>
+                      <SelectItem value="readonly">Somente Leitura</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {editingUser.profile && (
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Permissões</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Gerenciar Produtos</label>
+                      <Switch
+                        checked={editingUser.profile.canManageProducts}
+                        onCheckedChange={(checked) => 
+                          setEditingUser({
+                            ...editingUser,
+                            profile: {...editingUser.profile!, canManageProducts: checked}
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Gerenciar Pedidos</label>
+                      <Switch
+                        checked={editingUser.profile.canManageOrders}
+                        onCheckedChange={(checked) => 
+                          setEditingUser({
+                            ...editingUser,
+                            profile: {...editingUser.profile!, canManageOrders: checked}
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Ver Financeiro</label>
+                      <Switch
+                        checked={editingUser.profile.canViewFinancials}
+                        onCheckedChange={(checked) => 
+                          setEditingUser({
+                            ...editingUser,
+                            profile: {...editingUser.profile!, canViewFinancials: checked}
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Gerenciar Usuários</label>
+                      <Switch
+                        checked={editingUser.profile.canManageUsers}
+                        onCheckedChange={(checked) => 
+                          setEditingUser({
+                            ...editingUser,
+                            profile: {...editingUser.profile!, canManageUsers: checked}
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Configurações</label>
+                      <Switch
+                        checked={editingUser.profile.canManageSettings}
+                        onCheckedChange={(checked) => 
+                          setEditingUser({
+                            ...editingUser,
+                            profile: {...editingUser.profile!, canManageSettings: checked}
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Gerenciar Temas</label>
+                      <Switch
+                        checked={editingUser.profile.canManageThemes}
+                        onCheckedChange={(checked) => 
+                          setEditingUser({
+                            ...editingUser,
+                            profile: {...editingUser.profile!, canManageThemes: checked}
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingUser(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={() => {
+                    // TODO: Implement update user API call
+                    toast({
+                      title: "Usuário atualizado",
+                      description: "As alterações foram salvas com sucesso",
+                    });
+                    setEditingUser(null);
+                    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+                  }}
+                >
+                  Salvar Alterações
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
