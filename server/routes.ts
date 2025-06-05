@@ -390,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let completedAmount = 0;
       
       orders.forEach(order => {
-        const orderTotal = parseFloat(order.totalPrice);
+        const orderTotal = parseFloat(order.total || "0");
         grossSales += orderTotal;
         
         if (order.status === 'completed') {

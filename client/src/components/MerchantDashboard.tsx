@@ -269,6 +269,29 @@ export default function MerchantDashboard() {
     setShowOrderDetails(true);
   };
 
+  // Create mutation for updating orders
+  const updateOrderMutation = useMutation({
+    mutationFn: async ({ orderId, data }: { orderId: number; data: any }) => {
+      const response = await apiRequest("PUT", `/api/tenant/orders/${orderId}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Pedido atualizado",
+        description: "As informações do pedido foram atualizadas com sucesso.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenant/orders"] });
+      setShowOrderEdit(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar pedido",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditOrder = (orderId: number) => {
     const order = orders?.find(o => o.id === orderId);
     if (order) {
@@ -1063,11 +1086,8 @@ export default function MerchantDashboard() {
                 const order = orders.find(o => o.id === selectedOrder);
                 if (!order) return <p>Pedido não encontrado</p>;
                 
-                // Mock data for order items since it's not in the current schema
-                const orderItems = [
-                  { id: 1, name: "Produto Exemplo 1", sku: "SKU001", quantity: 2, price: 50.00, total: 100.00 },
-                  { id: 2, name: "Produto Exemplo 2", sku: "SKU002", quantity: 1, price: 75.00, total: 75.00 }
-                ];
+                // Fetch real order items from the order.items field
+                const orderItems = order.items || [];
 
                 return (
                   <div className="space-y-6">
