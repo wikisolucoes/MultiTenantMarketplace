@@ -67,7 +67,14 @@ import {
   Palette,
   Image,
   Users,
-  Ticket
+  Ticket,
+  Printer,
+  Truck,
+  FileCheck,
+  Mail,
+  RefreshCw,
+  Save,
+  UserCheck
 } from "lucide-react";
 
 const withdrawalSchema = z.object({
@@ -1030,64 +1037,263 @@ export default function MerchantDashboard() {
 
       {/* Order Details Dialog */}
       <Dialog open={showOrderDetails} onOpenChange={setShowOrderDetails}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalhes do Pedido #{selectedOrder}</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Detalhes do Pedido #{selectedOrder}</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir Pedido
+                </Button>
+                <Button variant="outline" size="sm">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Fatura
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Truck className="h-4 w-4 mr-2" />
+                  Lista Entrega
+                </Button>
+              </div>
+            </DialogTitle>
           </DialogHeader>
           {selectedOrder && orders && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {(() => {
                 const order = orders.find(o => o.id === selectedOrder);
                 if (!order) return <p>Pedido não encontrado</p>;
+                
+                // Mock data for order items since it's not in the current schema
+                const orderItems = [
+                  { id: 1, name: "Produto Exemplo 1", sku: "SKU001", quantity: 2, price: 50.00, total: 100.00 },
+                  { id: 2, name: "Produto Exemplo 2", sku: "SKU002", quantity: 1, price: 75.00, total: 75.00 }
+                ];
+
                 return (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-6">
+                    {/* Header Information */}
+                    <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
                       <div>
-                        <Label>Cliente</Label>
-                        <p className="font-medium">{order.customerName || "N/A"}</p>
-                      </div>
-                      <div>
-                        <Label>Email</Label>
-                        <p className="font-medium">{order.customerEmail || "N/A"}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Status</Label>
+                        <Label className="text-sm font-medium">Status do Pedido</Label>
                         <div className="mt-1">
                           {getOrderStatusBadge(order.status)}
                         </div>
                       </div>
                       <div>
-                        <Label>Pagamento</Label>
-                        <div className="flex items-center gap-2 mt-1">
-                          {getPaymentMethodIcon(order.paymentMethod || "")}
-                          <span className="capitalize">{order.paymentMethod || "N/A"}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Valor Total</Label>
-                        <p className="font-medium text-lg">{formatCurrency(order.total || "0")}</p>
-                      </div>
-                      <div>
-                        <Label>Data do Pedido</Label>
+                        <Label className="text-sm font-medium">Data do Pedido</Label>
                         <p className="font-medium">{formatDate(order.createdAt.toString())}</p>
                       </div>
+                      <div>
+                        <Label className="text-sm font-medium">Valor Total</Label>
+                        <p className="font-medium text-lg text-green-600">{formatCurrency(order.total || "0")}</p>
+                      </div>
                     </div>
-                    {order.trackingCode && (
-                      <div>
-                        <Label>Código de Rastreamento</Label>
-                        <p className="font-medium">{order.trackingCode}</p>
-                      </div>
-                    )}
+
+                    {/* Customer Information */}
+                    <div className="grid grid-cols-2 gap-6">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Informações do Cliente</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <div>
+                            <Label className="text-sm">Nome</Label>
+                            <p>{order.customerName || "N/A"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Email</Label>
+                            <p>{order.customerEmail || "N/A"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Telefone</Label>
+                            <p>{order.customerPhone || "N/A"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Documento</Label>
+                            <p>{order.customerDocument || "N/A"}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Pagamento e Entrega</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          <div>
+                            <Label className="text-sm">Método de Pagamento</Label>
+                            <div className="flex items-center gap-2">
+                              {getPaymentMethodIcon(order.paymentMethod || "")}
+                              <span className="capitalize">{order.paymentMethod || "N/A"}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Status do Pagamento</Label>
+                            <p>{order.paymentStatus || "N/A"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Código de Rastreamento</Label>
+                            <p>{order.trackingCode || "Não informado"}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Shipping Addresses */}
+                    <div className="grid grid-cols-2 gap-6">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Endereço de Entrega</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-1 text-sm">
+                            <p>{order.customerAddress || "Endereço não informado"}</p>
+                            <p>{order.customerCity || ""} - {order.customerState || ""}</p>
+                            <p>CEP: {order.customerZipCode || "N/A"}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Endereço de Cobrança</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-1 text-sm">
+                            <p>Mesmo endereço de entrega</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Order Items */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Produtos do Pedido</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {orderItems.map((item) => (
+                            <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div className="flex-1">
+                                <p className="font-medium">{item.name}</p>
+                                <p className="text-sm text-muted-foreground">SKU: {item.sku}</p>
+                              </div>
+                              <div className="text-center min-w-[80px]">
+                                <p className="font-medium">Qtd: {item.quantity}</p>
+                              </div>
+                              <div className="text-center min-w-[100px]">
+                                <p className="text-sm text-muted-foreground">Unit: {formatCurrency(item.price)}</p>
+                                <p className="font-medium">{formatCurrency(item.total)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">Subtotal:</span>
+                            <span>{formatCurrency(175.00)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">Frete:</span>
+                            <span>{formatCurrency(15.00)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">Impostos:</span>
+                            <span>{formatCurrency(order.taxTotal || "0")}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-lg font-bold border-t pt-2">
+                            <span>Total:</span>
+                            <span className="text-green-600">{formatCurrency(order.total || "0")}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* NFe and Tax Information */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center justify-between">
+                          <span>Nota Fiscal Eletrônica</span>
+                          <Button variant="outline" size="sm">
+                            <FileCheck className="h-4 w-4 mr-2" />
+                            Emitir NFe
+                          </Button>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm">Chave NFe</Label>
+                            <p className="font-mono text-sm">{order.nfeKey || "Não emitida"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Número NFe</Label>
+                            <p>{order.nfeNumber || "N/A"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Status NFe</Label>
+                            <p>{order.nfeStatus || "Pendente"}</p>
+                          </div>
+                          <div>
+                            <Label className="text-sm">Protocolo</Label>
+                            <p>{order.nfeProtocol || "N/A"}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Order History */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Histórico do Pedido</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {[
+                            { status: "Pedido criado", date: order.createdAt.toString(), user: "Sistema" },
+                            { status: "Pagamento confirmado", date: order.createdAt.toString(), user: "Gateway" },
+                            { status: "Em separação", date: order.createdAt.toString(), user: "João Silva" }
+                          ].map((event, index) => (
+                            <div key={index} className="flex items-center gap-4 p-3 border-l-2 border-cyan-200 bg-muted/30">
+                              <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                              <div className="flex-1">
+                                <p className="font-medium">{event.status}</p>
+                                <p className="text-sm text-muted-foreground">{formatDateTime(event.date)} - {event.user}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Notes */}
                     {order.notes && (
-                      <div>
-                        <Label>Observações</Label>
-                        <p className="text-muted-foreground">{order.notes}</p>
-                      </div>
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">Observações</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-muted-foreground">{order.notes}</p>
+                        </CardContent>
+                      </Card>
                     )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-4 border-t">
+                      <Button variant="outline" className="flex-1">
+                        <UserCheck className="h-4 w-4 mr-2" />
+                        Comissionar Afiliado
+                      </Button>
+                      <Button variant="outline" className="flex-1">
+                        <Mail className="h-4 w-4 mr-2" />
+                        Enviar Email Cliente
+                      </Button>
+                      <Button variant="outline" className="flex-1">
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Reprocessar Pedido
+                      </Button>
+                    </div>
                   </div>
                 );
               })()}
@@ -1098,61 +1304,373 @@ export default function MerchantDashboard() {
 
       {/* Order Edit Dialog */}
       <Dialog open={showOrderEdit} onOpenChange={setShowOrderEdit}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Pedido #{editingOrder?.id}</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Editar Pedido #{editingOrder?.id}</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Imprimir
+                </Button>
+                <Button variant="outline" size="sm">
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  Emitir NFe
+                </Button>
+              </div>
+            </DialogTitle>
           </DialogHeader>
           {editingOrder && (
-            <div className="space-y-4">
-              <div>
-                <Label>Status do Pedido</Label>
-                <Select defaultValue={editingOrder.status}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="confirmed">Confirmado</SelectItem>
-                    <SelectItem value="processing">Processando</SelectItem>
-                    <SelectItem value="shipped">Enviado</SelectItem>
-                    <SelectItem value="delivered">Entregue</SelectItem>
-                    <SelectItem value="cancelled">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Código de Rastreamento</Label>
-                <Input 
-                  placeholder="Insira o código de rastreamento"
-                  defaultValue={editingOrder.trackingCode || ""}
-                />
-              </div>
-              <div>
-                <Label>Observações</Label>
-                <Textarea 
-                  placeholder="Adicione observações sobre o pedido"
-                  defaultValue={editingOrder.notes || ""}
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => {
-                    toast({
-                      title: "Pedido atualizado",
-                      description: "As informações do pedido foram atualizadas com sucesso.",
-                    });
-                    setShowOrderEdit(false);
-                  }}
-                  className="flex-1"
-                >
-                  Salvar Alterações
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowOrderEdit(false)}
-                >
-                  Cancelar
-                </Button>
+            <div className="space-y-6">
+              {/* Order Status and Tracking */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Status e Rastreamento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="status">Status do Pedido</Label>
+                      <Select defaultValue={editingOrder.status}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                          <SelectItem value="confirmed">Confirmado</SelectItem>
+                          <SelectItem value="processing">Processando</SelectItem>
+                          <SelectItem value="shipped">Enviado</SelectItem>
+                          <SelectItem value="delivered">Entregue</SelectItem>
+                          <SelectItem value="cancelled">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="paymentStatus">Status do Pagamento</Label>
+                      <Select defaultValue={editingOrder.paymentStatus || "pending"}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                          <SelectItem value="paid">Pago</SelectItem>
+                          <SelectItem value="failed">Falhou</SelectItem>
+                          <SelectItem value="refunded">Reembolsado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="trackingCode">Código de Rastreamento</Label>
+                      <Input
+                        id="trackingCode"
+                        defaultValue={editingOrder.trackingCode || ""}
+                        placeholder="Digite o código de rastreamento"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="carrier">Transportadora</Label>
+                      <Select defaultValue="">
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a transportadora" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="correios">Correios</SelectItem>
+                          <SelectItem value="jadlog">JadLog</SelectItem>
+                          <SelectItem value="total">Total Express</SelectItem>
+                          <SelectItem value="loggi">Loggi</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Customer Information Edit */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Informações do Cliente</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="customerName">Nome do Cliente</Label>
+                      <Input
+                        id="customerName"
+                        defaultValue={editingOrder.customerName || ""}
+                        placeholder="Nome completo"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customerEmail">Email</Label>
+                      <Input
+                        id="customerEmail"
+                        type="email"
+                        defaultValue={editingOrder.customerEmail || ""}
+                        placeholder="email@exemplo.com"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="customerPhone">Telefone</Label>
+                      <Input
+                        id="customerPhone"
+                        defaultValue={editingOrder.customerPhone || ""}
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customerDocument">Documento</Label>
+                      <Input
+                        id="customerDocument"
+                        defaultValue={editingOrder.customerDocument || ""}
+                        placeholder="CPF/CNPJ"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Shipping Address Edit */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Endereço de Entrega</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="customerAddress">Endereço Completo</Label>
+                    <Input
+                      id="customerAddress"
+                      defaultValue={editingOrder.customerAddress || ""}
+                      placeholder="Rua, número, complemento"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="customerCity">Cidade</Label>
+                      <Input
+                        id="customerCity"
+                        defaultValue={editingOrder.customerCity || ""}
+                        placeholder="Cidade"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customerState">Estado</Label>
+                      <Input
+                        id="customerState"
+                        defaultValue={editingOrder.customerState || ""}
+                        placeholder="UF"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customerZipCode">CEP</Label>
+                      <Input
+                        id="customerZipCode"
+                        defaultValue={editingOrder.customerZipCode || ""}
+                        placeholder="00000-000"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Order Values */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Valores do Pedido</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="subtotal">Subtotal</Label>
+                      <Input
+                        id="subtotal"
+                        defaultValue={formatCurrency(175.00)}
+                        disabled
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="shippingCost">Frete</Label>
+                      <Input
+                        id="shippingCost"
+                        defaultValue="15.00"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="discount">Desconto</Label>
+                      <Input
+                        id="discount"
+                        defaultValue="0.00"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="taxTotal">Total de Impostos</Label>
+                      <Input
+                        id="taxTotal"
+                        defaultValue={editingOrder.taxTotal || "0.00"}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="total">Valor Total</Label>
+                      <Input
+                        id="total"
+                        defaultValue={editingOrder.total || "0"}
+                        className="font-bold text-lg"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* NFe Information */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Informações da NFe</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="nfeNumber">Número da NFe</Label>
+                      <Input
+                        id="nfeNumber"
+                        defaultValue={editingOrder.nfeNumber || ""}
+                        placeholder="Número da nota fiscal"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="nfeKey">Chave da NFe</Label>
+                      <Input
+                        id="nfeKey"
+                        defaultValue={editingOrder.nfeKey || ""}
+                        placeholder="Chave de acesso de 44 dígitos"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="nfeStatus">Status da NFe</Label>
+                      <Select defaultValue={editingOrder.nfeStatus || "pending"}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                          <SelectItem value="authorized">Autorizada</SelectItem>
+                          <SelectItem value="cancelled">Cancelada</SelectItem>
+                          <SelectItem value="denied">Rejeitada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="nfeProtocol">Protocolo</Label>
+                      <Input
+                        id="nfeProtocol"
+                        defaultValue={editingOrder.nfeProtocol || ""}
+                        placeholder="Protocolo de autorização"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Affiliate Commission */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Comissão de Afiliado</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="affiliateCode">Código do Afiliado</Label>
+                      <Input
+                        id="affiliateCode"
+                        defaultValue=""
+                        placeholder="Código ou ID do afiliado"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="commissionRate">Taxa de Comissão (%)</Label>
+                      <Input
+                        id="commissionRate"
+                        defaultValue="5.0"
+                        placeholder="0.0"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="commissionValue">Valor da Comissão</Label>
+                      <Input
+                        id="commissionValue"
+                        defaultValue="0.00"
+                        placeholder="0.00"
+                        disabled
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="commissionPaid"
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="commissionPaid">Comissão já foi paga</Label>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Internal Notes */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Observações Internas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div>
+                    <Label htmlFor="notes">Observações</Label>
+                    <Textarea
+                      id="notes"
+                      defaultValue={editingOrder.notes || ""}
+                      placeholder="Adicione observações sobre o pedido..."
+                      rows={4}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Action Buttons */}
+              <div className="flex justify-between gap-4 pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button variant="outline">
+                    <Mail className="h-4 w-4 mr-2" />
+                    Notificar Cliente
+                  </Button>
+                  <Button variant="outline">
+                    <UserCheck className="h-4 w-4 mr-2" />
+                    Processar Comissão
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setShowOrderEdit(false)}>
+                    Cancelar
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      toast({
+                        title: "Pedido atualizado",
+                        description: "As informações do pedido foram atualizadas com sucesso.",
+                      });
+                      setShowOrderEdit(false);
+                    }}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar Alterações
+                  </Button>
+                </div>
               </div>
             </div>
           )}
