@@ -657,6 +657,7 @@ function TenantDetailsView({
   setSelectedTenant: (tenant: Tenant | null) => void;
   setActiveTab: (tab: string) => void;
 }) {
+  const [activeStoreTab, setActiveStoreTab] = useState('overview');
   const { data: tenantDetails, isLoading } = useQuery({
     queryKey: ['/api/admin/tenants', tenant.id, 'details'],
   });
@@ -677,6 +678,55 @@ function TenantDetailsView({
 
   return (
     <div className="space-y-6">
+      {/* Tab Navigation */}
+      <div className="border-b">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveStoreTab('overview')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeStoreTab === 'overview'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Visão Geral
+          </button>
+          <button
+            onClick={() => setActiveStoreTab('settings')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeStoreTab === 'settings'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Configurações da Loja
+          </button>
+          <button
+            onClick={() => setActiveStoreTab('reports')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeStoreTab === 'reports'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Relatórios Detalhados
+          </button>
+          <button
+            onClick={() => setActiveStoreTab('products')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeStoreTab === 'products'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Gerenciar Produtos
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeStoreTab === 'overview' && (
+        <div className="space-y-6">
       {/* Store Header Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
@@ -903,42 +953,140 @@ function TenantDetailsView({
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
-        <Button 
-          className="w-full" 
-          variant="outline"
-          onClick={() => {
-            setSelectedTenant(null);
-            setActiveTab('settings');
-          }}
-        >
-          <Settings className="w-4 h-4 mr-2" />
-          Configurações da Loja
-        </Button>
-        <Button 
-          className="w-full" 
-          variant="outline"
-          onClick={() => {
-            setSelectedTenant(null);
-            setActiveTab('reports');
-          }}
-        >
-          <FileBarChart className="w-4 h-4 mr-2" />
-          Relatórios Detalhados
-        </Button>
-        <Button 
-          className="w-full" 
-          variant="outline"
-          onClick={() => {
-            setSelectedTenant(null);
-            setActiveTab('products');
-          }}
-        >
-          <Package className="w-4 h-4 mr-2" />
-          Gerenciar Produtos
-        </Button>
-      </div>
+        </div>
+      )}
+
+      {/* Store Settings Tab */}
+      {activeStoreTab === 'settings' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações da Loja</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Nome da Loja</Label>
+                  <Input value={tenant.name} readOnly />
+                </div>
+                <div>
+                  <Label>Subdomínio</Label>
+                  <Input value={tenant.subdomain} readOnly />
+                </div>
+                <div>
+                  <Label>Categoria</Label>
+                  <Input value={tenant.category || 'Não definida'} readOnly />
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Badge variant={tenant.isActive ? 'default' : 'secondary'}>
+                    {tenant.isActive ? 'Ativa' : 'Inativa'}
+                  </Badge>
+                </div>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Tema Ativo</Label>
+                  <Input value={tenant.activeTheme || 'Padrão'} readOnly />
+                </div>
+                <div>
+                  <Label>Cor Primária</Label>
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-6 h-6 rounded border"
+                      style={{ backgroundColor: tenant.primaryColor || '#0ea5e9' }}
+                    />
+                    <Input value={tenant.primaryColor || '#0ea5e9'} readOnly />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Store Reports Tab */}
+      {activeStoreTab === 'reports' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Relatórios da Loja</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Métricas de Performance</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Receita Total:</span>
+                      <span className="font-bold">R$ {metrics.totalRevenue}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Total de Pedidos:</span>
+                      <span className="font-bold">{metrics.totalOrders}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Produtos Ativos:</span>
+                      <span className="font-bold">{metrics.activeProducts}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Clientes:</span>
+                      <span className="font-bold">{metrics.customers}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Análise de Conversão</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Ticket Médio:</span>
+                      <span className="font-bold">R$ {metrics.averageOrderValue}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Taxa de Conversão:</span>
+                      <span className="font-bold">{metrics.conversionRate}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Última Atividade:</span>
+                      <span className="font-bold">{new Date(metrics.lastActivity).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Store Products Tab */}
+      {activeStoreTab === 'products' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gerenciar Produtos da Loja</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Produtos Ativos: {metrics.activeProducts}</h3>
+                  <Button size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar Produto
+                  </Button>
+                </div>
+                <div className="border rounded-lg p-4">
+                  <div className="text-center text-muted-foreground">
+                    <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Lista de produtos será carregada aqui</p>
+                    <p className="text-sm">Use a API para buscar produtos específicos desta loja</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
