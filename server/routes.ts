@@ -2580,6 +2580,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Remove plan-plugin relationships first
+      await db.execute(sql`
+        DELETE FROM plan_plugins WHERE plan_id = ${parseInt(id)}
+      `);
+
       const result = await db.execute(sql`
         DELETE FROM plugin_plans WHERE id = ${parseInt(id)}
         RETURNING *
