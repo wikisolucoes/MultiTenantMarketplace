@@ -117,12 +117,110 @@ const formatCurrency = (value: string | number) => {
   }).format(numValue);
 };
 
+interface UserEditFormProps {
+  user: User;
+  onClose: () => void;
+}
+
+function UserEditFormComponent({ user, onClose }: UserEditFormProps) {
+  const [editingUser, setEditingUser] = useState(user);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, userData }: { userId: number; userData: Partial<User> }) => {
+      return await apiRequest("PATCH", `/api/admin/users/${userId}`, userData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: "Usuário atualizado",
+        description: "As alterações foram salvas com sucesso",
+      });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="fullName">Nome Completo</Label>
+          <Input
+            id="fullName"
+            value={editingUser.fullName || ''}
+            onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            value={editingUser.email}
+            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+          />
+        </div>
+        <div>
+          <Label htmlFor="role">Role</Label>
+          <Select value={editingUser.role} onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="merchant">Merchant</SelectItem>
+              <SelectItem value="user">User</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="isActive">Status</Label>
+          <div className="flex items-center space-x-2 mt-2">
+            <Switch
+              id="isActive"
+              checked={editingUser.isActive}
+              onCheckedChange={(checked) => setEditingUser({ ...editingUser, isActive: checked })}
+            />
+            <Label htmlFor="isActive">{editingUser.isActive ? 'Ativo' : 'Inativo'}</Label>
+          </div>
+        </div>
+      </div>
+      <div className="flex justify-end gap-2 pt-4">
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button 
+          onClick={() => {
+            updateUserMutation.mutate({
+              userId: editingUser.id,
+              userData: editingUser
+            });
+          }}
+          disabled={updateUserMutation.isPending}
+        >
+          {updateUserMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isCreateTenantOpen, setIsCreateTenantOpen] = useState(false);
   const [isEditTenantOpen, setIsEditTenantOpen] = useState(false);
   const [isViewTenantOpen, setIsViewTenantOpen] = useState(false);
+  const [isViewUserOpen, setIsViewUserOpen] = useState(false);
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
@@ -502,12 +600,78 @@ export default function AdminDashboard() {
                             </td>
                             <td className="p-4">
                               <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="sm">
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm">
-                                  <Edit className="w-4 h-4" />
-                                </Button>
+                                <Dialog open={isViewUserOpen && selectedUser?.id === user.id} 
+                                       onOpenChange={(open) => {
+                                         setIsViewUserOpen(open);
+                                         if (open) setSelectedUser(user);
+                                       }}>
+                                  <DialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-2xl">
+                                    <DialogHeader>
+                                      <DialogTitle>Detalhes do Usuário</DialogTitle>
+                                    </DialogHeader>
+                                    {selectedUser && (
+                                      <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <div>
+                                            <Label className="text-sm font-medium">Nome Completo</Label>
+                                            <p className="text-sm text-muted-foreground">{selectedUser.fullName || 'Não informado'}</p>
+                                          </div>
+                                          <div>
+                                            <Label className="text-sm font-medium">Email</Label>
+                                            <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                                          </div>
+                                          <div>
+                                            <Label className="text-sm font-medium">Role</Label>
+                                            <Badge variant="outline">{selectedUser.role}</Badge>
+                                          </div>
+                                          <div>
+                                            <Label className="text-sm font-medium">Status</Label>
+                                            <Badge variant={selectedUser.isActive ? 'default' : 'secondary'}>
+                                              {selectedUser.isActive ? 'Ativo' : 'Inativo'}
+                                            </Badge>
+                                          </div>
+                                          <div>
+                                            <Label className="text-sm font-medium">Loja ID</Label>
+                                            <p className="text-sm text-muted-foreground">{selectedUser.tenantId}</p>
+                                          </div>
+                                          <div>
+                                            <Label className="text-sm font-medium">Último Login</Label>
+                                            <p className="text-sm text-muted-foreground">
+                                              {selectedUser.lastLoginAt ? new Date(selectedUser.lastLoginAt).toLocaleDateString('pt-BR') : 'Nunca'}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </DialogContent>
+                                </Dialog>
+                                <Dialog open={isEditUserOpen && selectedUser?.id === user.id} 
+                                       onOpenChange={(open) => {
+                                         setIsEditUserOpen(open);
+                                         if (open) setSelectedUser(user);
+                                       }}>
+                                  <DialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-2xl">
+                                    <DialogHeader>
+                                      <DialogTitle>Editar Usuário</DialogTitle>
+                                    </DialogHeader>
+                                    {selectedUser && (
+                                      <UserEditFormComponent 
+                                        user={selectedUser}
+                                        onClose={() => setIsEditUserOpen(false)}
+                                      />
+                                    )}
+                                  </DialogContent>
+                                </Dialog>
                               </div>
                             </td>
                           </tr>
