@@ -3307,7 +3307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (tenant_id) {
         whereClause += ' AND le.tenant_id = $' + (params.length + 1);
-        params.push(tenant_id);
+        params.push(parseInt(tenant_id as string));
       }
       
       if (start_date) {
@@ -3327,14 +3327,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ledgerResult = await db.execute(sql`
         SELECT 
-          le.*,
+          le.id,
+          le.tenant_id,
+          le.transaction_type,
+          le.amount,
+          le.description,
+          le.reference_type,
+          le.reference_id,
+          le.celcoin_transaction_id,
+          le.metadata,
+          le.created_at,
           t.name as tenant_name,
           o.id as order_id,
           o.total as order_total
         FROM ledger_entries le
         LEFT JOIN tenants t ON le.tenant_id = t.id
         LEFT JOIN orders o ON le.reference_id = o.id AND le.reference_type = 'order'
-        ${sql.raw(whereClause)}
         ORDER BY le.created_at DESC
         LIMIT 100
       `);
