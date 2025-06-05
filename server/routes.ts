@@ -2265,21 +2265,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await db.execute(sql`
         SELECT 
-          id,
-          COALESCE(display_name, name) as name,
-          description,
-          is_active,
-          category,
-          price,
-          monthly_price,
-          yearly_price,
-          features,
-          icon,
-          slug,
-          created_at,
-          updated_at
-        FROM plugins 
-        ORDER BY created_at DESC
+          p.id,
+          COALESCE(p.display_name, p.name) as name,
+          p.description,
+          p.is_active,
+          p.category,
+          p.price,
+          p.monthly_price,
+          p.yearly_price,
+          p.features,
+          p.icon,
+          p.slug,
+          p.created_at,
+          p.updated_at,
+          COALESCE(ps.installation_count, 0) as installations
+        FROM plugins p
+        LEFT JOIN (
+          SELECT 
+            plugin_id,
+            COUNT(*) as installation_count
+          FROM plugin_subscriptions 
+          WHERE status = 'active'
+          GROUP BY plugin_id
+        ) ps ON p.id = ps.plugin_id
+        ORDER BY p.created_at DESC
       `);
 
       const plugins = result.rows.map((row: any) => ({
@@ -2288,7 +2297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description: row.description,
         version: "1.0.0",
         isActive: row.is_active,
-        installations: Math.floor(Math.random() * 200) + 25, // Simulated installations for now
+        installations: row.installations || 0,
         category: row.category,
         developer: "WikiStore Team",
         price: row.price || (row.monthly_price > 0 ? `R$ ${row.monthly_price}/mês` : "Gratuito"),
@@ -2396,6 +2405,246 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating plugin:", error);
       res.status(500).json({ message: "Failed to update plugin" });
+    }
+  });
+
+  // Get plugin plans
+  app.get("/api/admin/plugin-plans", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          pp.*,
+          COUNT(ps.id) as active_subscriptions
+        FROM plugin_plans pp
+        LEFT JOIN plugin_subscriptions ps ON pp.id = ps.plan_id AND ps.status = 'active'
+        WHERE pp.is_active = true
+        GROUP BY pp.id
+        ORDER BY pp.display_order ASC, pp.monthly_price ASC
+      `);
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching plugin plans:", error);
+      res.status(500).json({ message: "Failed to fetch plugin plans" });
+    }
+  });
+
+  // Get tenant plugin subscriptions
+  app.get("/api/tenant/:tenantId/plugin-subscriptions", async (req, res) => {
+    try {
+      const { tenantId } = req.params;
+      
+      const result = await db.execute(sql`
+        SELECT 
+          ps.*,
+          p.name as plugin_name,
+          p.display_name,
+          p.description as plugin_description,
+          p.category,
+          pp.name as plan_name,
+          pp.description as plan_description
+        FROM plugin_subscriptions ps
+        LEFT JOIN plugins p ON ps.plugin_id = p.id
+        LEFT JOIN plugin_plans pp ON ps.plan_id = pp.id
+        WHERE ps.tenant_id = ${tenantId}
+        ORDER BY ps.created_at DESC
+      `);
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching tenant plugin subscriptions:", error);
+      res.status(500).json({ message: "Failed to fetch plugin subscriptions" });
+    }
+  });
+
+  // Subscribe to individual plugin
+  app.post("/api/tenant/:tenantId/subscribe-plugin", async (req, res) => {
+    try {
+      const { tenantId } = req.params;
+      const { pluginId, billingCycle } = req.body;
+
+      // Check if already subscribed
+      const existingResult = await db.execute(sql`
+        SELECT id FROM plugin_subscriptions 
+        WHERE tenant_id = ${tenantId} AND plugin_id = ${pluginId} AND status = 'active'
+      `);
+
+      if (existingResult.rows.length > 0) {
+        return res.status(400).json({ message: "Already subscribed to this plugin" });
+      }
+
+      // Get plugin details
+      const pluginResult = await db.execute(sql`
+        SELECT * FROM plugins WHERE id = ${pluginId} AND is_active = true
+      `);
+
+      if (pluginResult.rows.length === 0) {
+        return res.status(404).json({ message: "Plugin not found or inactive" });
+      }
+
+      const plugin = pluginResult.rows[0];
+      const price = billingCycle === 'yearly' ? plugin.yearly_price : plugin.monthly_price;
+
+      // Create subscription
+      const subscriptionResult = await db.execute(sql`
+        INSERT INTO plugin_subscriptions (
+          tenant_id, plugin_id, subscription_type, billing_cycle, 
+          current_price, next_billing_date, status
+        ) VALUES (
+          ${tenantId}, ${pluginId}, 'plugin', ${billingCycle}, 
+          ${price}, 
+          ${billingCycle === 'yearly' ? sql`NOW() + INTERVAL '1 year'` : sql`NOW() + INTERVAL '1 month'`},
+          'active'
+        ) RETURNING *
+      `);
+
+      // Record in history
+      await db.execute(sql`
+        INSERT INTO plugin_subscription_history (
+          subscription_id, action, amount, description
+        ) VALUES (
+          ${subscriptionResult.rows[0].id}, 'created', ${price}, 
+          'Plugin subscription created'
+        )
+      `);
+
+      res.json({ 
+        message: "Successfully subscribed to plugin",
+        subscription: subscriptionResult.rows[0]
+      });
+    } catch (error) {
+      console.error("Error subscribing to plugin:", error);
+      res.status(500).json({ message: "Failed to subscribe to plugin" });
+    }
+  });
+
+  // Subscribe to plugin plan
+  app.post("/api/tenant/:tenantId/subscribe-plan", async (req, res) => {
+    try {
+      const { tenantId } = req.params;
+      const { planId, billingCycle } = req.body;
+
+      // Check if already subscribed to a plan
+      const existingResult = await db.execute(sql`
+        SELECT id FROM plugin_subscriptions 
+        WHERE tenant_id = ${tenantId} AND subscription_type = 'plan' AND status = 'active'
+      `);
+
+      if (existingResult.rows.length > 0) {
+        return res.status(400).json({ message: "Already subscribed to a plan. Cancel existing subscription first." });
+      }
+
+      // Get plan details
+      const planResult = await db.execute(sql`
+        SELECT * FROM plugin_plans WHERE id = ${planId} AND is_active = true
+      `);
+
+      if (planResult.rows.length === 0) {
+        return res.status(404).json({ message: "Plugin plan not found or inactive" });
+      }
+
+      const plan = planResult.rows[0];
+      const price = billingCycle === 'yearly' ? plan.yearly_price : plan.monthly_price;
+
+      // Create subscription
+      const subscriptionResult = await db.execute(sql`
+        INSERT INTO plugin_subscriptions (
+          tenant_id, plan_id, subscription_type, billing_cycle, 
+          current_price, next_billing_date, status
+        ) VALUES (
+          ${tenantId}, ${planId}, 'plan', ${billingCycle}, 
+          ${price}, 
+          ${billingCycle === 'yearly' ? sql`NOW() + INTERVAL '1 year'` : sql`NOW() + INTERVAL '1 month'`},
+          'active'
+        ) RETURNING *
+      `);
+
+      // Record in history
+      await db.execute(sql`
+        INSERT INTO plugin_subscription_history (
+          subscription_id, action, amount, description
+        ) VALUES (
+          ${subscriptionResult.rows[0].id}, 'created', ${price}, 
+          'Plugin plan subscription created'
+        )
+      `);
+
+      res.json({ 
+        message: "Successfully subscribed to plugin plan",
+        subscription: subscriptionResult.rows[0]
+      });
+    } catch (error) {
+      console.error("Error subscribing to plan:", error);
+      res.status(500).json({ message: "Failed to subscribe to plan" });
+    }
+  });
+
+  // Cancel plugin subscription
+  app.post("/api/tenant/:tenantId/cancel-subscription/:subscriptionId", async (req, res) => {
+    try {
+      const { tenantId, subscriptionId } = req.params;
+      const { reason } = req.body;
+
+      // Update subscription
+      const result = await db.execute(sql`
+        UPDATE plugin_subscriptions 
+        SET status = 'cancelled', cancelled_at = NOW(), auto_renew = false,
+            notes = COALESCE(notes, '') || ${reason ? `\nCancellation reason: ${reason}` : '\nCancelled by user'}
+        WHERE id = ${subscriptionId} AND tenant_id = ${tenantId} AND status = 'active'
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Active subscription not found" });
+      }
+
+      // Record in history
+      await db.execute(sql`
+        INSERT INTO plugin_subscription_history (
+          subscription_id, action, description
+        ) VALUES (
+          ${subscriptionId}, 'cancelled', 
+          ${reason || 'Subscription cancelled by user'}
+        )
+      `);
+
+      res.json({ 
+        message: "Subscription cancelled successfully",
+        subscription: result.rows[0]
+      });
+    } catch (error) {
+      console.error("Error cancelling subscription:", error);
+      res.status(500).json({ message: "Failed to cancel subscription" });
+    }
+  });
+
+  // Get tenant available plugins (considering active subscriptions)
+  app.get("/api/tenant/:tenantId/available-plugins", async (req, res) => {
+    try {
+      const { tenantId } = req.params;
+      
+      const result = await db.execute(sql`
+        SELECT 
+          p.*,
+          CASE WHEN ps.id IS NOT NULL THEN true ELSE false END as is_subscribed,
+          ps.subscription_type,
+          ps.billing_cycle,
+          ps.expires_at,
+          CASE WHEN plan_sub.id IS NOT NULL THEN true ELSE false END as included_in_plan
+        FROM plugins p
+        LEFT JOIN plugin_subscriptions ps ON p.id = ps.plugin_id 
+          AND ps.tenant_id = ${tenantId} AND ps.status = 'active'
+        LEFT JOIN plugin_subscriptions plan_sub ON plan_sub.tenant_id = ${tenantId} 
+          AND plan_sub.subscription_type = 'plan' AND plan_sub.status = 'active'
+        LEFT JOIN plugin_plans pp ON plan_sub.plan_id = pp.id
+        WHERE p.is_active = true AND p.is_public = true
+        ORDER BY p.category, p.name
+      `);
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching available plugins:", error);
+      res.status(500).json({ message: "Failed to fetch available plugins" });
     }
   });
 
