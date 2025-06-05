@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import AdminHeader from "./AdminHeader";
 import { 
   Store, 
   Users, 
@@ -132,6 +133,12 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Buscar dados do usuário atual
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/auth/user'],
+    retry: false,
+  });
+
   // Queries
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['/api/admin/stats'],
@@ -220,52 +227,19 @@ export default function AdminDashboard() {
   const categoryDistribution = reports?.categoryDistribution || [];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Painel Administrativo WikiStore
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Gestão completa da plataforma de e-commerce
-          </p>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Visão Geral
-            </TabsTrigger>
-            <TabsTrigger value="tenants" className="flex items-center gap-2">
-              <Store className="w-4 h-4" />
-              Lojas
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Usuários
-            </TabsTrigger>
-            <TabsTrigger value="plugins" className="flex items-center gap-2">
-              <Plug className="w-4 h-4" />
-              Plugins
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Relatórios
-            </TabsTrigger>
-            <TabsTrigger value="system" className="flex items-center gap-2">
-              <Monitor className="w-4 h-4" />
-              Sistema
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              Configurações
-            </TabsTrigger>
-          </TabsList>
+    <div className="min-h-screen bg-background">
+      <AdminHeader 
+        currentUser={currentUser}
+        onTabChange={setActiveTab}
+        activeTab={activeTab}
+      />
+      
+      <main className="container mx-auto p-6">
+        <div className="space-y-6">
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
+          {activeTab === "overview" && (
+            <div className="space-y-6">
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card>
@@ -396,10 +370,12 @@ export default function AdminDashboard() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+            </div>
+          )}
 
           {/* Tenants Tab */}
-          <TabsContent value="tenants" className="space-y-6">
+          {activeTab === "tenants" && (
+            <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="relative">
@@ -909,9 +885,10 @@ export default function AdminDashboard() {
             <div className="flex justify-end">
               <Button>Salvar Configurações</Button>
             </div>
-          </TabsContent>
-        </Tabs>
-      </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
