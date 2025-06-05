@@ -48,6 +48,7 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  FileBarChart,
   ArrowUpRight,
   Info
 } from "lucide-react";
@@ -408,7 +409,11 @@ export default function AdminDashboard() {
                                       <DialogTitle>Detalhes da Loja - {tenant.name}</DialogTitle>
                                     </DialogHeader>
                                     {selectedTenant && (
-                                      <TenantDetailsView tenant={selectedTenant} />
+                                      <TenantDetailsView 
+                                        tenant={selectedTenant}
+                                        setSelectedTenant={setSelectedTenant}
+                                        setActiveTab={setActiveTab}
+                                      />
                                     )}
                                   </DialogContent>
                                 </Dialog>
