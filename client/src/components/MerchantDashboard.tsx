@@ -44,6 +44,7 @@ import BannerManager from "@/components/storefront/BannerManager";
 import UserManagement from "@/components/UserManagement";
 import SupportTicketSystem from "@/components/SupportTicketSystem";
 import StoreSettings from "@/components/StoreSettings";
+import ReportsManagement from "@/components/ReportsManagement";
 import { 
   LayoutDashboard,
   Package,
@@ -74,7 +75,8 @@ import {
   Mail,
   RefreshCw,
   Save,
-  UserCheck
+  UserCheck,
+  BarChart3
 } from "lucide-react";
 
 const withdrawalSchema = z.object({
@@ -462,6 +464,14 @@ export default function MerchantDashboard() {
               </Button>
               <Button
                 variant="ghost"
+                className={`w-full justify-start ${activeSection === "reports" ? "bg-accent" : ""}`}
+                onClick={() => setActiveSection("reports")}
+              >
+                <BarChart3 className="mr-3 h-4 w-4" />
+                Relatórios
+              </Button>
+              <Button
+                variant="ghost"
                 className={`w-full justify-start ${activeSection === "themes" ? "bg-accent" : ""}`}
                 onClick={() => setActiveSection("themes")}
               >
@@ -515,6 +525,7 @@ export default function MerchantDashboard() {
                 {activeSection === "orders" && "Pedidos"}
                 {activeSection === "financial" && "Financeiro"}
                 {activeSection === "withdrawals" && "Saques"}
+                {activeSection === "reports" && "Relatórios"}
                 {activeSection === "themes" && "Temas da Loja"}
                 {activeSection === "banners" && "Banners"}
                 {activeSection === "settings" && "Configurações"}
