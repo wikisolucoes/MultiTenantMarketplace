@@ -1061,32 +1061,86 @@ function TenantDetailsView({
 
       {/* Store Products Tab */}
       {activeStoreTab === 'products' && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gerenciar Produtos da Loja</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Produtos Ativos: {metrics.activeProducts}</h3>
-                  <Button size="sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Produto
-                  </Button>
-                </div>
-                <div className="border rounded-lg p-4">
-                  <div className="text-center text-muted-foreground">
-                    <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Lista de produtos será carregada aqui</p>
-                    <p className="text-sm">Use a API para buscar produtos específicos desta loja</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StoreProductsTab tenantId={tenant.id} activeProducts={metrics.activeProducts} />
       )}
+    </div>
+  );
+}
+
+// Store Products Tab Component
+function StoreProductsTab({ tenantId, activeProducts }: { tenantId: number; activeProducts: number }) {
+  const { data: products, isLoading } = useQuery({
+    queryKey: ['/api/products', tenantId],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+              <p>Carregando produtos...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Gerenciar Produtos da Loja</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Produtos Ativos: {activeProducts}</h3>
+              <Button size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar Produto
+              </Button>
+            </div>
+            
+            {products && (products as any[]).length > 0 ? (
+              <div className="space-y-4">
+                {(products as any[]).slice(0, 5).map((product: any) => (
+                  <div key={product.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Estoque: {product.stock} • Preço: R$ {parseFloat(product.price || '0').toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={product.isActive ? 'default' : 'secondary'}>
+                        {product.isActive ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                      <Button variant="ghost" size="sm">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                <Button variant="outline" className="w-full">
+                  Ver Todos os Produtos
+                </Button>
+              </div>
+            ) : (
+              <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum produto encontrado para esta loja</p>
+                <p className="text-sm">Adicione produtos para começar a vender</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

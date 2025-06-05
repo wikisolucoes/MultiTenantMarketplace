@@ -147,6 +147,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get products by tenant ID
+  app.get('/api/products/:tenantId', async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      const products = await storage.getProductsByTenantId(tenantId);
+      res.json(products);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      res.status(500).json({ message: 'Failed to fetch products' });
+    }
+  });
+
   // Brand management
   app.get("/api/brands/:tenantId", async (req, res) => {
     try {
