@@ -2265,32 +2265,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await db.execute(sql`
         SELECT 
-          id,
-          COALESCE(display_name, name) as name,
-          description,
-          is_active,
-          category,
-          price,
-          monthly_price,
-          yearly_price,
-          features,
-          icon,
-          slug,
-          created_at
-        FROM plugins 
-        ORDER BY created_at DESC
+          p.id,
+          COALESCE(p.display_name, p.name) as name,
+          p.description,
+          p.is_active,
+          p.category,
+          p.price,
+          p.monthly_price,
+          p.yearly_price,
+          p.features,
+          p.icon,
+          p.slug,
+          p.created_at,
+          p.updated_at,
+          COALESCE(ps.installation_count, 0) as installations
+        FROM plugins p
+        LEFT JOIN (
+          SELECT 
+            plugin_id,
+            COUNT(*) as installation_count
+          FROM plugin_subscriptions 
+          WHERE status = 'active'
+          GROUP BY plugin_id
+        ) ps ON p.id = ps.plugin_id
+        ORDER BY p.created_at DESC
       `);
 
       const plugins = result.rows.map((row: any) => ({
         id: row.id,
         name: row.name,
         description: row.description,
-        version: "1.0.0", // Default version for display
+        version: "1.0.0",
         isActive: row.is_active,
-        installations: Math.floor(Math.random() * 500) + 50, // Calculated installations
+        installations: row.installations || 0,
         category: row.category,
         developer: "WikiStore Team",
-        price: row.price || (row.monthly_price > 0 ? `R$ ${row.monthly_price}/mês` : "Gratuito")
+        price: row.price || (row.monthly_price > 0 ? `R$ ${row.monthly_price}/mês` : "Gratuito"),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
       }));
 
       res.json(plugins);
@@ -2324,16 +2336,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { name, description, category, price, developer, isActive } = req.body;
       
+      console.log("Updating plugin:", { id, isActive, name, description, category, price });
+      
+      // Use direct SQL for more control
       const result = await db.execute(sql`
         UPDATE plugins 
         SET 
-          display_name = COALESCE(${name}, display_name),
-          description = COALESCE(${description}, description),
-          category = COALESCE(${category}, category),
-          price = COALESCE(${price}, price),
-          is_active = COALESCE(${isActive}, is_active),
+          display_name = CASE WHEN ${name} IS NOT NULL THEN ${name} ELSE display_name END,
+          description = CASE WHEN ${description} IS NOT NULL THEN ${description} ELSE description END,
+          category = CASE WHEN ${category} IS NOT NULL THEN ${category} ELSE category END,
+          price = CASE WHEN ${price} IS NOT NULL THEN ${price} ELSE price END,
+          is_active = CASE WHEN ${isActive} IS NOT NULL THEN ${isActive} ELSE is_active END,
           updated_at = NOW()
-        WHERE id = ${id}
+        WHERE id = ${parseInt(id)}
         RETURNING *
       `);
 
@@ -2341,6 +2356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Plugin not found" });
       }
 
+      console.log("Plugin updated successfully:", result.rows[0]);
       res.json(result.rows[0]);
     } catch (error) {
       console.error("Error updating plugin:", error);
