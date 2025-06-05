@@ -644,34 +644,23 @@ export default function AdminDashboard() {
 
 // Tenant Details View Component
 function TenantDetailsView({ tenant }: { tenant: Tenant }) {
-  const { data: tenantDetails } = useQuery({
+  const { data: tenantDetails, isLoading } = useQuery({
     queryKey: ['/api/admin/tenants', tenant.id, 'details'],
   });
 
-  const { data: tenantOrders } = useQuery({
-    queryKey: ['/api/admin/tenants', tenant.id, 'orders'],
-  });
-
-  const { data: tenantProducts } = useQuery({
-    queryKey: ['/api/admin/tenants', tenant.id, 'products'],
-  });
-
-  // Mock data for demonstration - this would come from the API
-  const mockMetrics = {
-    totalRevenue: tenant.monthlyRevenue,
-    totalOrders: tenant.totalOrders,
-    activeProducts: 45,
-    customers: 156,
-    averageOrderValue: '120.50',
-    conversionRate: '3.2%',
+  // Use real data from API or fallback to tenant data
+  const metrics = tenantDetails?.metrics || {
+    totalRevenue: tenant.monthlyRevenue || '0.00',
+    monthlyRevenue: tenant.monthlyRevenue || '0.00',
+    totalOrders: tenant.totalOrders || 0,
+    activeProducts: 0,
+    customers: 0,
+    averageOrderValue: '0.00',
+    conversionRate: '0.0%',
     lastActivity: new Date().toLocaleDateString('pt-BR')
   };
 
-  const mockRecentOrders = [
-    { id: 1, customerName: 'João Silva', value: 'R$ 245,00', status: 'Entregue', date: '2024-06-01' },
-    { id: 2, customerName: 'Maria Santos', value: 'R$ 189,90', status: 'Processando', date: '2024-06-02' },
-    { id: 3, customerName: 'Pedro Costa', value: 'R$ 356,75', status: 'Enviado', date: '2024-06-03' }
-  ];
+  const recentOrders = tenantDetails?.recentOrders || [];
 
   return (
     <div className="space-y-6">
@@ -775,7 +764,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
               <DollarSign className="w-4 h-4 text-green-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Receita Mensal</p>
-                <p className="text-lg font-bold">{formatCurrency(mockMetrics.totalRevenue)}</p>
+                <p className="text-lg font-bold">{formatCurrency(metrics.monthlyRevenue)}</p>
               </div>
             </div>
           </CardContent>
@@ -787,7 +776,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
               <Package className="w-4 h-4 text-blue-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Total de Pedidos</p>
-                <p className="text-lg font-bold">{mockMetrics.totalOrders}</p>
+                <p className="text-lg font-bold">{metrics.totalOrders}</p>
               </div>
             </div>
           </CardContent>
@@ -799,7 +788,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
               <Users className="w-4 h-4 text-purple-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Clientes</p>
-                <p className="text-lg font-bold">{mockMetrics.customers}</p>
+                <p className="text-lg font-bold">{metrics.customers}</p>
               </div>
             </div>
           </CardContent>
@@ -811,7 +800,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
               <TrendingUp className="w-4 h-4 text-orange-600" />
               <div>
                 <p className="text-sm text-muted-foreground">Ticket Médio</p>
-                <p className="text-lg font-bold">R$ {mockMetrics.averageOrderValue}</p>
+                <p className="text-lg font-bold">R$ {metrics.averageOrderValue}</p>
               </div>
             </div>
           </CardContent>
