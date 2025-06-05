@@ -3182,53 +3182,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transaction History
   app.get('/api/admin/financial/transaction-history', async (req, res) => {
     try {
-      // Get recent plugin subscription history
+      // Get recent plugin subscription history with more details
       const subscriptionHistoryResult = await db.execute(sql`
         SELECT 
-          psh.*,
+          psh.id,
+          psh.subscription_id,
+          psh.action,
+          psh.amount,
+          psh.payment_status,
+          psh.description,
+          psh.created_at,
           ps.tenant_id,
-          t.name as tenant_name
+          ps.subscription_type,
+          t.name as tenant_name,
+          CASE 
+            WHEN ps.subscription_type = 'plan' THEN p.name
+            WHEN ps.subscription_type = 'plugin' THEN pl.name
+            ELSE 'Produto Desconhecido'
+          END as product_name
         FROM plugin_subscription_history psh
         JOIN plugin_subscriptions ps ON psh.subscription_id = ps.id
         LEFT JOIN tenants t ON ps.tenant_id = t.id
+        LEFT JOIN plans p ON ps.plan_id = p.id
+        LEFT JOIN plugins pl ON ps.plugin_id = pl.id
+        WHERE psh.action IN ('created', 'renewed', 'upgraded', 'downgraded', 'cancelled')
         ORDER BY psh.created_at DESC
-        LIMIT 50
+        LIMIT 30
       `);
 
-      // Get recent orders as transactions
+      // Get recent orders as transactions with more details
       const orderTransactionsResult = await db.execute(sql`
         SELECT 
-          o.*,
-          t.name as tenant_name
+          o.id,
+          o.total,
+          o.status,
+          o.payment_method,
+          o.payment_status,
+          o.created_at,
+          o.tenant_id,
+          t.name as tenant_name,
+          'Pedido da Loja' as product_name
         FROM orders o
         LEFT JOIN tenants t ON o.tenant_id = t.id
+        WHERE o.total IS NOT NULL AND o.total != '0'
         ORDER BY o.created_at DESC
-        LIMIT 50
+        LIMIT 30
       `);
 
-      // Combine and format transactions
+      // Combine and format transactions with enhanced details
       const transactions = [
         ...subscriptionHistoryResult.rows.map((sub: any) => ({
           id: `SUB-${sub.id}`,
-          type: 'subscription',
-          amount: sub.amount || '0.00',
-          status: sub.payment_status || 'succeeded',
-          paymentMethod: 'stripe',
-          tenantName: sub.tenant_name || `Tenant ${sub.tenant_id}`,
+          type: sub.subscription_type === 'plan' ? 'Plano' : 'Plugin',
+          amount: parseFloat(sub.amount || '0').toFixed(2),
+          status: sub.payment_status === 'succeeded' ? 'succeeded' : 'pending',
+          paymentMethod: 'Assinatura',
+          tenantName: sub.tenant_name || `Loja ${sub.tenant_id}`,
+          productName: sub.product_name,
+          description: sub.description || `${sub.action} - ${sub.product_name}`,
           createdAt: sub.created_at
         })),
         ...orderTransactionsResult.rows.map((order: any) => ({
           id: `ORD-${order.id}`,
-          type: 'order',
-          amount: order.total || '0.00',
+          type: 'Pedido',
+          amount: parseFloat(order.total || '0').toFixed(2),
           status: order.payment_status || order.status || 'pending',
-          paymentMethod: order.payment_method || 'unknown',
-          tenantName: order.tenant_name || `Tenant ${order.tenant_id}`,
+          paymentMethod: order.payment_method || 'PIX',
+          tenantName: order.tenant_name || `Loja ${order.tenant_id}`,
+          productName: order.product_name,
+          description: `Pedido #${order.id} - ${order.tenant_name}`,
           createdAt: order.created_at
         }))
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      res.json(transactions.slice(0, 100)); // Return top 100 transactions
+      res.json(transactions.slice(0, 50)); // Return top 50 transactions
     } catch (error) {
       console.error("Error fetching transaction history:", error);
       res.status(500).json({ message: "Failed to fetch transaction history" });
