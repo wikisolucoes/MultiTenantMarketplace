@@ -3300,21 +3300,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Ledger Entries - Extrato da Conta Celcoin
   app.get('/api/admin/financial/ledger', async (req, res) => {
     try {
-      // Simulate ledger data based on actual orders and transactions
-      const ordersResult = await db.execute(sql`
+      const { tenant_id, transaction_type, start_date, end_date } = req.query;
+      
+      // Build WHERE clause based on filters
+      let whereClause = "WHERE o.payment_status = 'succeeded'";
+      
+      if (tenant_id) {
+        whereClause += ` AND o.tenant_id = ${parseInt(tenant_id as string)}`;
+      }
+      
+      if (start_date) {
+        whereClause += ` AND o.created_at >= '${start_date}'`;
+      }
+      
+      if (end_date) {
+        whereClause += ` AND o.created_at <= '${end_date}'`;
+      }
+
+      // Fetch filtered orders
+      const ordersResult = await db.execute(sql.raw(`
         SELECT 
           o.*,
           t.name as tenant_name
         FROM orders o
         LEFT JOIN tenants t ON o.tenant_id = t.id
-        WHERE o.payment_status = 'succeeded'
+        ${whereClause}
         ORDER BY o.created_at DESC
         LIMIT 50
-      `);
+      `));
 
       // Create ledger entries from orders
       let runningBalance = 1000.00; // Starting balance
-      const entries: any[] = [];
+      const allEntries: any[] = [];
       
       ordersResult.rows.forEach((order: any, index: number) => {
         const orderTotal = parseFloat(order.total || '0');
@@ -3323,7 +3340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Credit entry for sale
         runningBalance += netAmount;
-        entries.push({
+        allEntries.push({
           id: `LEDGER-${order.id}-CR`,
           tenantId: order.tenant_id,
           tenantName: order.tenant_name || `Loja ${order.tenant_id}`,
@@ -3347,7 +3364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (index % 3 === 0) {
           const feeAmount = 25.00;
           runningBalance -= feeAmount;
-          entries.push({
+          allEntries.push({
             id: `LEDGER-FEE-${order.id}`,
             tenantId: order.tenant_id,
             tenantName: order.tenant_name || `Loja ${order.tenant_id}`,
@@ -3365,18 +3382,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
+      // Apply transaction type filter
+      let filteredEntries = allEntries;
+      if (transaction_type && transaction_type !== 'all') {
+        filteredEntries = allEntries.filter(entry => entry.transactionType === transaction_type);
+      }
+
       // Sort entries by date (most recent first)
-      entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      filteredEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       // Calculate summary
       const summary = {
         totalCredits: 0,
         totalDebits: 0,
         netBalance: 0,
-        transactionCount: entries.length
+        transactionCount: filteredEntries.length
       };
 
-      entries.forEach(entry => {
+      filteredEntries.forEach(entry => {
         const amount = parseFloat(entry.amount);
         if (entry.transactionType === 'credit') {
           summary.totalCredits += amount;
@@ -3388,7 +3411,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       summary.netBalance = summary.totalCredits - summary.totalDebits;
 
       res.json({
-        entries: entries.slice(0, 100), // Limit to 100 entries
+        entries: filteredEntries.slice(0, 100), // Limit to 100 entries
         summary,
         filters: req.query
       });

@@ -1990,6 +1990,12 @@ function UserEditFormComponent({ user, onClose }: UserEditFormProps) {
 
 function FinancialManagement() {
   const [activeFinancialTab, setActiveFinancialTab] = useState('overview');
+  const [ledgerFilters, setLedgerFilters] = useState({
+    tenant_id: '',
+    transaction_type: '',
+    start_date: '',
+    end_date: ''
+  });
   const { toast } = useToast();
 
   // Financial data queries
@@ -2009,8 +2015,15 @@ function FinancialManagement() {
     queryKey: ['/api/admin/financial/celcoin-integration'],
   });
 
-  const { data: ledgerData, isLoading: ledgerLoading } = useQuery({
-    queryKey: ['/api/admin/financial/ledger'],
+  const { data: ledgerData, isLoading: ledgerLoading, refetch: refetchLedger } = useQuery({
+    queryKey: ['/api/admin/financial/ledger', ledgerFilters],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      Object.entries(ledgerFilters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+      return fetch(`/api/admin/financial/ledger?${params}`).then(res => res.json());
+    },
     enabled: activeFinancialTab === 'ledger'
   });
 
@@ -2020,6 +2033,63 @@ function FinancialManagement() {
       style: 'currency',
       currency: 'BRL'
     }).format(numValue || 0);
+  };
+
+  const handleFilterChange = (key: string, value: string) => {
+    setLedgerFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const exportToCSV = () => {
+    if (!ledgerData?.entries?.length) {
+      toast({
+        title: "Erro",
+        description: "Não há dados para exportar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const csvHeaders = [
+      'Data/Hora',
+      'Loja',
+      'Tipo',
+      'Descrição',
+      'Valor',
+      'Saldo',
+      'Ref. Celcoin'
+    ];
+
+    const csvData = ledgerData.entries.map((entry: any) => [
+      new Date(entry.createdAt).toLocaleString('pt-BR'),
+      entry.tenantName,
+      entry.transactionType === 'credit' ? 'Crédito' : 'Débito',
+      entry.description,
+      formatCurrency(entry.amount),
+      formatCurrency(entry.runningBalance),
+      entry.celcoinTransactionId || '—'
+    ]);
+
+    const csvContent = [csvHeaders, ...csvData]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `extrato-celcoin-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Sucesso",
+      description: "Extrato exportado com sucesso",
+    });
   };
 
   return (
@@ -2604,7 +2674,10 @@ function FinancialManagement() {
 
                     {/* Filters */}
                     <div className="flex gap-4 flex-wrap">
-                      <Select defaultValue="all">
+                      <Select 
+                        value={ledgerFilters.tenant_id || "all"} 
+                        onValueChange={(value) => handleFilterChange('tenant_id', value === 'all' ? '' : value)}
+                      >
                         <SelectTrigger className="w-48">
                           <SelectValue placeholder="Filtrar por Loja" />
                         </SelectTrigger>
@@ -2616,7 +2689,10 @@ function FinancialManagement() {
                         </SelectContent>
                       </Select>
                       
-                      <Select defaultValue="all">
+                      <Select 
+                        value={ledgerFilters.transaction_type || "all"} 
+                        onValueChange={(value) => handleFilterChange('transaction_type', value === 'all' ? '' : value)}
+                      >
                         <SelectTrigger className="w-40">
                           <SelectValue placeholder="Tipo" />
                         </SelectTrigger>
@@ -2627,12 +2703,41 @@ function FinancialManagement() {
                         </SelectContent>
                       </Select>
 
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="date"
+                          value={ledgerFilters.start_date}
+                          onChange={(e) => handleFilterChange('start_date', e.target.value)}
+                          className="px-3 py-2 border rounded-md text-sm"
+                          placeholder="Data inicial"
+                        />
+                        <span className="text-muted-foreground">até</span>
+                        <input
+                          type="date"
+                          value={ledgerFilters.end_date}
+                          onChange={(e) => handleFilterChange('end_date', e.target.value)}
+                          className="px-3 py-2 border rounded-md text-sm"
+                          placeholder="Data final"
+                        />
+                      </div>
+
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={exportToCSV}>
                           Exportar CSV
                         </Button>
-                        <Button variant="outline" size="sm">
-                          Filtros Avançados
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setLedgerFilters({
+                              tenant_id: '',
+                              transaction_type: '',
+                              start_date: '',
+                              end_date: ''
+                            });
+                          }}
+                        >
+                          Limpar Filtros
                         </Button>
                       </div>
                     </div>
