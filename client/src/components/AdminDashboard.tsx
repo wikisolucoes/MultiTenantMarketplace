@@ -473,6 +473,30 @@ function SubscriptionManagement() {
     queryKey: ["/api/admin/plugin-subscriptions"],
   });
 
+  // Test plan activation function
+  const testPlanActivation = async () => {
+    try {
+      const result = await apiRequest('POST', '/api/admin/activate-plan-plugins', {
+        tenantId: 5, // Loja Demo
+        planId: 1   // Plano Básico
+      });
+      
+      toast({
+        title: "Teste de Ativação Concluído",
+        description: `${result.activatedPlugins?.length || 0} plugins foram ativados automaticamente para a Loja Demo`,
+      });
+      
+      // Refresh subscriptions
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugin-subscriptions"] });
+    } catch (error: any) {
+      toast({
+        title: "Erro no Teste",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -605,6 +629,24 @@ function SubscriptionManagement() {
                       </div>
                     </div>
                   )}
+
+                  {plan.plugins && plan.plugins.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Plugins inclusos:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {plan.plugins.slice(0, 4).map((pluginId: number) => (
+                          <Badge key={pluginId} variant="secondary" className="text-xs">
+                            🔌 Plugin ID {pluginId}
+                          </Badge>
+                        ))}
+                        {plan.plugins.length > 4 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{plan.plugins.length - 4} plugins
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -627,7 +669,17 @@ function SubscriptionManagement() {
       {/* Subscriptions Tab */}
       {activeSubTab === "subscriptions" && (
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold">Assinaturas Ativas</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Assinaturas Ativas</h3>
+            <Button 
+              onClick={() => testPlanActivation()}
+              variant="outline"
+              size="sm"
+            >
+              <Settings className="w-4 h-4 mr-2" />
+              Testar Ativação de Plano
+            </Button>
+          </div>
           
           <Card>
             <CardContent className="p-0">

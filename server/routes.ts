@@ -2437,7 +2437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY pp.display_order ASC, pp.monthly_price ASC
       `);
 
-      const plans = result.rows.map((row: any) => {
+      const plans = await Promise.all(result.rows.map(async (row: any) => {
         let features = [];
         try {
           if (row.features) {
@@ -2455,13 +2455,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Error parsing features for plan', row.id, ':', error);
           features = [];
         }
+
+        // Get linked plugins
+        const pluginsResult = await db.execute(sql`
+          SELECT plugin_id FROM plan_plugins WHERE plan_id = ${row.id}
+        `);
+        const plugins = pluginsResult.rows.map((p: any) => p.plugin_id);
         
         return {
           ...row,
           features: Array.isArray(features) ? features : [],
-          activeSubscriptions: parseInt(row.active_subscriptions) || 0
+          activeSubscriptions: parseInt(row.active_subscriptions) || 0,
+          plugins
         };
-      });
+      }));
 
       res.json(plans);
     } catch (error) {
@@ -2473,7 +2480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create plugin plan
   app.post("/api/admin/plugin-plans", async (req, res) => {
     try {
-      const { name, description, monthlyPrice, yearlyPrice, maxTenants, features, isActive } = req.body;
+      const { name, description, monthlyPrice, yearlyPrice, maxTenants, features, isActive, selectedPlugins } = req.body;
       
       const result = await db.execute(sql`
         INSERT INTO plugin_plans (
@@ -2486,6 +2493,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING *
       `);
 
+      const planId = result.rows[0].id;
+
+      // Link plugins to plan
+      if (selectedPlugins && selectedPlugins.length > 0) {
+        for (const pluginId of selectedPlugins) {
+          await db.execute(sql`
+            INSERT INTO plan_plugins (plan_id, plugin_id, is_required) 
+            VALUES (${planId}, ${pluginId}, true)
+            ON CONFLICT (plan_id, plugin_id) DO NOTHING
+          `);
+        }
+      }
+
       res.json(result.rows[0]);
     } catch (error) {
       console.error("Error creating plugin plan:", error);
@@ -2497,7 +2517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/plugin-plans/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, monthlyPrice, yearlyPrice, maxTenants, features, isActive } = req.body;
+      const { name, description, monthlyPrice, yearlyPrice, maxTenants, features, isActive, selectedPlugins } = req.body;
       
       const result = await db.execute(sql`
         UPDATE plugin_plans 
@@ -2516,6 +2536,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (result.rows.length === 0) {
         return res.status(404).json({ message: "Plan not found" });
+      }
+
+      // Update linked plugins
+      if (selectedPlugins !== undefined) {
+        // Remove existing plugin links
+        await db.execute(sql`
+          DELETE FROM plan_plugins WHERE plan_id = ${parseInt(id)}
+        `);
+
+        // Add new plugin links
+        if (selectedPlugins && selectedPlugins.length > 0) {
+          for (const pluginId of selectedPlugins) {
+            await db.execute(sql`
+              INSERT INTO plan_plugins (plan_id, plugin_id, is_required) 
+              VALUES (${parseInt(id)}, ${pluginId}, true)
+            `);
+          }
+        }
       }
 
       res.json(result.rows[0]);
@@ -2578,6 +2616,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching plugin subscriptions:", error);
       res.status(500).json({ message: "Failed to fetch plugin subscriptions" });
+    }
+  });
+
+  // Activate plan plugins for tenant
+  app.post("/api/admin/activate-plan-plugins", async (req, res) => {
+    try {
+      const { tenantId, planId } = req.body;
+
+      if (!tenantId || !planId) {
+        return res.status(400).json({ message: "Tenant ID and Plan ID are required" });
+      }
+
+      // Get plugins associated with the plan
+      const planPluginsResult = await db.execute(sql`
+        SELECT pp.plugin_id, p.name as plugin_name
+        FROM plan_plugins pp
+        JOIN plugins p ON pp.plugin_id = p.id
+        WHERE pp.plan_id = ${planId}
+      `);
+
+      if (planPluginsResult.rows.length === 0) {
+        return res.json({ message: "No plugins associated with this plan", activatedPlugins: [] });
+      }
+
+      const activatedPlugins = [];
+
+      // Activate each plugin for the tenant
+      for (const row of planPluginsResult.rows) {
+        const pluginId = row.plugin_id;
+        
+        // Check if plugin is already active for this tenant
+        const existingResult = await db.execute(sql`
+          SELECT id FROM plugin_subscriptions 
+          WHERE tenant_id = ${tenantId} AND plugin_id = ${pluginId} AND status = 'active'
+        `);
+
+        if (existingResult.rows.length === 0) {
+          // Create plugin subscription for individual plugin
+          await db.execute(sql`
+            INSERT INTO plugin_subscriptions (
+              tenant_id, plugin_id, subscription_type, status, started_at, current_price
+            ) VALUES (
+              ${tenantId}, ${pluginId}, 'individual', 'active', NOW(), 0
+            )
+          `);
+
+          activatedPlugins.push({
+            pluginId,
+            pluginName: row.plugin_name
+          });
+        }
+      }
+
+      res.json({ 
+        message: `Activated ${activatedPlugins.length} plugins for tenant`,
+        activatedPlugins
+      });
+    } catch (error) {
+      console.error("Error activating plan plugins:", error);
+      res.status(500).json({ message: "Failed to activate plan plugins" });
     }
   });
 
