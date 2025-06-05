@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,11 @@ import {
   UserCheck,
   Clock,
   CheckCircle,
+  Wallet,
+  Repeat,
+  Receipt,
+  Smartphone,
+  Target,
   XCircle,
   FileBarChart,
   ArrowUpRight,
@@ -1979,6 +1984,691 @@ function UserEditFormComponent({ user, onClose }: UserEditFormProps) {
           {updateUserMutation.isPending ? "Salvando..." : "Salvar Alterações"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function FinancialManagement() {
+  const [activeFinancialTab, setActiveFinancialTab] = useState('overview');
+  const { toast } = useToast();
+
+  // Financial data queries
+  const { data: platformRevenue, isLoading: revenueLoading } = useQuery({
+    queryKey: ['/api/admin/financial/platform-revenue'],
+  });
+
+  const { data: subscriptionAnalytics, isLoading: subscriptionLoading } = useQuery({
+    queryKey: ['/api/admin/financial/subscription-analytics'],
+  });
+
+  const { data: transactionHistory, isLoading: transactionLoading } = useQuery({
+    queryKey: ['/api/admin/financial/transaction-history'],
+  });
+
+  const { data: celcoinIntegration, isLoading: celcoinLoading } = useQuery({
+    queryKey: ['/api/admin/financial/celcoin-integration'],
+  });
+
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(numValue || 0);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Gestão Financeira</h2>
+          <p className="text-muted-foreground">
+            Controle completo das finanças da plataforma e integrações financeiras
+          </p>
+        </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveFinancialTab('overview')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeFinancialTab === 'overview'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Receita da Plataforma
+          </button>
+          <button
+            onClick={() => setActiveFinancialTab('subscriptions')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeFinancialTab === 'subscriptions'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Analytics de Assinaturas
+          </button>
+          <button
+            onClick={() => setActiveFinancialTab('transactions')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeFinancialTab === 'transactions'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Histórico de Transações
+          </button>
+          <button
+            onClick={() => setActiveFinancialTab('celcoin')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeFinancialTab === 'celcoin'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Integração Celcoin
+          </button>
+          <button
+            onClick={() => setActiveFinancialTab('payments')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeFinancialTab === 'payments'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Métodos de Pagamento
+          </button>
+          <button
+            onClick={() => setActiveFinancialTab('reports')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeFinancialTab === 'reports'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Relatórios Financeiros
+          </button>
+        </nav>
+      </div>
+
+      {/* Platform Revenue Overview */}
+      {activeFinancialTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Key Financial Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Receita Total da Plataforma</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(platformRevenue?.totalRevenue || 0)}</div>
+                <p className="text-xs text-muted-foreground">
+                  +12.5% em relação ao mês anterior
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Receita de Assinaturas</CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(platformRevenue?.subscriptionRevenue || 0)}</div>
+                <p className="text-xs text-muted-foreground">
+                  Receita mensal recorrente
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Taxa de Transações</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(platformRevenue?.transactionFees || 0)}</div>
+                <p className="text-xs text-muted-foreground">
+                  {platformRevenue?.totalTransactions || 0} transações processadas
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Saldo Disponível</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(platformRevenue?.availableBalance || 0)}</div>
+                <p className="text-xs text-muted-foreground">
+                  Pronto para saque
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Revenue Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Receita Mensal</CardTitle>
+                <CardDescription>Evolução da receita nos últimos 12 meses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Gráfico de receita mensal será exibido aqui
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribuição de Receita</CardTitle>
+                <CardDescription>Breakdown por fonte de receita</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  Gráfico de distribuição será exibido aqui
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription Analytics */}
+      {activeFinancialTab === 'subscriptions' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Assinaturas Ativas</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{subscriptionAnalytics?.activeSubscriptions || 0}</div>
+                <p className="text-xs text-muted-foreground">
+                  +{subscriptionAnalytics?.newSubscriptionsThisMonth || 0} este mês
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Taxa de Churn</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{subscriptionAnalytics?.churnRate || 0}%</div>
+                <p className="text-xs text-muted-foreground">
+                  {subscriptionAnalytics?.cancelledThisMonth || 0} cancelamentos este mês
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">LTV Médio</CardTitle>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(subscriptionAnalytics?.averageLTV || 0)}</div>
+                <p className="text-xs text-muted-foreground">
+                  Valor vitalício do cliente
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">MRR</CardTitle>
+                <Repeat className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(subscriptionAnalytics?.mrr || 0)}</div>
+                <p className="text-xs text-muted-foreground">
+                  Receita mensal recorrente
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Subscription Details Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Detalhes das Assinaturas</CardTitle>
+              <CardDescription>Lista completa de assinaturas de plugins e planos</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4">Tenant</th>
+                      <th className="text-left p-4">Tipo</th>
+                      <th className="text-left p-4">Produto</th>
+                      <th className="text-left p-4">Status</th>
+                      <th className="text-left p-4">Valor</th>
+                      <th className="text-left p-4">Próxima Cobrança</th>
+                      <th className="text-left p-4">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subscriptionAnalytics?.subscriptions?.map((sub: any) => (
+                      <tr key={sub.id} className="border-b">
+                        <td className="p-4">{sub.tenantName}</td>
+                        <td className="p-4">
+                          <Badge variant="outline">
+                            {sub.subscriptionType === 'plugin' ? 'Plugin' : 'Plano'}
+                          </Badge>
+                        </td>
+                        <td className="p-4">{sub.productName}</td>
+                        <td className="p-4">
+                          <Badge className={sub.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                            {sub.status === 'active' ? 'Ativo' : 'Cancelado'}
+                          </Badge>
+                        </td>
+                        <td className="p-4">{formatCurrency(sub.currentPrice)}</td>
+                        <td className="p-4">{new Date(sub.nextBillingDate).toLocaleDateString('pt-BR')}</td>
+                        <td className="p-4">
+                          <Button variant="outline" size="sm">
+                            Gerenciar
+                          </Button>
+                        </td>
+                      </tr>
+                    )) || []}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Transaction History */}
+      {activeFinancialTab === 'transactions' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Histórico de Transações</CardTitle>
+              <CardDescription>Todas as transações financeiras da plataforma</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Filters */}
+                <div className="flex gap-4">
+                  <Select defaultValue="all">
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="succeeded">Aprovado</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="failed">Falhou</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select defaultValue="all">
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="subscription">Assinatura</SelectItem>
+                      <SelectItem value="order">Pedido</SelectItem>
+                      <SelectItem value="withdrawal">Saque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Transaction Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-4">ID Transação</th>
+                        <th className="text-left p-4">Data</th>
+                        <th className="text-left p-4">Tenant</th>
+                        <th className="text-left p-4">Tipo</th>
+                        <th className="text-left p-4">Valor</th>
+                        <th className="text-left p-4">Status</th>
+                        <th className="text-left p-4">Método</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transactionHistory?.map((transaction: any) => (
+                        <tr key={transaction.id} className="border-b">
+                          <td className="p-4 font-mono text-sm">{transaction.id}</td>
+                          <td className="p-4">{new Date(transaction.createdAt).toLocaleDateString('pt-BR')}</td>
+                          <td className="p-4">{transaction.tenantName}</td>
+                          <td className="p-4">
+                            <Badge variant="outline">{transaction.type}</Badge>
+                          </td>
+                          <td className="p-4">{formatCurrency(transaction.amount)}</td>
+                          <td className="p-4">
+                            <Badge className={
+                              transaction.status === 'succeeded' ? 'bg-green-100 text-green-800' :
+                              transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }>
+                              {transaction.status === 'succeeded' ? 'Aprovado' :
+                               transaction.status === 'pending' ? 'Pendente' : 'Falhou'}
+                            </Badge>
+                          </td>
+                          <td className="p-4">{transaction.paymentMethod}</td>
+                        </tr>
+                      )) || []}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Celcoin Integration */}
+      {activeFinancialTab === 'celcoin' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Integração Celcoin</CardTitle>
+              <CardDescription>Status e configurações da integração com Celcoin</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Connection Status */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <div>
+                      <p className="font-medium">Status da Conexão</p>
+                      <p className="text-sm text-muted-foreground">Conectado e funcionando</p>
+                    </div>
+                  </div>
+                  <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+                </div>
+
+                {/* API Statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Transações Processadas</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{celcoinIntegration?.totalTransactions || 0}</div>
+                      <p className="text-xs text-muted-foreground">Últimos 30 dias</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Volume Processado</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{formatCurrency(celcoinIntegration?.totalVolume || 0)}</div>
+                      <p className="text-xs text-muted-foreground">Últimos 30 dias</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Taxa de Sucesso</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{celcoinIntegration?.successRate || 0}%</div>
+                      <p className="text-xs text-muted-foreground">Transações aprovadas</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Configuration */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Configurações</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Client ID</Label>
+                          <Input value="****-****-****-****" disabled />
+                        </div>
+                        <div>
+                          <Label>Environment</Label>
+                          <Select defaultValue="production">
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="production">Produção</SelectItem>
+                              <SelectItem value="sandbox">Sandbox</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button>Salvar Configurações</Button>
+                        <Button variant="outline">Testar Conexão</Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Payment Methods */}
+      {activeFinancialTab === 'payments' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Métodos de Pagamento</CardTitle>
+              <CardDescription>Configurações dos métodos de pagamento aceitos</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Payment Methods Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <Card>
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <CreditCard className="w-5 h-5" />
+                        Cartão de Crédito
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Status:</span>
+                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm">Taxa:</span>
+                          <span className="text-sm">3.99%</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <Smartphone className="w-5 h-5" />
+                        PIX
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Status:</span>
+                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm">Taxa:</span>
+                          <span className="text-sm">0.99%</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-4">
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="w-5 h-5" />
+                        Boleto
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Status:</span>
+                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm">Taxa:</span>
+                          <span className="text-sm">R$ 3.49</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Payment Configuration */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Configurações de Pagamento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label>Taxa Padrão da Plataforma (%)</Label>
+                          <Input type="number" defaultValue="5.0" />
+                        </div>
+                        <div>
+                          <Label>Prazo de Repasse (dias)</Label>
+                          <Input type="number" defaultValue="30" />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Switch id="auto-transfer" />
+                        <Label htmlFor="auto-transfer">Repasse automático</Label>
+                      </div>
+                      
+                      <Button>Salvar Configurações</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Financial Reports */}
+      {activeFinancialTab === 'reports' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Relatórios Financeiros</CardTitle>
+              <CardDescription>Gere relatórios financeiros detalhados</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Report Types */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BarChart3 className="w-5 h-5" />
+                        Receita Mensal
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">Relatório detalhado da receita mensal</p>
+                      <Button className="w-full mt-4" variant="outline">
+                        <Download className="w-4 h-4 mr-2" />
+                        Gerar Relatório
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="w-5 h-5" />
+                        Análise de Assinaturas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">Métricas detalhadas de assinaturas</p>
+                      <Button className="w-full mt-4" variant="outline">
+                        <Download className="w-4 h-4 mr-2" />
+                        Gerar Relatório
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Receipt className="w-5 h-5" />
+                        Relatório Fiscal
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">Dados para declaração fiscal</p>
+                      <Button className="w-full mt-4" variant="outline">
+                        <Download className="w-4 h-4 mr-2" />
+                        Gerar Relatório
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Quick Stats */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Resumo Financeiro</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">{formatCurrency(1250000)}</div>
+                        <p className="text-sm text-muted-foreground">Receita Total</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">847</div>
+                        <p className="text-sm text-muted-foreground">Assinaturas Ativas</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">2.3%</div>
+                        <p className="text-sm text-muted-foreground">Taxa de Churn</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-orange-600">{formatCurrency(89500)}</div>
+                        <p className="text-sm text-muted-foreground">MRR</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

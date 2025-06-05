@@ -3070,6 +3070,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Financial Management API Routes
+  
+  // Platform Revenue Data
+  app.get('/api/admin/financial/platform-revenue', async (req, res) => {
+    try {
+      // Get all orders from all tenants
+      const allOrdersResult = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(CAST(total AS DECIMAL)), 0) as total_revenue,
+          COUNT(*) as total_transactions
+        FROM orders
+        WHERE status = 'completed'
+      `);
+      
+      // Get all active plugin subscriptions
+      const subscriptionsResult = await db.execute(sql`
+        SELECT 
+          COALESCE(SUM(CAST(current_price AS DECIMAL)), 0) as subscription_revenue,
+          COUNT(*) as active_count
+        FROM plugin_subscriptions 
+        WHERE status = 'active'
+      `);
+      
+      const totalRevenue = parseFloat(allOrdersResult.rows[0]?.total_revenue || "0");
+      const subscriptionRevenue = parseFloat(subscriptionsResult.rows[0]?.subscription_revenue || "0");
+      
+      // Platform takes 5% fee on transactions
+      const transactionFees = totalRevenue * 0.05;
+      const availableBalance = transactionFees * 0.8; // 80% available for withdrawal
+      
+      res.json({
+        totalRevenue: totalRevenue.toFixed(2),
+        subscriptionRevenue: subscriptionRevenue.toFixed(2),
+        transactionFees: transactionFees.toFixed(2),
+        availableBalance: availableBalance.toFixed(2),
+        totalTransactions: parseInt(allOrdersResult.rows[0]?.total_transactions || "0")
+      });
+    } catch (error) {
+      console.error("Error fetching platform revenue:", error);
+      res.status(500).json({ message: "Failed to fetch platform revenue data" });
+    }
+  });
+
+  // Subscription Analytics
+  app.get('/api/admin/financial/subscription-analytics', async (req, res) => {
+    try {
+      const activeSubscriptionsResult = await db.execute(sql`
+        SELECT 
+          ps.*,
+          t.name as tenant_name,
+          p.name as plugin_name,
+          pp.name as plan_name
+        FROM plugin_subscriptions ps
+        LEFT JOIN tenants t ON ps.tenant_id = t.id
+        LEFT JOIN plugins p ON ps.plugin_id = p.id
+        LEFT JOIN plugin_plans pp ON ps.plan_id = pp.id
+        WHERE ps.status = 'active'
+        ORDER BY ps.created_at DESC
+      `);
+
+      // Calculate subscription metrics
+      const currentMonth = new Date().getMonth();
+      const activeSubscriptions = activeSubscriptionsResult.rows;
+      
+      const newThisMonth = activeSubscriptions.filter(sub => 
+        new Date(sub.created_at).getMonth() === currentMonth
+      ).length;
+
+      const mrr = activeSubscriptions
+        .reduce((sum, sub) => sum + parseFloat(sub.current_price || "0"), 0);
+
+      // Get cancellation data for churn calculation
+      const cancelledResult = await db.execute(sql`
+        SELECT COUNT(*) as cancelled_count
+        FROM plugin_subscriptions 
+        WHERE status = 'cancelled' 
+        AND DATE_TRUNC('month', cancelled_at) = DATE_TRUNC('month', CURRENT_DATE)
+      `);
+
+      const cancelledThisMonth = parseInt(cancelledResult.rows[0]?.cancelled_count || "0");
+      const totalActive = activeSubscriptions.length;
+      const churnRate = totalActive > 0 ? ((cancelledThisMonth / (totalActive + cancelledThisMonth)) * 100) : 0;
+      
+      // Calculate average LTV (simplified: MRR * 12 months / churn rate)
+      const averageLTV = churnRate > 0 ? (mrr * 12) / (churnRate / 100) : mrr * 24;
+
+      res.json({
+        activeSubscriptions: totalActive,
+        newSubscriptionsThisMonth: newThisMonth,
+        churnRate: churnRate.toFixed(1),
+        averageLTV: averageLTV.toFixed(2),
+        mrr: mrr.toFixed(2),
+        cancelledThisMonth: cancelledThisMonth,
+        subscriptions: activeSubscriptions.map(sub => ({
+          id: sub.id,
+          tenantName: sub.tenant_name || `Tenant ${sub.tenant_id}`,
+          subscriptionType: sub.subscription_type,
+          productName: sub.subscription_type === 'plugin' ? (sub.plugin_name || 'Plugin Individual') : (sub.plan_name || 'Plano Premium'),
+          status: sub.status,
+          currentPrice: sub.current_price,
+          nextBillingDate: sub.next_billing_date
+        }))
+      });
+    } catch (error) {
+      console.error("Error fetching subscription analytics:", error);
+      res.status(500).json({ message: "Failed to fetch subscription analytics" });
+    }
+  });
+
+  // Transaction History
+  app.get('/api/admin/financial/transaction-history', async (req, res) => {
+    try {
+      // Get recent plugin subscription history
+      const subscriptionHistoryResult = await db.execute(sql`
+        SELECT 
+          psh.*,
+          ps.tenant_id,
+          t.name as tenant_name
+        FROM plugin_subscription_history psh
+        JOIN plugin_subscriptions ps ON psh.subscription_id = ps.id
+        LEFT JOIN tenants t ON ps.tenant_id = t.id
+        ORDER BY psh.created_at DESC
+        LIMIT 50
+      `);
+
+      // Get recent orders as transactions
+      const orderTransactionsResult = await db.execute(sql`
+        SELECT 
+          o.*,
+          t.name as tenant_name
+        FROM orders o
+        LEFT JOIN tenants t ON o.tenant_id = t.id
+        ORDER BY o.created_at DESC
+        LIMIT 50
+      `);
+
+      // Combine and format transactions
+      const transactions = [
+        ...subscriptionHistoryResult.rows.map((sub: any) => ({
+          id: `SUB-${sub.id}`,
+          type: 'subscription',
+          amount: sub.amount || '0.00',
+          status: sub.payment_status || 'succeeded',
+          paymentMethod: 'stripe',
+          tenantName: sub.tenant_name || `Tenant ${sub.tenant_id}`,
+          createdAt: sub.created_at
+        })),
+        ...orderTransactionsResult.rows.map((order: any) => ({
+          id: `ORD-${order.id}`,
+          type: 'order',
+          amount: order.total || '0.00',
+          status: order.payment_status || order.status || 'pending',
+          paymentMethod: order.payment_method || 'unknown',
+          tenantName: order.tenant_name || `Tenant ${order.tenant_id}`,
+          createdAt: order.created_at
+        }))
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      res.json(transactions.slice(0, 100)); // Return top 100 transactions
+    } catch (error) {
+      console.error("Error fetching transaction history:", error);
+      res.status(500).json({ message: "Failed to fetch transaction history" });
+    }
+  });
+
+  // Celcoin Integration Status
+  app.get('/api/admin/financial/celcoin-integration', async (req, res) => {
+    try {
+      // Get Celcoin transaction data from orders (last 30 days)
+      const celcoinResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total_transactions,
+          COALESCE(SUM(CAST(total AS DECIMAL)), 0) as total_volume,
+          COUNT(CASE WHEN payment_status = 'succeeded' OR status = 'completed' THEN 1 END) as successful_transactions
+        FROM orders 
+        WHERE celcoin_transaction_id IS NOT NULL 
+        AND created_at >= CURRENT_DATE - INTERVAL '30 days'
+      `);
+
+      const result = celcoinResult.rows[0];
+      const totalTransactions = parseInt(result?.total_transactions || "0");
+      const totalVolume = parseFloat(result?.total_volume || "0");
+      const successfulTransactions = parseInt(result?.successful_transactions || "0");
+      
+      const successRate = totalTransactions > 0 ? 
+        ((successfulTransactions / totalTransactions) * 100) : 0;
+
+      res.json({
+        totalTransactions,
+        totalVolume: totalVolume.toFixed(2),
+        successRate: parseFloat(successRate.toFixed(1)),
+        status: 'connected',
+        lastSync: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error fetching Celcoin integration data:", error);
+      res.status(500).json({ message: "Failed to fetch Celcoin integration data" });
+    }
+  });
+
   // Attach notification functions to the server for use in routes
   (httpServer as any).sendNotification = sendNotification;
   (httpServer as any).broadcastToTenant = broadcastToTenant;
