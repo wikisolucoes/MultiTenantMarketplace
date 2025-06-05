@@ -1086,8 +1086,8 @@ export default function MerchantDashboard() {
                 const order = orders.find(o => o.id === selectedOrder);
                 if (!order) return <p>Pedido não encontrado</p>;
                 
-                // Fetch real order items from the order.items field
-                const orderItems = order.items || [];
+                // Parse real order items from the order.items JSON field
+                const orderItems = order.items ? JSON.parse(order.items) : [];
 
                 return (
                   <div className="space-y-6">
