@@ -14,7 +14,6 @@ export async function seedOrders() {
         customerPhone: "(11) 99999-8888",
         customerDocument: "123.456.789-10",
         total: "299.90",
-        subtotal: "249.90",
         taxAmount: "25.00",
         shippingCost: "25.00",
         paymentMethod: "credit_card",
@@ -39,7 +38,6 @@ export async function seedOrders() {
         customerPhone: "(21) 98888-7777",
         customerDocument: "987.654.321-00",
         total: "159.50",
-        subtotal: "129.50",
         taxAmount: "15.00",
         shippingCost: "15.00",
         paymentMethod: "pix",
@@ -63,7 +61,6 @@ export async function seedOrders() {
         customerPhone: "(31) 97777-6666",
         customerDocument: "456.789.123-45",
         total: "89.90",
-        subtotal: "79.90",
         taxAmount: "8.00",
         shippingCost: "2.00",
         paymentMethod: "boleto",
@@ -165,3 +162,6 @@ export async function seedOrders() {
     console.error("Error seeding order data:", error);
   }
 }
+
+// Execute seeding immediately
+seedOrders();
