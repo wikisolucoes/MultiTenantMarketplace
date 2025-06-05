@@ -677,6 +677,11 @@ function TenantDetailsView({
 
   const recentOrders = (tenantDetails as any)?.recentOrders || [];
 
+  // Debug logging
+  console.log('TenantDetails API Data:', tenantDetails);
+  console.log('Recent Orders:', recentOrders);
+  console.log('Recent Orders Length:', recentOrders.length);
+
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
