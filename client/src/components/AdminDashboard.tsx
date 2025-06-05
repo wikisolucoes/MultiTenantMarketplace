@@ -4145,7 +4145,10 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{formatCurrency(adminStats.totalRevenue)}</div>
                     <p className="text-xs text-muted-foreground">
-                      +12.5% vs mês anterior
+                      {reportsData?.revenueData ? 
+                        `${reportsData.revenueData.length} meses de dados` : 
+                        'Dados atualizados'
+                      }
                     </p>
                   </CardContent>
                 </Card>
@@ -4171,7 +4174,10 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{adminStats.totalOrders}</div>
                     <p className="text-xs text-muted-foreground">
-                      +8.2% vs mês anterior
+                      {reportsData?.paymentMethodData ? 
+                        `${reportsData.paymentMethodData.length} métodos` : 
+                        'Pedidos totais'
+                      }
                     </p>
                   </CardContent>
                 </Card>
