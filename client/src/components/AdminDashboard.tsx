@@ -4145,8 +4145,8 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{formatCurrency(adminStats.totalRevenue)}</div>
                     <p className="text-xs text-muted-foreground">
-                      {reportsData?.revenueData ? 
-                        `${reportsData.revenueData.length} meses de dados` : 
+                      {(reportsData as any)?.revenueData ? 
+                        `${(reportsData as any).revenueData.length} meses de dados` : 
                         'Dados atualizados'
                       }
                     </p>
@@ -4197,7 +4197,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Revenue Analysis */}
-              {reportsData && reportsData.revenueData && (
+              {(reportsData as any)?.revenueData && Array.isArray((reportsData as any).revenueData) && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -4209,12 +4209,12 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="h-80 w-full">
                       <div className="flex items-end justify-between h-full space-x-2">
-                        {reportsData.revenueData.map((data: any, index: number) => (
+                        {(reportsData as any).revenueData.map((data: any, index: number) => (
                           <div key={index} className="flex flex-col items-center flex-1">
                             <div 
                               className="bg-gradient-to-t from-blue-500 to-blue-300 w-full rounded-t relative"
                               style={{ 
-                                height: `${Math.max((data.revenue / Math.max(...reportsData.revenueData.map((d: any) => d.revenue))) * 250, 15)}px` 
+                                height: `${Math.max((data.revenue / Math.max(...(reportsData as any).revenueData.map((d: any) => d.revenue))) * 250, 15)}px` 
                               }}
                             >
                               <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs font-medium text-center">
@@ -4234,7 +4234,7 @@ export default function AdminDashboard() {
               )}
 
               {/* Top Performing Stores */}
-              {reportsData && reportsData.tenantPerformanceData && (
+              {(reportsData as any)?.tenantPerformanceData && Array.isArray((reportsData as any).tenantPerformanceData) && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -4245,7 +4245,7 @@ export default function AdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {reportsData.tenantPerformanceData.map((tenant: any, index: number) => (
+                      {(reportsData as any).tenantPerformanceData.map((tenant: any, index: number) => (
                         <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                           <div className="flex items-center gap-4">
                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white ${
@@ -4276,7 +4276,7 @@ export default function AdminDashboard() {
               {/* Analytics Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Category Distribution */}
-                {reportsData && reportsData.categoryDistribution && (
+                {(reportsData as any)?.categoryDistribution && Array.isArray((reportsData as any).categoryDistribution) && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -4286,8 +4286,8 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {reportsData.categoryDistribution.map((category: any, index: number) => {
-                          const total = reportsData.categoryDistribution.reduce((sum: number, cat: any) => sum + cat.revenue, 0);
+                        {(reportsData as any).categoryDistribution.map((category: any, index: number) => {
+                          const total = (reportsData as any).categoryDistribution.reduce((sum: number, cat: any) => sum + cat.revenue, 0);
                           const percentage = total > 0 ? ((category.revenue / total) * 100).toFixed(1) : '0';
                           return (
                             <div key={index} className="space-y-2">
@@ -4314,7 +4314,7 @@ export default function AdminDashboard() {
                 )}
 
                 {/* Payment Methods Analysis */}
-                {reportsData && reportsData.paymentMethodData && (
+                {(reportsData as any)?.paymentMethodData && Array.isArray((reportsData as any).paymentMethodData) && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -4324,7 +4324,7 @@ export default function AdminDashboard() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {reportsData.paymentMethodData.map((method: any, index: number) => (
+                        {(reportsData as any).paymentMethodData.map((method: any, index: number) => (
                           <div key={index} className="flex items-center justify-between p-3 border rounded">
                             <div className="flex items-center gap-3">
                               <div className={`w-3 h-3 rounded-full ${
