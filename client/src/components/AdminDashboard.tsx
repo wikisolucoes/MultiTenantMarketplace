@@ -910,7 +910,7 @@ function TenantDetailsView({
           variant="outline"
           onClick={() => {
             setSelectedTenant(null);
-            setActiveTab('tenants');
+            setActiveTab('settings');
           }}
         >
           <Settings className="w-4 h-4 mr-2" />
@@ -932,7 +932,7 @@ function TenantDetailsView({
           variant="outline"
           onClick={() => {
             setSelectedTenant(null);
-            setActiveTab('dashboard');
+            setActiveTab('products');
           }}
         >
           <Package className="w-4 h-4 mr-2" />
