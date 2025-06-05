@@ -83,11 +83,19 @@ interface User {
   id: number;
   email: string;
   fullName: string;
+  document?: string;
+  documentType?: string;
+  phone?: string;
   role: string;
-  tenantId: number;
+  tenantId?: number;
+  profileImage?: string;
   isActive: boolean;
+  permissions?: string[];
   lastLoginAt?: string;
+  createdBy?: number;
   createdAt: string;
+  updatedAt?: string;
+  adminNotes?: string;
 }
 
 interface SystemMetric {
@@ -149,50 +157,226 @@ function UserEditFormComponent({ user, onClose }: UserEditFormProps) {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="fullName">Nome Completo</Label>
-          <Input
-            id="fullName"
-            value={editingUser.fullName || ''}
-            onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            value={editingUser.email}
-            onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label htmlFor="role">Role</Label>
-          <Select value={editingUser.role} onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="merchant">Merchant</SelectItem>
-              <SelectItem value="user">User</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="isActive">Status</Label>
-          <div className="flex items-center space-x-2 mt-2">
-            <Switch
-              id="isActive"
-              checked={editingUser.isActive}
-              onCheckedChange={(checked) => setEditingUser({ ...editingUser, isActive: checked })}
+    <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+      {/* Informações Básicas */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Informações Básicas</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="fullName">Nome Completo *</Label>
+            <Input
+              id="fullName"
+              value={editingUser.fullName || ''}
+              onChange={(e) => setEditingUser({ ...editingUser, fullName: e.target.value })}
             />
-            <Label htmlFor="isActive">{editingUser.isActive ? 'Ativo' : 'Inativo'}</Label>
+          </div>
+          <div>
+            <Label htmlFor="email">Email *</Label>
+            <Input
+              id="email"
+              type="email"
+              value={editingUser.email}
+              onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label htmlFor="document">Documento (CPF/CNPJ)</Label>
+            <Input
+              id="document"
+              value={editingUser.document || ''}
+              onChange={(e) => setEditingUser({ ...editingUser, document: e.target.value })}
+              placeholder="000.000.000-00"
+            />
+          </div>
+          <div>
+            <Label htmlFor="documentType">Tipo de Documento</Label>
+            <Select 
+              value={editingUser.documentType || 'cpf'} 
+              onValueChange={(value) => setEditingUser({ ...editingUser, documentType: value })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cpf">CPF</SelectItem>
+                <SelectItem value="cnpj">CNPJ</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="phone">Telefone</Label>
+            <Input
+              id="phone"
+              value={editingUser.phone || ''}
+              onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+              placeholder="(11) 99999-9999"
+            />
           </div>
         </div>
       </div>
-      <div className="flex justify-end gap-2 pt-4">
+
+      {/* Perfil e Acesso */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Perfil e Acesso</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="role">Função/Role *</Label>
+            <Select value={editingUser.role} onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="merchant">Comerciante</SelectItem>
+                <SelectItem value="manager">Gerente</SelectItem>
+                <SelectItem value="employee">Funcionário</SelectItem>
+                <SelectItem value="user">Usuário</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="tenantId">ID da Loja</Label>
+            <Input
+              id="tenantId"
+              type="number"
+              value={editingUser.tenantId || ''}
+              onChange={(e) => setEditingUser({ ...editingUser, tenantId: parseInt(e.target.value) || undefined })}
+            />
+          </div>
+          <div>
+            <Label htmlFor="isActive">Status da Conta</Label>
+            <div className="flex items-center space-x-2 mt-2">
+              <Switch
+                id="isActive"
+                checked={editingUser.isActive}
+                onCheckedChange={(checked) => setEditingUser({ ...editingUser, isActive: checked })}
+              />
+              <Label htmlFor="isActive">{editingUser.isActive ? 'Ativo' : 'Inativo'}</Label>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="profileImage">URL da Imagem de Perfil</Label>
+            <Input
+              id="profileImage"
+              value={editingUser.profileImage || ''}
+              onChange={(e) => setEditingUser({ ...editingUser, profileImage: e.target.value })}
+              placeholder="https://exemplo.com/avatar.jpg"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Permissões Administrativas */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Permissões Administrativas</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageProducts"
+                checked={editingUser.permissions?.includes('manage_products') || false}
+                onCheckedChange={(checked) => {
+                  const permissions = editingUser.permissions || [];
+                  const newPermissions = checked 
+                    ? [...permissions, 'manage_products']
+                    : permissions.filter(p => p !== 'manage_products');
+                  setEditingUser({ ...editingUser, permissions: newPermissions });
+                }}
+              />
+              <Label htmlFor="canManageProducts">Gerenciar Produtos</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageOrders"
+                checked={editingUser.permissions?.includes('manage_orders') || false}
+                onCheckedChange={(checked) => {
+                  const permissions = editingUser.permissions || [];
+                  const newPermissions = checked 
+                    ? [...permissions, 'manage_orders']
+                    : permissions.filter(p => p !== 'manage_orders');
+                  setEditingUser({ ...editingUser, permissions: newPermissions });
+                }}
+              />
+              <Label htmlFor="canManageOrders">Gerenciar Pedidos</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canViewFinancials"
+                checked={editingUser.permissions?.includes('view_financials') || false}
+                onCheckedChange={(checked) => {
+                  const permissions = editingUser.permissions || [];
+                  const newPermissions = checked 
+                    ? [...permissions, 'view_financials']
+                    : permissions.filter(p => p !== 'view_financials');
+                  setEditingUser({ ...editingUser, permissions: newPermissions });
+                }}
+              />
+              <Label htmlFor="canViewFinancials">Ver Financeiro</Label>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageUsers"
+                checked={editingUser.permissions?.includes('manage_users') || false}
+                onCheckedChange={(checked) => {
+                  const permissions = editingUser.permissions || [];
+                  const newPermissions = checked 
+                    ? [...permissions, 'manage_users']
+                    : permissions.filter(p => p !== 'manage_users');
+                  setEditingUser({ ...editingUser, permissions: newPermissions });
+                }}
+              />
+              <Label htmlFor="canManageUsers">Gerenciar Usuários</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageSettings"
+                checked={editingUser.permissions?.includes('manage_settings') || false}
+                onCheckedChange={(checked) => {
+                  const permissions = editingUser.permissions || [];
+                  const newPermissions = checked 
+                    ? [...permissions, 'manage_settings']
+                    : permissions.filter(p => p !== 'manage_settings');
+                  setEditingUser({ ...editingUser, permissions: newPermissions });
+                }}
+              />
+              <Label htmlFor="canManageSettings">Gerenciar Configurações</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="canManageThemes"
+                checked={editingUser.permissions?.includes('manage_themes') || false}
+                onCheckedChange={(checked) => {
+                  const permissions = editingUser.permissions || [];
+                  const newPermissions = checked 
+                    ? [...permissions, 'manage_themes']
+                    : permissions.filter(p => p !== 'manage_themes');
+                  setEditingUser({ ...editingUser, permissions: newPermissions });
+                }}
+              />
+              <Label htmlFor="canManageThemes">Gerenciar Temas</Label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Observações Administrativas */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Observações</h3>
+        <div>
+          <Label htmlFor="adminNotes">Notas do Administrador</Label>
+          <Textarea
+            id="adminNotes"
+            value={editingUser.adminNotes || ''}
+            onChange={(e) => setEditingUser({ ...editingUser, adminNotes: e.target.value })}
+            placeholder="Observações internas sobre este usuário..."
+            rows={3}
+          />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4 border-t">
         <Button variant="outline" onClick={onClose}>
           Cancelar
         </Button>
@@ -615,37 +799,95 @@ export default function AdminDashboard() {
                                       <DialogTitle>Detalhes do Usuário</DialogTitle>
                                     </DialogHeader>
                                     {selectedUser && (
-                                      <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                          <div>
-                                            <Label className="text-sm font-medium">Nome Completo</Label>
-                                            <p className="text-sm text-muted-foreground">{selectedUser.fullName || 'Não informado'}</p>
-                                          </div>
-                                          <div>
-                                            <Label className="text-sm font-medium">Email</Label>
-                                            <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
-                                          </div>
-                                          <div>
-                                            <Label className="text-sm font-medium">Role</Label>
-                                            <Badge variant="outline">{selectedUser.role}</Badge>
-                                          </div>
-                                          <div>
-                                            <Label className="text-sm font-medium">Status</Label>
-                                            <Badge variant={selectedUser.isActive ? 'default' : 'secondary'}>
-                                              {selectedUser.isActive ? 'Ativo' : 'Inativo'}
-                                            </Badge>
-                                          </div>
-                                          <div>
-                                            <Label className="text-sm font-medium">Loja ID</Label>
-                                            <p className="text-sm text-muted-foreground">{selectedUser.tenantId}</p>
-                                          </div>
-                                          <div>
-                                            <Label className="text-sm font-medium">Último Login</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                              {selectedUser.lastLoginAt ? new Date(selectedUser.lastLoginAt).toLocaleDateString('pt-BR') : 'Nunca'}
-                                            </p>
+                                      <div className="space-y-6">
+                                        {/* Informações Básicas */}
+                                        <div>
+                                          <h3 className="text-lg font-semibold mb-3">Informações Básicas</h3>
+                                          <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                              <Label className="text-sm font-medium">Nome Completo</Label>
+                                              <p className="text-sm text-muted-foreground">{selectedUser.fullName || 'Não informado'}</p>
+                                            </div>
+                                            <div>
+                                              <Label className="text-sm font-medium">Email</Label>
+                                              <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                                            </div>
+                                            <div>
+                                              <Label className="text-sm font-medium">Documento</Label>
+                                              <p className="text-sm text-muted-foreground">
+                                                {selectedUser.document ? `${selectedUser.document} (${selectedUser.documentType?.toUpperCase()})` : 'Não informado'}
+                                              </p>
+                                            </div>
+                                            <div>
+                                              <Label className="text-sm font-medium">Telefone</Label>
+                                              <p className="text-sm text-muted-foreground">{selectedUser.phone || 'Não informado'}</p>
+                                            </div>
                                           </div>
                                         </div>
+
+                                        {/* Perfil e Acesso */}
+                                        <div>
+                                          <h3 className="text-lg font-semibold mb-3">Perfil e Acesso</h3>
+                                          <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                              <Label className="text-sm font-medium">Role</Label>
+                                              <Badge variant="outline">{selectedUser.role}</Badge>
+                                            </div>
+                                            <div>
+                                              <Label className="text-sm font-medium">Status</Label>
+                                              <Badge variant={selectedUser.isActive ? 'default' : 'secondary'}>
+                                                {selectedUser.isActive ? 'Ativo' : 'Inativo'}
+                                              </Badge>
+                                            </div>
+                                            <div>
+                                              <Label className="text-sm font-medium">Loja ID</Label>
+                                              <p className="text-sm text-muted-foreground">{selectedUser.tenantId || 'N/A'}</p>
+                                            </div>
+                                            <div>
+                                              <Label className="text-sm font-medium">Criado por</Label>
+                                              <p className="text-sm text-muted-foreground">{selectedUser.createdBy || 'Sistema'}</p>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Atividade e Logs */}
+                                        <div>
+                                          <h3 className="text-lg font-semibold mb-3">Atividade e Logs</h3>
+                                          <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                              <Label className="text-sm font-medium">Último Login</Label>
+                                              <p className="text-sm text-muted-foreground">
+                                                {selectedUser.lastLoginAt ? new Date(selectedUser.lastLoginAt).toLocaleDateString('pt-BR') : 'Nunca'}
+                                              </p>
+                                            </div>
+                                            <div>
+                                              <Label className="text-sm font-medium">Data de Criação</Label>
+                                              <p className="text-sm text-muted-foreground">
+                                                {selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
+                                              </p>
+                                            </div>
+                                            <div>
+                                              <Label className="text-sm font-medium">Última Atualização</Label>
+                                              <p className="text-sm text-muted-foreground">
+                                                {selectedUser.updatedAt ? new Date(selectedUser.updatedAt).toLocaleDateString('pt-BR') : 'N/A'}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Permissões */}
+                                        {selectedUser.permissions && (
+                                          <div>
+                                            <h3 className="text-lg font-semibold mb-3">Permissões</h3>
+                                            <div className="flex flex-wrap gap-2">
+                                              {Array.isArray(selectedUser.permissions) ? selectedUser.permissions.map((permission: string, index: number) => (
+                                                <Badge key={index} variant="secondary">{permission}</Badge>
+                                              )) : (
+                                                <p className="text-sm text-muted-foreground">Nenhuma permissão especial</p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </DialogContent>
