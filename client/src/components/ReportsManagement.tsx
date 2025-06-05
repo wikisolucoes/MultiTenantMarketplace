@@ -63,24 +63,25 @@ export default function ReportsManagement() {
   });
 
   // Use authentic database data from API
-  const financialData = reportsData?.financialData || [];
-  const salesData = reportsData?.salesData || [];
-  const customersData = reportsData?.customersData || [];
-  const inventoryData = reportsData?.inventoryData || [];
+  const financialData = (reportsData as any)?.financialData || [];
+  const salesData = (reportsData as any)?.salesData || [];
+  const customersData = (reportsData as any)?.customersData || [];
+  const inventoryData = (reportsData as any)?.inventoryData || [];
+  const summary = (reportsData as any)?.summary || { totalOrders: 0, totalRevenue: '0.00', averageOrderValue: '0.00', conversionRate: '0.0' };
 
-  const customerData = [
-    { segment: 'Novos', quantidade: 45, percentual: 35 },
-    { segment: 'Recorrentes', quantidade: 67, percentual: 52 },
-    { segment: 'VIP', quantidade: 17, percentual: 13 }
-  ];
+  // Use authentic customer segmentation from database
+  const customerSegmentData = customersData.slice(0, 3).map((customer: any, index: number) => ({
+    segment: index === 0 ? 'Top Cliente' : index === 1 ? 'Cliente Ativo' : 'Cliente Regular',
+    quantidade: customer.pedidos || 0,
+    percentual: Math.round((customer.total / (summary.totalRevenue || 1)) * 100) || 0
+  }));
 
-  const stockData = [
-    { product: 'Smartphone XYZ', estoque: 23, status: 'baixo' },
-    { product: 'Fone Bluetooth', estoque: 67, status: 'ok' },
-    { product: 'Capinha Protetora', estoque: 145, status: 'alto' },
-    { product: 'Carregador USB', estoque: 8, status: 'critico' },
-    { product: 'Película de Vidro', estoque: 89, status: 'ok' }
-  ];
+  // Use authentic stock data from database
+  const stockData = inventoryData.map((item: any) => ({
+    product: item.product || 'Produto',
+    estoque: item.estoque || 0,
+    status: item.estoque < 10 ? 'critico' : item.estoque < 50 ? 'baixo' : item.estoque < 100 ? 'ok' : 'alto'
+  }));
 
   const handlePeriodChange = (period: string) => {
     let from, to;
@@ -421,9 +422,9 @@ export default function ReportsManagement() {
                 <CardTitle className="text-lg">Total de Vendas</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">1.247</div>
+                <div className="text-2xl font-bold">{summary.totalOrders}</div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  +15.3% vs período anterior
+                  Pedidos processados
                 </p>
               </CardContent>
             </Card>
@@ -433,9 +434,9 @@ export default function ReportsManagement() {
                 <CardTitle className="text-lg">Ticket Médio</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">R$ 102,18</div>
+                <div className="text-2xl font-bold">{formatCurrency(parseFloat(summary.averageOrderValue))}</div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  -2.1% vs período anterior
+                  Valor médio por pedido
                 </p>
               </CardContent>
             </Card>
@@ -445,21 +446,21 @@ export default function ReportsManagement() {
                 <CardTitle className="text-lg">Taxa de Conversão</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">3.8%</div>
+                <div className="text-2xl font-bold">{summary.conversionRate}%</div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  +0.5% vs período anterior
+                  Pedidos completados
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Itens por Pedido</CardTitle>
+                <CardTitle className="text-lg">Receita Total</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">2.3</div>
+                <div className="text-2xl font-bold">{formatCurrency(parseFloat(summary.totalRevenue))}</div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  +0.2 vs período anterior
+                  Faturamento acumulado
                 </p>
               </CardContent>
             </Card>
@@ -472,7 +473,7 @@ export default function ReportsManagement() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {salesData.map((item, index) => (
+                  {salesData.map((item: any, index: number) => (
                     <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                       <div>
                         <p className="font-medium">{item.product}</p>
@@ -671,14 +672,14 @@ export default function ReportsManagement() {
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={customerData}
+                      data={customerSegmentData}
                       cx="50%"
                       cy="50%"
                       outerRadius={100}
                       dataKey="quantidade"
                       label={({ segment, percentual }) => `${segment}: ${percentual}%`}
                     >
-                      {customerData.map((entry, index) => (
+                      {customerSegmentData.map((entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
