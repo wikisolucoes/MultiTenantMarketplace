@@ -3262,40 +3262,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Celcoin Integration Status
+  // Celcoin Integration Status and Payment Methods
   app.get('/api/admin/financial/celcoin-integration', async (req, res) => {
     try {
-      // Get Celcoin transaction data from orders (last 30 days)
-      const celcoinResult = await db.execute(sql`
+      // Get overall transaction statistics
+      const overallResult = await db.execute(sql`
         SELECT 
           COUNT(*) as total_transactions,
           COALESCE(SUM(CAST(total AS DECIMAL)), 0) as total_volume,
-          COUNT(CASE WHEN payment_status = 'succeeded' OR status = 'completed' THEN 1 END) as successful_transactions
+          COUNT(CASE WHEN payment_status = 'succeeded' THEN 1 END) as successful_transactions
         FROM orders 
-        WHERE celcoin_transaction_id IS NOT NULL 
+        WHERE total IS NOT NULL AND total != '0'
         AND created_at >= CURRENT_DATE - INTERVAL '30 days'
       `);
 
-      const result = celcoinResult.rows[0];
-      const totalTransactions = parseInt(result?.total_transactions || "0");
-      const totalVolume = parseFloat(result?.total_volume || "0");
-      const successfulTransactions = parseInt(result?.successful_transactions || "0");
+      // Get payment method breakdown
+      const paymentMethodsResult = await db.execute(sql`
+        SELECT 
+          payment_method,
+          COUNT(*) as method_count,
+          COUNT(CASE WHEN payment_status = 'succeeded' THEN 1 END) as successful_count,
+          COALESCE(SUM(CAST(total AS DECIMAL)), 0) as method_volume
+        FROM orders 
+        WHERE total IS NOT NULL AND total != '0'
+        AND created_at >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY payment_method
+        ORDER BY method_count DESC
+      `);
+
+      const overall = overallResult.rows[0];
+      const totalTransactions = parseInt(overall?.total_transactions || "0");
+      const totalVolume = parseFloat(overall?.total_volume || "0");
+      const successfulTransactions = parseInt(overall?.successful_transactions || "0");
       
       const successRate = totalTransactions > 0 ? 
         ((successfulTransactions / totalTransactions) * 100) : 0;
+
+      // Format payment methods data
+      const paymentMethods = paymentMethodsResult.rows.map((method: any) => {
+        const methodCount = parseInt(method.method_count || "0");
+        const successCount = parseInt(method.successful_count || "0");
+        const methodSuccessRate = methodCount > 0 ? ((successCount / methodCount) * 100) : 0;
+        
+        return {
+          method: method.payment_method || 'unknown',
+          methodName: getPaymentMethodName(method.payment_method),
+          count: methodCount,
+          successCount,
+          successRate: parseFloat(methodSuccessRate.toFixed(1)),
+          volume: parseFloat(method.method_volume || "0").toFixed(2),
+          percentage: totalTransactions > 0 ? parseFloat(((methodCount / totalTransactions) * 100).toFixed(1)) : 0
+        };
+      });
 
       res.json({
         totalTransactions,
         totalVolume: totalVolume.toFixed(2),
         successRate: parseFloat(successRate.toFixed(1)),
         status: 'connected',
-        lastSync: new Date().toISOString()
+        lastSync: new Date().toISOString(),
+        paymentMethods
       });
     } catch (error) {
       console.error("Error fetching Celcoin integration data:", error);
       res.status(500).json({ message: "Failed to fetch Celcoin integration data" });
     }
   });
+
+  function getPaymentMethodName(method: string): string {
+    const methodNames: { [key: string]: string } = {
+      'pix': 'PIX',
+      'credit_card': 'Cartão de Crédito',
+      'debit_card': 'Cartão de Débito', 
+      'boleto': 'Boleto Bancário',
+      'cartao': 'Cartão',
+      'bank_transfer': 'Transferência Bancária'
+    };
+    return methodNames[method] || method;
+  }
 
   // Ledger Entries - Extrato da Conta Celcoin
   app.get('/api/admin/financial/ledger', async (req, res) => {

@@ -2568,6 +2568,49 @@ function FinancialManagement() {
                   </Card>
                 </div>
 
+                {/* Payment Methods Analysis */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Análise de Métodos de Pagamento</CardTitle>
+                    <CardDescription>Distribuição e performance dos métodos de pagamento (últimos 30 dias)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      {celcoinIntegration?.paymentMethods?.length ? (
+                        <div className="space-y-4">
+                          {celcoinIntegration.paymentMethods.map((method: any) => (
+                            <div key={method.method} className="flex items-center justify-between p-4 border rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                  <span className="text-blue-600 font-semibold text-sm">
+                                    {method.methodName.substring(0, 3).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="font-medium">{method.methodName}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {method.count} transações ({method.percentage}%)
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-medium">{formatCurrency(method.volume)}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  Taxa de sucesso: {method.successRate}%
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          Nenhum método de pagamento encontrado
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Configuration */}
                 <Card>
                   <CardHeader>
