@@ -136,9 +136,10 @@ interface CreateUserFormProps {
 
 interface NotificationFormProps {
   onClose: () => void;
+  tenants: any[];
 }
 
-function NotificationFormComponent({ onClose }: NotificationFormProps) {
+function NotificationFormComponent({ onClose, tenants }: NotificationFormProps) {
   const [notification, setNotification] = useState({
     title: '',
     message: '',
@@ -1549,7 +1550,10 @@ export default function AdminDashboard() {
                       <DialogHeader>
                         <DialogTitle>Enviar Informativo por E-mail</DialogTitle>
                       </DialogHeader>
-                      <NotificationFormComponent onClose={() => setIsCreateNotificationOpen(false)} />
+                      <NotificationFormComponent 
+                        onClose={() => setIsCreateNotificationOpen(false)} 
+                        tenants={tenants as any[]} 
+                      />
                     </DialogContent>
                   </Dialog>
                 </CardHeader>
