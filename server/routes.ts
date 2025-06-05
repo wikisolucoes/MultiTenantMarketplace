@@ -1896,12 +1896,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: row.id,
         email: row.email,
         fullName: row.full_name,
+        document: row.document,
+        documentType: row.document_type,
+        phone: row.phone,
         role: row.role,
         tenantId: row.tenant_id,
         tenantName: row.tenant_name,
+        profileImage: row.profile_image,
         isActive: row.is_active,
+        permissions: row.permissions,
         lastLoginAt: row.last_login_at,
-        createdAt: row.created_at
+        createdBy: row.created_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
       }));
 
       res.json(users);
