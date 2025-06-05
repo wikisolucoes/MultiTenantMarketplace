@@ -455,6 +455,482 @@ function PluginDetailsView({ plugin }: { plugin: any }) {
   );
 }
 
+// Subscription Management Component
+function SubscriptionManagement() {
+  const [activeSubTab, setActiveSubTab] = useState("plans");
+  const [isCreatePlanOpen, setIsCreatePlanOpen] = useState(false);
+  const [isEditPlanOpen, setIsEditPlanOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch plans and subscriptions
+  const { data: plans, isLoading: plansLoading } = useQuery({
+    queryKey: ["/api/admin/plugin-plans"],
+  });
+
+  const { data: subscriptions, isLoading: subscriptionsLoading } = useQuery({
+    queryKey: ["/api/admin/plugin-subscriptions"],
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Planos & Assinaturas</h2>
+          <p className="text-muted-foreground">Gerencie planos da plataforma e assinaturas ativas</p>
+        </div>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveSubTab('plans')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeSubTab === 'plans'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Planos Disponíveis
+          </button>
+          <button
+            onClick={() => setActiveSubTab('subscriptions')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeSubTab === 'subscriptions'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Assinaturas Ativas
+          </button>
+          <button
+            onClick={() => setActiveSubTab('analytics')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeSubTab === 'analytics'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            }`}
+          >
+            Analytics
+          </button>
+        </nav>
+      </div>
+
+      {/* Plans Tab */}
+      {activeSubTab === "plans" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Planos da Plataforma</h3>
+            <Button onClick={() => setIsCreatePlanOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Criar Novo Plano
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(plans as any[] || []).map((plan: any) => (
+              <Card key={plan.id} className="relative">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-xl">{plan.name}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedPlan(plan);
+                            setIsEditPlanOpen(true);
+                          }}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-red-600">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <p className="text-muted-foreground">{plan.description}</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-2xl font-bold text-green-600">R$ {plan.monthlyPrice}</p>
+                      <p className="text-sm text-muted-foreground">por mês</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-blue-600">R$ {plan.yearlyPrice}</p>
+                      <p className="text-sm text-muted-foreground">por ano</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Máximo de lojas:</span>
+                      <Badge variant="outline">{plan.maxTenants}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Status:</span>
+                      <Badge variant={plan.isActive ? "default" : "secondary"}>
+                        {plan.isActive ? "Ativo" : "Inativo"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {plan.features && Array.isArray(plan.features) && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Recursos inclusos:</p>
+                      <div className="space-y-1">
+                        {plan.features.slice(0, 3).map((feature: string, index: number) => (
+                          <div key={index} className="flex items-center gap-2 text-xs">
+                            <CheckCircle className="w-3 h-3 text-green-500" />
+                            <span>{feature}</span>
+                          </div>
+                        ))}
+                        {plan.features.length > 3 && (
+                          <p className="text-xs text-muted-foreground">
+                            +{plan.features.length - 3} recursos adicionais
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {(!plans || (plans as any[]).length === 0) && (
+            <div className="text-center py-12">
+              <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Nenhum plano encontrado</h3>
+              <p className="text-muted-foreground mb-4">Crie o primeiro plano da plataforma</p>
+              <Button onClick={() => setIsCreatePlanOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Criar Primeiro Plano
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Subscriptions Tab */}
+      {activeSubTab === "subscriptions" && (
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold">Assinaturas Ativas</h3>
+          
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 font-medium">Loja</th>
+                      <th className="text-left p-4 font-medium">Plano</th>
+                      <th className="text-left p-4 font-medium">Status</th>
+                      <th className="text-left p-4 font-medium">Ciclo</th>
+                      <th className="text-left p-4 font-medium">Próx. Cobrança</th>
+                      <th className="text-left p-4 font-medium">Valor</th>
+                      <th className="text-left p-4 font-medium">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(subscriptions as any[] || []).map((subscription: any) => (
+                      <tr key={subscription.id} className="border-b hover:bg-muted/50">
+                        <td className="p-4">
+                          <div>
+                            <p className="font-medium">{subscription.tenantName || 'N/A'}</p>
+                            <p className="text-sm text-muted-foreground">ID: {subscription.tenantId}</p>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant="outline">{subscription.planName || 'Individual'}</Badge>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
+                            {subscription.status}
+                          </Badge>
+                        </td>
+                        <td className="p-4">{subscription.billingCycle}</td>
+                        <td className="p-4">
+                          {subscription.nextBillingDate ? 
+                            new Date(subscription.nextBillingDate).toLocaleDateString('pt-BR') : 
+                            'N/A'
+                          }
+                        </td>
+                        <td className="p-4">R$ {subscription.currentPrice}</td>
+                        <td className="p-4">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver Detalhes
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-red-600">
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Cancelar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {(!subscriptions || (subscriptions as any[]).length === 0) && (
+                <div className="text-center py-12">
+                  <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Nenhuma assinatura encontrada</h3>
+                  <p className="text-muted-foreground">As assinaturas ativas aparecerão aqui</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Analytics Tab */}
+      {activeSubTab === "analytics" && (
+        <div className="space-y-6">
+          <h3 className="text-lg font-semibold">Analytics de Assinaturas</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">R$ 0,00</div>
+                <p className="text-xs text-muted-foreground">Receita recorrente</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Assinaturas Ativas</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{(subscriptions as any[] || []).length}</div>
+                <p className="text-xs text-muted-foreground">Total de assinantes</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Taxa de Retenção</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">0%</div>
+                <p className="text-xs text-muted-foreground">Últimos 30 dias</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Plano Popular</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">Básico</div>
+                <p className="text-xs text-muted-foreground">Mais assinado</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Create Plan Modal */}
+      <Dialog open={isCreatePlanOpen} onOpenChange={setIsCreatePlanOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Criar Novo Plano</DialogTitle>
+          </DialogHeader>
+          <PlanFormComponent onClose={() => setIsCreatePlanOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Plan Modal */}
+      <Dialog open={isEditPlanOpen} onOpenChange={setIsEditPlanOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Plano - {selectedPlan?.name}</DialogTitle>
+          </DialogHeader>
+          {selectedPlan && (
+            <PlanFormComponent 
+              plan={selectedPlan}
+              onClose={() => setIsEditPlanOpen(false)} 
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Plan Form Component
+function PlanFormComponent({ onClose, plan }: { onClose: () => void; plan?: any }) {
+  const [formData, setFormData] = useState({
+    name: plan?.name || '',
+    description: plan?.description || '',
+    monthlyPrice: plan?.monthlyPrice || '',
+    yearlyPrice: plan?.yearlyPrice || '',
+    maxTenants: plan?.maxTenants || 1,
+    features: plan?.features ? (Array.isArray(plan.features) ? plan.features.join('\n') : '') : '',
+    isActive: plan?.isActive ?? true
+  });
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (data: any) => {
+      const endpoint = plan ? `/api/admin/plugin-plans/${plan.id}` : '/api/admin/plugin-plans';
+      const method = plan ? 'PATCH' : 'POST';
+      return await apiRequest(method, endpoint, {
+        ...data,
+        features: data.features.split('\n').filter((f: string) => f.trim())
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugin-plans"] });
+      toast({
+        title: plan ? "Plano atualizado" : "Plano criado",
+        description: plan ? "Plano foi atualizado com sucesso." : "Plano foi criado com sucesso.",
+      });
+      onClose();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!formData.name || !formData.description || !formData.monthlyPrice) {
+      toast({
+        title: "Erro",
+        description: "Nome, descrição e preço mensal são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+    mutation.mutate(formData);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="name">Nome do Plano *</Label>
+          <Input
+            id="name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Plano Básico"
+          />
+        </div>
+        <div>
+          <Label htmlFor="maxTenants">Máximo de Lojas</Label>
+          <Input
+            id="maxTenants"
+            type="number"
+            value={formData.maxTenants}
+            onChange={(e) => setFormData({ ...formData, maxTenants: parseInt(e.target.value) || 1 })}
+            placeholder="1"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="description">Descrição *</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Descrição do plano..."
+          rows={3}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="monthlyPrice">Preço Mensal (R$) *</Label>
+          <Input
+            id="monthlyPrice"
+            value={formData.monthlyPrice}
+            onChange={(e) => setFormData({ ...formData, monthlyPrice: e.target.value })}
+            placeholder="29.90"
+          />
+        </div>
+        <div>
+          <Label htmlFor="yearlyPrice">Preço Anual (R$)</Label>
+          <Input
+            id="yearlyPrice"
+            value={formData.yearlyPrice}
+            onChange={(e) => setFormData({ ...formData, yearlyPrice: e.target.value })}
+            placeholder="299.00"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="features">Recursos (um por linha)</Label>
+        <Textarea
+          id="features"
+          value={formData.features}
+          onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+          placeholder="nfe-eletronica&#10;gateway-pagamento&#10;analytics-basico"
+          rows={4}
+        />
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Switch
+          checked={formData.isActive}
+          onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+        />
+        <Label>Plano ativo</Label>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button onClick={handleSubmit} disabled={mutation.isPending}>
+          {mutation.isPending ? "Salvando..." : (plan ? "Atualizar" : "Criar")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function NotificationFormComponent({ onClose, tenants }: NotificationFormProps) {
   const [notification, setNotification] = useState({
     title: '',
@@ -2129,6 +2605,13 @@ export default function AdminDashboard() {
                   )}
                 </DialogContent>
               </Dialog>
+            </div>
+          )}
+
+          {/* Subscriptions Tab */}
+          {activeTab === "subscriptions" && (
+            <div className="space-y-6">
+              <SubscriptionManagement />
             </div>
           )}
 
