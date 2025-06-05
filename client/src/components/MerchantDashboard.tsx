@@ -1035,6 +1035,11 @@ export default function MerchantDashboard() {
               </Card>
             )}
 
+            {/* Reports Management Section */}
+            {activeSection === "reports" && (
+              <ReportsManagement />
+            )}
+
             {/* Theme Management Section */}
             {activeSection === "themes" && (
               <ThemeManager 
