@@ -121,6 +121,7 @@ export default function AdminDashboard() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isCreateTenantOpen, setIsCreateTenantOpen] = useState(false);
   const [isEditTenantOpen, setIsEditTenantOpen] = useState(false);
+  const [isViewTenantOpen, setIsViewTenantOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
@@ -392,9 +393,25 @@ export default function AdminDashboard() {
                             <td className="p-4">{tenant.totalOrders}</td>
                             <td className="p-4">
                               <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="sm">
-                                  <Eye className="w-4 h-4" />
-                                </Button>
+                                <Dialog open={isViewTenantOpen && selectedTenant?.id === tenant.id} 
+                                       onOpenChange={(open) => {
+                                         setIsViewTenantOpen(open);
+                                         if (open) setSelectedTenant(tenant);
+                                       }}>
+                                  <DialogTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+                                    <DialogHeader>
+                                      <DialogTitle>Detalhes da Loja - {tenant.name}</DialogTitle>
+                                    </DialogHeader>
+                                    {selectedTenant && (
+                                      <TenantDetailsView tenant={selectedTenant} />
+                                    )}
+                                  </DialogContent>
+                                </Dialog>
                                 <Dialog open={isEditTenantOpen && selectedTenant?.id === tenant.id} 
                                        onOpenChange={(open) => {
                                          setIsEditTenantOpen(open);
@@ -621,6 +638,279 @@ export default function AdminDashboard() {
           
         </div>
       </main>
+    </div>
+  );
+}
+
+// Tenant Details View Component
+function TenantDetailsView({ tenant }: { tenant: Tenant }) {
+  const { data: tenantDetails } = useQuery({
+    queryKey: ['/api/admin/tenants', tenant.id, 'details'],
+  });
+
+  const { data: tenantOrders } = useQuery({
+    queryKey: ['/api/admin/tenants', tenant.id, 'orders'],
+  });
+
+  const { data: tenantProducts } = useQuery({
+    queryKey: ['/api/admin/tenants', tenant.id, 'products'],
+  });
+
+  // Mock data for demonstration - this would come from the API
+  const mockMetrics = {
+    totalRevenue: tenant.monthlyRevenue,
+    totalOrders: tenant.totalOrders,
+    activeProducts: 45,
+    customers: 156,
+    averageOrderValue: '120.50',
+    conversionRate: '3.2%',
+    lastActivity: new Date().toLocaleDateString('pt-BR')
+  };
+
+  const mockRecentOrders = [
+    { id: 1, customerName: 'João Silva', value: 'R$ 245,00', status: 'Entregue', date: '2024-06-01' },
+    { id: 2, customerName: 'Maria Santos', value: 'R$ 189,90', status: 'Processando', date: '2024-06-02' },
+    { id: 3, customerName: 'Pedro Costa', value: 'R$ 356,75', status: 'Enviado', date: '2024-06-03' }
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Store Header Info */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="w-5 h-5" />
+              Informações da Loja
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Nome</Label>
+                <p className="font-medium">{tenant.name}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Subdomínio</Label>
+                <p className="font-medium">{tenant.subdomain}.wikistore.com</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Categoria</Label>
+                <p className="font-medium">{tenant.category}</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Status</Label>
+                <Badge variant={tenant.status === 'active' ? 'default' : 'secondary'}>
+                  {tenant.status === 'active' ? 'Ativo' : 'Inativo'}
+                </Badge>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Pessoa de Contato</Label>
+                <p className="font-medium">{tenant.contactPerson}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4 text-muted-foreground" />
+                <span>{tenant.email}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-muted-foreground" />
+                <span>{tenant.phone}</span>
+              </div>
+              {tenant.cnpj && (
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-muted-foreground" />
+                  <span>CNPJ: {tenant.cnpj}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span>Criado em: {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5" />
+              Acesso Rápido
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <Button variant="outline" className="w-full justify-start" asChild>
+                <a href={`https://${tenant.subdomain}.wikistore.com`} target="_blank" rel="noopener noreferrer">
+                  <Globe className="w-4 h-4 mr-2" />
+                  Visitar Loja
+                </a>
+              </Button>
+              <Button variant="outline" className="w-full justify-start">
+                <Settings className="w-4 h-4 mr-2" />
+                Configurações da Loja
+              </Button>
+              <Button variant="outline" className="w-full justify-start">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Relatórios Detalhados
+              </Button>
+              <Button variant="outline" className="w-full justify-start">
+                <Package className="w-4 h-4 mr-2" />
+                Gerenciar Produtos
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-green-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Receita Mensal</p>
+                <p className="text-lg font-bold">{formatCurrency(mockMetrics.totalRevenue)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-blue-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Total de Pedidos</p>
+                <p className="text-lg font-bold">{mockMetrics.totalOrders}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Clientes</p>
+                <p className="text-lg font-bold">{mockMetrics.customers}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-orange-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Ticket Médio</p>
+                <p className="text-lg font-bold">R$ {mockMetrics.averageOrderValue}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Produtos Ativos</p>
+                <p className="text-2xl font-bold">{mockMetrics.activeProducts}</p>
+              </div>
+              <Package className="w-8 h-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
+                <p className="text-2xl font-bold">{mockMetrics.conversionRate}</p>
+              </div>
+              <TrendingUp className="w-8 h-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Última Atividade</p>
+                <p className="text-2xl font-bold text-sm">{mockMetrics.lastActivity}</p>
+              </div>
+              <Clock className="w-8 h-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Orders */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            Pedidos Recentes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {mockRecentOrders.map((order) => (
+              <div key={order.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <div>
+                    <p className="font-medium">{order.customerName}</p>
+                    <p className="text-sm text-muted-foreground">#{order.id} • {order.date}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium">{order.value}</p>
+                  <Badge variant={
+                    order.status === 'Entregue' ? 'default' :
+                    order.status === 'Enviado' ? 'secondary' : 'outline'
+                  }>
+                    {order.status}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4">
+            <Button variant="outline" className="w-full">
+              Ver Todos os Pedidos
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-3 pt-4 border-t">
+        <Button variant="outline">
+          <Download className="w-4 h-4 mr-2" />
+          Exportar Dados
+        </Button>
+        <Button variant="outline">
+          <Mail className="w-4 h-4 mr-2" />
+          Enviar Relatório
+        </Button>
+        <Button>
+          <Settings className="w-4 h-4 mr-2" />
+          Gerenciar Loja
+        </Button>
+      </div>
     </div>
   );
 }
