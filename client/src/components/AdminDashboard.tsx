@@ -56,7 +56,9 @@ import {
   MoreHorizontal,
   MoreVertical,
   Code,
-  User
+  User,
+  PlayCircle,
+  PauseCircle
 } from "lucide-react";
 
 interface AdminStats {
@@ -497,6 +499,29 @@ function SubscriptionManagement() {
     }
   };
 
+  // Toggle plan status function
+  const togglePlanStatus = async (planId: number, newStatus: boolean) => {
+    try {
+      await apiRequest('PATCH', `/api/admin/plugin-plans/${planId}/toggle-status`, {
+        isActive: newStatus
+      });
+      
+      toast({
+        title: "Status Atualizado",
+        description: `Plano ${newStatus ? 'ativado' : 'desativado'} com sucesso`,
+      });
+      
+      // Refresh plans
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugin-plans"] });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao Atualizar Status",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -589,11 +614,15 @@ function SubscriptionManagement() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-2xl font-bold text-green-600">R$ {plan.monthlyPrice}</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        R$ {Number(plan.monthly_price || 0).toFixed(2)}
+                      </p>
                       <p className="text-sm text-muted-foreground">por mês</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-semibold text-blue-600">R$ {plan.yearlyPrice}</p>
+                      <p className="text-lg font-semibold text-blue-600">
+                        R$ {Number(plan.yearly_price || 0).toFixed(2)}
+                      </p>
                       <p className="text-sm text-muted-foreground">por ano</p>
                     </div>
                   </div>
@@ -601,13 +630,17 @@ function SubscriptionManagement() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span>Máximo de lojas:</span>
-                      <Badge variant="outline">{plan.maxTenants}</Badge>
+                      <Badge variant="outline">{plan.max_tenants}</Badge>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span>Status:</span>
-                      <Badge variant={plan.isActive ? "default" : "secondary"}>
-                        {plan.isActive ? "Ativo" : "Inativo"}
+                      <Badge variant={plan.is_active ? "default" : "secondary"}>
+                        {plan.is_active ? "Ativo" : "Inativo"}
                       </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Assinaturas ativas:</span>
+                      <Badge variant="outline">{plan.activeSubscriptions || 0}</Badge>
                     </div>
                   </div>
 
@@ -647,6 +680,27 @@ function SubscriptionManagement() {
                       </div>
                     </div>
                   )}
+
+                  <div className="pt-4 border-t">
+                    <Button
+                      onClick={() => togglePlanStatus(plan.id, !plan.is_active)}
+                      variant={plan.is_active ? "outline" : "default"}
+                      size="sm"
+                      className="w-full"
+                    >
+                      {plan.is_active ? (
+                        <>
+                          <PauseCircle className="w-4 h-4 mr-2" />
+                          Desativar Plano
+                        </>
+                      ) : (
+                        <>
+                          <PlayCircle className="w-4 h-4 mr-2" />
+                          Ativar Plano
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
