@@ -11,6 +11,7 @@ import {
   foreignKey,
   date,
   bigint,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -701,6 +702,22 @@ export const pluginUsageRelations = relations(pluginUsage, ({ one }) => ({
   plugin: one(plugins, { fields: [pluginUsage.pluginId], references: [plugins.id] }),
 }));
 
+// Plan-Plugin relationships
+export const planPlugins = pgTable("plan_plugins", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id").references(() => pluginPlans.id).notNull(),
+  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
+  isRequired: boolean("is_required").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniquePlanPlugin: unique().on(table.planId, table.pluginId),
+}));
+
+export const planPluginsRelations = relations(planPlugins, ({ one }) => ({
+  plan: one(pluginPlans, { fields: [planPlugins.planId], references: [pluginPlans.id] }),
+  plugin: one(plugins, { fields: [planPlugins.pluginId], references: [plugins.id] }),
+}));
+
 // Zod schemas for validation
 export const insertTenantSchema = createInsertSchema(tenants).omit({
   id: true,
@@ -746,6 +763,11 @@ export const insertProductPromotionSchema = createInsertSchema(productPromotions
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertPlanPluginSchema = createInsertSchema(planPlugins).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertBulkPricingRuleSchema = createInsertSchema(bulkPricingRules).omit({

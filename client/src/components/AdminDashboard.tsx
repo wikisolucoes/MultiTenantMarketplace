@@ -801,10 +801,16 @@ function PlanFormComponent({ onClose, plan }: { onClose: () => void; plan?: any 
     yearlyPrice: plan?.yearlyPrice || '',
     maxTenants: plan?.maxTenants || 1,
     features: plan?.features ? (Array.isArray(plan.features) ? plan.features.join('\n') : '') : '',
-    isActive: plan?.isActive ?? true
+    isActive: plan?.isActive ?? true,
+    selectedPlugins: plan?.plugins || []
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch available plugins
+  const { data: plugins } = useQuery({
+    queryKey: ["/api/admin/plugins"],
+  });
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {
@@ -812,7 +818,8 @@ function PlanFormComponent({ onClose, plan }: { onClose: () => void; plan?: any 
       const method = plan ? 'PATCH' : 'POST';
       return await apiRequest(method, endpoint, {
         ...data,
-        features: data.features.split('\n').filter((f: string) => f.trim())
+        features: data.features.split('\n').filter((f: string) => f.trim()),
+        selectedPlugins: data.selectedPlugins
       });
     },
     onSuccess: () => {
@@ -909,6 +916,46 @@ function PlanFormComponent({ onClose, plan }: { onClose: () => void; plan?: any 
           placeholder="nfe-eletronica&#10;gateway-pagamento&#10;analytics-basico"
           rows={4}
         />
+      </div>
+
+      <div>
+        <Label htmlFor="plugins">Plugins Inclusos no Plano</Label>
+        <div className="border rounded-lg p-4 max-h-48 overflow-y-auto space-y-2">
+          {(plugins as any[] || []).map((plugin: any) => (
+            <div key={plugin.id} className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id={`plugin-${plugin.id}`}
+                checked={formData.selectedPlugins.includes(plugin.id)}
+                onChange={(e) => {
+                  const isChecked = e.target.checked;
+                  setFormData({
+                    ...formData,
+                    selectedPlugins: isChecked
+                      ? [...formData.selectedPlugins, plugin.id]
+                      : formData.selectedPlugins.filter((id: number) => id !== plugin.id)
+                  });
+                }}
+                className="rounded"
+              />
+              <Label htmlFor={`plugin-${plugin.id}`} className="flex items-center gap-2 cursor-pointer">
+                <span className="text-2xl">{plugin.icon}</span>
+                <div>
+                  <span className="font-medium">{plugin.displayName}</span>
+                  <p className="text-sm text-muted-foreground">{plugin.description}</p>
+                </div>
+              </Label>
+            </div>
+          ))}
+          {(!plugins || (plugins as any[]).length === 0) && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhum plugin disponível
+            </p>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Plugins selecionados serão ativados automaticamente quando um lojista contratar este plano
+        </p>
       </div>
 
       <div className="flex items-center space-x-2">
