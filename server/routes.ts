@@ -2294,13 +2294,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const plugins = result.rows.map((row: any) => ({
         id: row.id,
         name: row.name,
+        displayName: row.name,
         description: row.description,
         version: "1.0.0",
         isActive: row.is_active,
         installations: row.installations || 0,
         category: row.category,
+        icon: row.icon,
+        slug: row.slug,
         developer: "WikiStore Team",
-        price: row.price || (row.monthly_price > 0 ? `R$ ${row.monthly_price}/mês` : "Gratuito"),
+        price: row.price,
+        monthlyPrice: row.monthly_price,
+        yearlyPrice: row.yearly_price,
+        features: row.features ? JSON.parse(row.features) : [],
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }));
