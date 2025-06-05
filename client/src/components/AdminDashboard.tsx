@@ -2537,6 +2537,187 @@ function FinancialManagement() {
         </div>
       )}
 
+      {/* Ledger - Extrato Celcoin */}
+      {activeFinancialTab === 'ledger' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Extrato da Conta Celcoin</CardTitle>
+              <CardDescription>Visualize todas as movimentações financeiras dos lojistas na conta Celcoin</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Summary Cards */}
+                {ledgerLoading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium">Total de Créditos</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-green-600">
+                            {formatCurrency(ledgerData?.summary?.totalCredits || 0)}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium">Total de Débitos</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-red-600">
+                            {formatCurrency(ledgerData?.summary?.totalDebits || 0)}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium">Saldo Líquido</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className={`text-2xl font-bold ${
+                            (ledgerData?.summary?.netBalance || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {formatCurrency(ledgerData?.summary?.netBalance || 0)}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium">Total de Transações</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-blue-600">
+                            {ledgerData?.summary?.transactionCount || 0}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="flex gap-4 flex-wrap">
+                      <Select defaultValue="all">
+                        <SelectTrigger className="w-48">
+                          <SelectValue placeholder="Filtrar por Loja" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas as Lojas</SelectItem>
+                          <SelectItem value="1">Loja Demo</SelectItem>
+                          <SelectItem value="2">Shopping das Makess</SelectItem>
+                          <SelectItem value="5">Boutique Virtual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select defaultValue="all">
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="credit">Créditos</SelectItem>
+                          <SelectItem value="debit">Débitos</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm">
+                          Exportar CSV
+                        </Button>
+                        <Button variant="outline" size="sm">
+                          Filtros Avançados
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Ledger Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-4">Data/Hora</th>
+                            <th className="text-left p-4">Loja</th>
+                            <th className="text-left p-4">Tipo</th>
+                            <th className="text-left p-4">Descrição</th>
+                            <th className="text-left p-4">Valor</th>
+                            <th className="text-left p-4">Saldo</th>
+                            <th className="text-left p-4">Ref. Celcoin</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ledgerData?.entries?.length ? (
+                            ledgerData.entries.map((entry: any) => (
+                              <tr key={entry.id} className="border-b hover:bg-gray-50">
+                                <td className="p-4 text-sm">
+                                  {new Date(entry.createdAt).toLocaleString('pt-BR')}
+                                </td>
+                                <td className="p-4">
+                                  <div className="font-medium">{entry.tenantName}</div>
+                                  <div className="text-sm text-muted-foreground">ID: {entry.tenantId}</div>
+                                </td>
+                                <td className="p-4">
+                                  <Badge className={
+                                    entry.transactionType === 'credit' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-red-100 text-red-800'
+                                  }>
+                                    {entry.transactionType === 'credit' ? 'Crédito' : 'Débito'}
+                                  </Badge>
+                                </td>
+                                <td className="p-4">
+                                  <div className="font-medium">{entry.description}</div>
+                                  {entry.referenceType && (
+                                    <div className="text-sm text-muted-foreground">
+                                      {entry.referenceType}: {entry.referenceId}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-4">
+                                  <span className={`font-medium ${
+                                    entry.transactionType === 'credit' ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {entry.transactionType === 'credit' ? '+' : '-'}{formatCurrency(entry.amount)}
+                                  </span>
+                                </td>
+                                <td className="p-4 font-mono text-sm">
+                                  {formatCurrency(entry.runningBalance)}
+                                </td>
+                                <td className="p-4">
+                                  {entry.celcoinTransactionId ? (
+                                    <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                                      {entry.celcoinTransactionId}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                                Nenhuma movimentação encontrada
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Payment Methods */}
       {activeFinancialTab === 'payments' && (
         <div className="space-y-6">
