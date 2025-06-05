@@ -1632,6 +1632,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Cancel plugin subscription
+  app.patch("/api/admin/plugin-subscriptions/:id/cancel", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      // Update subscription
+      const result = await db.execute(sql`
+        UPDATE plugin_subscriptions 
+        SET status = 'cancelled', cancelled_at = NOW(), auto_renew = false,
+            notes = COALESCE(notes, '') || ${reason ? `\nCancellation reason: ${reason}` : '\nCancelled by admin'}
+        WHERE id = ${parseInt(id)} AND status = 'active'
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Active subscription not found" });
+      }
+
+      // Record in history
+      await db.execute(sql`
+        INSERT INTO plugin_subscription_history (
+          subscription_id, action, description
+        ) VALUES (
+          ${parseInt(id)}, 'cancelled', 
+          ${reason || 'Subscription cancelled by admin'}
+        )
+      `);
+
+      res.json({ 
+        message: "Subscription cancelled successfully",
+        subscription: result.rows[0]
+      });
+    } catch (error) {
+      console.error("Error cancelling subscription:", error);
+      res.status(500).json({ message: "Failed to cancel subscription" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   // WebSocket Server for real-time notifications

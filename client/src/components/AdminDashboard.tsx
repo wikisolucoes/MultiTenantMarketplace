@@ -811,16 +811,19 @@ function SubscriptionManagement() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewSubscription(subscription)}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver Detalhes
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditSubscription(subscription)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600">
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={() => handleCancelSubscription(subscription)}
+                              >
                                 <XCircle className="mr-2 h-4 w-4" />
                                 Cancelar
                               </DropdownMenuItem>
@@ -1922,6 +1925,11 @@ export default function AdminDashboard() {
   const [pluginStatusFilter, setPluginStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // Subscription management states
+  const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
+  const [isViewSubscriptionOpen, setIsViewSubscriptionOpen] = useState(false);
+  const [isEditSubscriptionOpen, setIsEditSubscriptionOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -1948,6 +1956,44 @@ export default function AdminDashboard() {
 
   const togglePluginStatus = (pluginId: number, isActive: boolean) => {
     togglePluginMutation.mutate({ pluginId, isActive });
+  };
+
+  // Subscription management mutations
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async (subscriptionId: number) => {
+      return await apiRequest("PATCH", `/api/admin/plugin-subscriptions/${subscriptionId}/cancel`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugin-subscriptions"] });
+      toast({
+        title: "Assinatura cancelada",
+        description: "A assinatura foi cancelada com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao cancelar assinatura",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Subscription handlers
+  const handleViewSubscription = (subscription: any) => {
+    setSelectedSubscription(subscription);
+    setIsViewSubscriptionOpen(true);
+  };
+
+  const handleEditSubscription = (subscription: any) => {
+    setSelectedSubscription(subscription);
+    setIsEditSubscriptionOpen(true);
+  };
+
+  const handleCancelSubscription = (subscription: any) => {
+    if (confirm(`Tem certeza que deseja cancelar a assinatura de ${subscription.tenant_name}?`)) {
+      cancelSubscriptionMutation.mutate(subscription.id);
+    }
   };
 
   // Fetch current user data
