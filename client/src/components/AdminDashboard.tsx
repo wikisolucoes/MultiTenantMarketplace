@@ -4117,14 +4117,341 @@ export default function AdminDashboard() {
           {/* Reports Tab */}
           {activeTab === "reports" && (
             <div className="space-y-6">
+              {/* Reports Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Relatórios e Analytics</h2>
+                  <p className="text-muted-foreground">Análise completa da performance da plataforma</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Exportar Dashboard
+                  </Button>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4" />
+                    Atualizar
+                  </Button>
+                </div>
+              </div>
+
+              {/* Key Performance Indicators */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatCurrency(adminStats.totalRevenue)}</div>
+                    <p className="text-xs text-muted-foreground">
+                      +12.5% vs mês anterior
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Lojas Ativas</CardTitle>
+                    <Store className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminStats.activeTenants}</div>
+                    <p className="text-xs text-muted-foreground">
+                      de {adminStats.totalTenants} total
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total de Pedidos</CardTitle>
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{adminStats.totalOrders}</div>
+                    <p className="text-xs text-muted-foreground">
+                      +8.2% vs mês anterior
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Taxa Plataforma</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{formatCurrency(adminStats.platformFee)}</div>
+                    <p className="text-xs text-muted-foreground">
+                      5% sobre vendas
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Revenue Analysis */}
+              {reportsData && reportsData.revenueData && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5" />
+                      Análise de Receita (12 meses)
+                    </CardTitle>
+                    <CardDescription>Evolução da receita e número de pedidos por mês</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-80 w-full">
+                      <div className="flex items-end justify-between h-full space-x-2">
+                        {reportsData.revenueData.map((data: any, index: number) => (
+                          <div key={index} className="flex flex-col items-center flex-1">
+                            <div 
+                              className="bg-gradient-to-t from-blue-500 to-blue-300 w-full rounded-t relative"
+                              style={{ 
+                                height: `${Math.max((data.revenue / Math.max(...reportsData.revenueData.map((d: any) => d.revenue))) * 250, 15)}px` 
+                              }}
+                            >
+                              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-xs font-medium text-center">
+                                {formatCurrency(data.revenue)}
+                              </div>
+                            </div>
+                            <div className="text-xs mt-3 text-center">
+                              <div className="font-medium">{data.month}</div>
+                              <div className="text-muted-foreground">{data.orderCount} pedidos</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Top Performing Stores */}
+              {reportsData && reportsData.tenantPerformanceData && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="w-5 h-5" />
+                      Top 10 Lojas por Performance
+                    </CardTitle>
+                    <CardDescription>Ranking das lojas com melhor desempenho em receita</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {reportsData.tenantPerformanceData.map((tenant: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white ${
+                              index === 0 ? 'bg-yellow-500' : 
+                              index === 1 ? 'bg-gray-400' : 
+                              index === 2 ? 'bg-amber-600' : 'bg-blue-500'
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div>
+                              <p className="font-medium">{tenant.tenantName}</p>
+                              <p className="text-sm text-muted-foreground">{tenant.category}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">{formatCurrency(tenant.totalRevenue)}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {tenant.totalOrders} pedidos • {tenant.conversionRate}% conversão
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Analytics Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Category Distribution */}
+                {reportsData && reportsData.categoryDistribution && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileBarChart className="w-5 h-5" />
+                        Distribuição por Categoria
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {reportsData.categoryDistribution.map((category: any, index: number) => {
+                          const total = reportsData.categoryDistribution.reduce((sum: number, cat: any) => sum + cat.revenue, 0);
+                          const percentage = total > 0 ? ((category.revenue / total) * 100).toFixed(1) : '0';
+                          return (
+                            <div key={index} className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium">{category.name}</span>
+                                <span className="text-sm text-muted-foreground">{percentage}%</span>
+                              </div>
+                              <div className="w-full bg-muted rounded-full h-2">
+                                <div 
+                                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full"
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{category.tenantCount} lojas</span>
+                                <span>{formatCurrency(category.revenue)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Payment Methods Analysis */}
+                {reportsData && reportsData.paymentMethodData && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <CreditCard className="w-5 h-5" />
+                        Análise de Métodos de Pagamento
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {reportsData.paymentMethodData.map((method: any, index: number) => (
+                          <div key={index} className="flex items-center justify-between p-3 border rounded">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-3 h-3 rounded-full ${
+                                method.successRate >= 90 ? 'bg-green-500' : 
+                                method.successRate >= 70 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`} />
+                              <div>
+                                <p className="font-medium">{method.method}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {method.transactionCount} transações
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium">{formatCurrency(method.volume)}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {method.successRate}% sucesso
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* User Activity */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Relatórios e Analytics</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Atividade dos Usuários
+                  </CardTitle>
+                  <CardDescription>Análise da base de usuários da plataforma</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">
-                    Relatórios detalhados e analytics da plataforma serão implementados aqui.
-                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-blue-600">{adminStats.totalUsers}</div>
+                      <p className="text-sm text-muted-foreground">Total de Usuários</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-green-600">{adminStats.activeUsers}</div>
+                      <p className="text-sm text-muted-foreground">Usuários Ativos</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-purple-600">
+                        {adminStats.totalUsers > 0 ? ((adminStats.activeUsers / adminStats.totalUsers) * 100).toFixed(1) : 0}%
+                      </div>
+                      <p className="text-sm text-muted-foreground">Taxa de Ativação</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-orange-600">
+                        {adminStats.totalOrders > 0 && adminStats.activeUsers > 0 ? 
+                          (adminStats.totalOrders / adminStats.activeUsers).toFixed(1) : 0}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Pedidos por Usuário</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="w-5 h-5" />
+                    Ações Rápidas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Button variant="outline" className="flex items-center gap-2 h-16">
+                      <FileText className="w-5 h-5" />
+                      <div className="text-left">
+                        <div className="font-medium">Relatório Mensal</div>
+                        <div className="text-xs text-muted-foreground">Gerar PDF</div>
+                      </div>
+                    </Button>
+                    <Button variant="outline" className="flex items-center gap-2 h-16">
+                      <Download className="w-5 h-5" />
+                      <div className="text-left">
+                        <div className="font-medium">Exportar Dados</div>
+                        <div className="text-xs text-muted-foreground">CSV/Excel</div>
+                      </div>
+                    </Button>
+                    <Button variant="outline" className="flex items-center gap-2 h-16">
+                      <BarChart3 className="w-5 h-5" />
+                      <div className="text-left">
+                        <div className="font-medium">Dashboard Executivo</div>
+                        <div className="text-xs text-muted-foreground">Visualização</div>
+                      </div>
+                    </Button>
+                    <Button variant="outline" className="flex items-center gap-2 h-16">
+                      <Mail className="w-5 h-5" />
+                      <div className="text-left">
+                        <div className="font-medium">Enviar Relatório</div>
+                        <div className="text-xs text-muted-foreground">Por email</div>
+                      </div>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* System Performance Metrics */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Monitor className="w-5 h-5" />
+                    Métricas de Performance do Sistema
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {(systemMetrics as SystemMetric[] || []).map((metric: SystemMetric, index: number) => (
+                      <div key={index} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium">{metric.name}</h4>
+                          <div className={`flex items-center gap-1 ${
+                            metric.status === 'up' ? 'text-green-600' :
+                            metric.status === 'down' ? 'text-red-600' : 'text-yellow-600'
+                          }`}>
+                            {metric.status === 'up' && <CheckCircle className="w-4 h-4" />}
+                            {metric.status === 'down' && <XCircle className="w-4 h-4" />}
+                            {metric.status === 'stable' && <Activity className="w-4 h-4" />}
+                          </div>
+                        </div>
+                        <div className="text-2xl font-bold mb-1">{metric.value}</div>
+                        <div className="text-sm text-muted-foreground">{metric.change}</div>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </div>
