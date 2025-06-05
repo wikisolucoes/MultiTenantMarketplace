@@ -811,18 +811,28 @@ function SubscriptionManagement() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleViewSubscription(subscription)}>
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedSubscription(subscription);
+                                setIsViewSubscriptionOpen(true);
+                              }}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver Detalhes
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEditSubscription(subscription)}>
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedSubscription(subscription);
+                                setIsEditSubscriptionOpen(true);
+                              }}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 className="text-red-600"
-                                onClick={() => handleCancelSubscription(subscription)}
+                                onClick={() => {
+                                  if (confirm(`Tem certeza que deseja cancelar a assinatura de ${subscription.tenant_name}?`)) {
+                                    cancelSubscriptionMutation.mutate(subscription.id);
+                                  }
+                                }}
                               >
                                 <XCircle className="mr-2 h-4 w-4" />
                                 Cancelar
