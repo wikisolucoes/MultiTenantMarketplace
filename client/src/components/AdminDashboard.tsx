@@ -649,7 +649,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
   });
 
   // Use real data from API or fallback to tenant data
-  const metrics = tenantDetails?.metrics || {
+  const metrics = (tenantDetails as any)?.metrics || {
     totalRevenue: tenant.monthlyRevenue || '0.00',
     monthlyRevenue: tenant.monthlyRevenue || '0.00',
     totalOrders: tenant.totalOrders || 0,
@@ -660,7 +660,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
     lastActivity: new Date().toLocaleDateString('pt-BR')
   };
 
-  const recentOrders = tenantDetails?.recentOrders || [];
+  const recentOrders = (tenantDetails as any)?.recentOrders || [];
 
   return (
     <div className="space-y-6">
@@ -814,7 +814,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Produtos Ativos</p>
-                <p className="text-2xl font-bold">{mockMetrics.activeProducts}</p>
+                <p className="text-2xl font-bold">{metrics.activeProducts}</p>
               </div>
               <Package className="w-8 h-8 text-muted-foreground" />
             </div>
@@ -826,7 +826,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
-                <p className="text-2xl font-bold">{mockMetrics.conversionRate}</p>
+                <p className="text-2xl font-bold">{metrics.conversionRate}</p>
               </div>
               <TrendingUp className="w-8 h-8 text-muted-foreground" />
             </div>
@@ -838,7 +838,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Última Atividade</p>
-                <p className="text-2xl font-bold text-sm">{mockMetrics.lastActivity}</p>
+                <p className="text-2xl font-bold text-sm">{new Date(metrics.lastActivity).toLocaleDateString('pt-BR')}</p>
               </div>
               <Clock className="w-8 h-8 text-muted-foreground" />
             </div>
@@ -856,7 +856,7 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {mockRecentOrders.map((order) => (
+            {recentOrders.length > 0 ? recentOrders.map((order: any) => (
               <div key={order.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -875,7 +875,12 @@ function TenantDetailsView({ tenant }: { tenant: Tenant }) {
                   </Badge>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="text-center p-6 text-muted-foreground">
+                <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum pedido encontrado para esta loja</p>
+              </div>
+            )}
           </div>
           <div className="mt-4">
             <Button variant="outline" className="w-full">
