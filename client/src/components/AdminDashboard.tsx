@@ -463,6 +463,12 @@ function SubscriptionManagement() {
   const [isCreatePlanOpen, setIsCreatePlanOpen] = useState(false);
   const [isEditPlanOpen, setIsEditPlanOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
+  
+  // Subscription management states
+  const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
+  const [isViewSubscriptionOpen, setIsViewSubscriptionOpen] = useState(false);
+  const [isEditSubscriptionOpen, setIsEditSubscriptionOpen] = useState(false);
+  
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -474,6 +480,53 @@ function SubscriptionManagement() {
   const { data: subscriptions, isLoading: subscriptionsLoading } = useQuery({
     queryKey: ["/api/admin/plugin-subscriptions"],
   });
+
+  // Subscription management mutations
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async (subscriptionId: number) => {
+      return await apiRequest("PATCH", `/api/admin/plugin-subscriptions/${subscriptionId}/cancel`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugin-subscriptions"] });
+      toast({
+        title: "Assinatura cancelada",
+        description: "A assinatura foi cancelada com sucesso.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao cancelar assinatura",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update subscription mutation
+  const updateSubscriptionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("PATCH", `/api/admin/plugin-subscriptions/${data.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/plugin-subscriptions"] });
+      toast({
+        title: "Assinatura atualizada",
+        description: "As alterações foram salvas com sucesso.",
+      });
+      setIsEditSubscriptionOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao atualizar assinatura",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleUpdateSubscription = (updatedSubscription: any) => {
+    updateSubscriptionMutation.mutate(updatedSubscription);
+  };
 
   // Test plan activation function
   const testPlanActivation = async () => {
@@ -937,6 +990,21 @@ function SubscriptionManagement() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Subscription Details Modal */}
+      <SubscriptionDetailsModal 
+        subscription={selectedSubscription}
+        isOpen={isViewSubscriptionOpen}
+        onClose={() => setIsViewSubscriptionOpen(false)}
+      />
+
+      {/* Edit Subscription Modal */}
+      <EditSubscriptionModal 
+        subscription={selectedSubscription}
+        isOpen={isEditSubscriptionOpen}
+        onClose={() => setIsEditSubscriptionOpen(false)}
+        onSave={handleUpdateSubscription}
+      />
     </div>
   );
 }
