@@ -1671,13 +1671,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get comprehensive platform statistics
       const totalTenantsResult = await db.execute(sql`SELECT COUNT(*) as count FROM tenants`);
-      const activeTenantsResult = await db.execute(sql`SELECT COUNT(*) as count FROM tenants WHERE is_active = true`);
+      const activeTenantsResult = await db.execute(sql`SELECT COUNT(*) as count FROM tenants WHERE status = 'active'`);
       const totalUsersResult = await db.execute(sql`SELECT COUNT(*) as count FROM users`);
       const activeUsersResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE is_active = true`);
       const totalOrdersResult = await db.execute(sql`SELECT COUNT(*) as count FROM orders`);
-      const totalRevenueResult = await db.execute(sql`SELECT COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0) as total FROM orders WHERE status = 'completed'`);
+      const totalRevenueResult = await db.execute(sql`SELECT COALESCE(SUM(CAST(total AS DECIMAL)), 0) as total FROM orders WHERE status = 'completed'`);
       const monthlyRevenueResult = await db.execute(sql`
-        SELECT COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0) as total 
+        SELECT COALESCE(SUM(CAST(total AS DECIMAL)), 0) as total 
         FROM orders 
         WHERE status = 'completed' 
         AND created_at >= DATE_TRUNC('month', CURRENT_DATE)
@@ -1719,7 +1719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         LEFT JOIN (
           SELECT 
             tenant_id,
-            SUM(CAST(total_amount AS DECIMAL)) as monthly_revenue,
+            SUM(CAST(total AS DECIMAL)) as monthly_revenue,
             COUNT(*) as total_orders
           FROM orders 
           WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
@@ -1732,7 +1732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: row.id,
         name: row.name,
         subdomain: row.subdomain,
-        status: row.is_active ? 'active' : 'inactive',
+        status: row.status || 'active',
         category: row.category || 'retail',
         monthlyRevenue: row.monthly_revenue || '0',
         totalOrders: parseInt(row.total_orders) || 0,
@@ -1753,25 +1753,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/tenants", async (req, res) => {
     try {
       const tenantData = req.body;
-      const tenant = await storage.createTenant({
-        name: tenantData.name,
-        subdomain: tenantData.subdomain,
-        category: tenantData.category,
-        cnpj: tenantData.cnpj,
-        corporateName: tenantData.name,
-        fantasyName: tenantData.name,
-        description: `Loja ${tenantData.name}`,
-        address: 'Endereço a ser definido',
-        city: 'São Paulo',
-        state: 'SP',
-        zipCode: '00000-000',
-        phone: tenantData.phone,
-        email: tenantData.email,
-        contactPerson: tenantData.contactPerson,
-        status: tenantData.status
-      });
+      
+      const result = await db.execute(sql`
+        INSERT INTO tenants (
+          name, subdomain, category, cnpj, corporate_name, fantasy_name,
+          description, address, city, state, zip_code, phone, email, 
+          contact_person, status, created_at, updated_at
+        ) VALUES (
+          ${tenantData.name}, ${tenantData.subdomain}, ${tenantData.category}, 
+          ${tenantData.cnpj}, ${tenantData.name}, ${tenantData.name},
+          ${'Loja ' + tenantData.name}, ${'Endereço a ser definido'}, ${'São Paulo'}, 
+          ${'SP'}, ${'00000-000'}, ${tenantData.phone}, ${tenantData.email},
+          ${tenantData.contactPerson}, ${tenantData.status}, NOW(), NOW()
+        ) RETURNING *
+      `);
 
-      res.json(tenant);
+      res.json(result.rows[0]);
     } catch (error) {
       console.error("Error creating tenant:", error);
       res.status(500).json({ message: "Failed to create tenant" });
@@ -1997,7 +1994,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const revenueResult = await db.execute(sql`
         SELECT 
           TO_CHAR(DATE_TRUNC('month', created_at), 'Mon') as month,
-          SUM(CAST(total_amount AS DECIMAL)) as revenue
+          SUM(CAST(total AS DECIMAL)) as revenue
         FROM orders 
         WHERE status = 'completed' 
         AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '11 months')
@@ -2021,7 +2018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           category as name,
           COUNT(*) as count,
-          COALESCE(SUM(CAST(o.total_amount AS DECIMAL)), 0) as revenue
+          COALESCE(SUM(CAST(o.total AS DECIMAL)), 0) as revenue
         FROM tenants t
         LEFT JOIN orders o ON t.id = o.tenant_id AND o.status = 'completed'
         GROUP BY t.category
