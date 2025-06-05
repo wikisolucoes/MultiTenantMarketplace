@@ -25,7 +25,8 @@ import {
   Puzzle,
   Activity,
   Mail,
-  CreditCard
+  CreditCard,
+  DollarSign
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -46,6 +47,7 @@ const navigationItems = [
   { id: "users", label: "Usuários", icon: Users },
   { id: "plugins", label: "Plugins", icon: Puzzle },
   { id: "subscriptions", label: "Planos & Assinaturas", icon: CreditCard },
+  { id: "financial", label: "Financeiro", icon: DollarSign },
   { id: "communications", label: "Comunicação", icon: Mail },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "system", label: "Sistema", icon: Activity },

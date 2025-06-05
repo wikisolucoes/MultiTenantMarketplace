@@ -3078,6 +3078,13 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* Financial Tab */}
+          {activeTab === "financial" && (
+            <div className="space-y-6">
+              <FinancialManagement />
+            </div>
+          )}
+
           {/* Settings Tab */}
           {activeTab === "settings" && (
             <div className="space-y-6">
