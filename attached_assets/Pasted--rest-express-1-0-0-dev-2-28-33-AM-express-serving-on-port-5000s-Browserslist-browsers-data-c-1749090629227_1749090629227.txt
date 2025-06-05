@@ -1,0 +1,60 @@
+> rest-express@1.0.0 dev
+2:28:33 AM [express] serving on port 5000s
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+2:29:35 AM [express] POST /api/login 200 in 3915ms :: {"user":{"id":2,"email":"joao@exemplo.com","fu…
+2:29:40 AM [express] GET /api/tenant/withdrawals 304 in 1ms :: []
+Error calculating financial stats: error: column "subtotal" does not exist
+    at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345:74
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async NeonPreparedQuery.execute (/home/runner/workspace/node_modules/src/neon-serverless/session.ts:102:18)
+    at async DatabaseStorage.getOrdersByTenantId (/home/runner/workspace/server/storage.ts:433:12)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:385:22) {
+  length: 168,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: 'Perhaps you meant to reference the column "orders.total".',
+  position: '186',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3729',
+  routine: 'errorMissingColumn'
+}
+2:29:40 AM [express] GET /api/tenant/financial-stats 500 in 80ms :: {"message":"Failed to fetch fina…
+Error fetching tenant orders: error: column "subtotal" does not exist
+    at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345:74
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async NeonPreparedQuery.execute (/home/runner/workspace/node_modules/src/neon-serverless/session.ts:102:18)
+    at async DatabaseStorage.getOrdersByTenantId (/home/runner/workspace/server/storage.ts:433:12)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:540:20) {
+  length: 168,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: 'Perhaps you meant to reference the column "orders.total".',
+  position: '186',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_relation.c',
+  line: '3729',
+  routine: 'errorMissingColumn'
+}
+2:29:42 AM [express] GET /api/tenant/orders 500 in 2254ms :: {"message":"Failed to fetch orders"}
+2:29:42 AM [express] GET /api/tenant/products 304 in 2295ms :: [{"id":24,"tenantId":5,"name":"Tênis …

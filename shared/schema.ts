@@ -413,7 +413,6 @@ export const orders = pgTable("orders", {
   customerState: text("customer_state"),
   customerZipCode: text("customer_zip_code"),
   total: decimal("total", { precision: 10, scale: 2 }),
-  subtotal: decimal("subtotal", { precision: 10, scale: 2 }),
   taxTotal: decimal("tax_total", { precision: 10, scale: 2 }),
   shippingTotal: decimal("shipping_total", { precision: 10, scale: 2 }),
   discountTotal: decimal("discount_total", { precision: 10, scale: 2 }),
