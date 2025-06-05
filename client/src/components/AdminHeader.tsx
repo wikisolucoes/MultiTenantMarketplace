@@ -23,7 +23,8 @@ import {
   Store,
   BarChart3,
   Puzzle,
-  Activity
+  Activity,
+  Mail
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -43,6 +44,7 @@ const navigationItems = [
   { id: "tenants", label: "Lojas", icon: Store },
   { id: "users", label: "Usuários", icon: Users },
   { id: "plugins", label: "Plugins", icon: Puzzle },
+  { id: "communications", label: "Comunicação", icon: Mail },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "system", label: "Sistema", icon: Activity },
   { id: "settings", label: "Configurações", icon: Settings },

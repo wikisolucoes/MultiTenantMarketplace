@@ -694,6 +694,7 @@ export default function AdminDashboard() {
   const [isViewUserOpen, setIsViewUserOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [isCreateNotificationOpen, setIsCreateNotificationOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const { toast } = useToast();
@@ -1280,6 +1281,102 @@ export default function AdminDashboard() {
                   <p className="text-muted-foreground">
                     Relatórios detalhados e analytics da plataforma serão implementados aqui.
                   </p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Communications Tab */}
+          {activeTab === "communications" && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Central de Comunicação</CardTitle>
+                  <Dialog open={isCreateNotificationOpen} onOpenChange={setIsCreateNotificationOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Novo Informativo
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Enviar Informativo por E-mail</DialogTitle>
+                      </DialogHeader>
+                      <NotificationFormComponent onClose={() => setIsCreateNotificationOpen(false)} />
+                    </DialogContent>
+                  </Dialog>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="text-sm text-muted-foreground">
+                      Envie informativos e comunicados importantes para usuários da plataforma por e-mail.
+                    </div>
+                    
+                    {/* Recent Notifications */}
+                    <div className="border rounded-lg">
+                      <div className="bg-muted/50 px-4 py-2 border-b">
+                        <h3 className="font-medium">Informativos Recentes</h3>
+                      </div>
+                      <div className="p-4">
+                        {notificationsLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+                          </div>
+                        ) : notifications && (notifications as any[]).length > 0 ? (
+                          <div className="space-y-3">
+                            {(notifications as any[]).slice(0, 5).map((notification: any) => (
+                              <div key={notification.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-medium">{notification.title}</h4>
+                                    <Badge 
+                                      variant={
+                                        notification.status === 'completed' ? 'default' :
+                                        notification.status === 'sending' ? 'secondary' :
+                                        notification.status === 'failed' ? 'destructive' : 'outline'
+                                      }
+                                    >
+                                      {notification.status === 'completed' ? 'Enviado' :
+                                       notification.status === 'sending' ? 'Enviando' :
+                                       notification.status === 'failed' ? 'Falha' : 'Pendente'}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mt-1">
+                                    {notification.message.length > 100 
+                                      ? `${notification.message.substring(0, 100)}...` 
+                                      : notification.message}
+                                  </p>
+                                  <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                    <span>Tipo: {
+                                      notification.recipientType === 'all' ? 'Todos os usuários' :
+                                      notification.recipientType === 'specific' ? 'Usuários específicos' :
+                                      notification.recipientType === 'tenant' ? 'Usuários de loja específica' : 
+                                      notification.recipientType
+                                    }</span>
+                                    {notification.sentCount > 0 && (
+                                      <span>Enviados: {notification.sentCount}</span>
+                                    )}
+                                    {notification.failedCount > 0 && (
+                                      <span className="text-red-600">Falhas: {notification.failedCount}</span>
+                                    )}
+                                    <span>Criado: {new Date(notification.createdAt).toLocaleDateString('pt-BR')}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Mail className="w-4 h-4 text-muted-foreground" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            Nenhum informativo enviado ainda
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
