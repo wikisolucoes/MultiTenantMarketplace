@@ -1160,22 +1160,29 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Plugin management function
-  const togglePluginStatus = async (pluginId: number, isActive: boolean) => {
-    try {
-      await apiRequest("PATCH", `/api/admin/plugins/${pluginId}`, { isActive });
+  // Plugin management mutation
+  const togglePluginMutation = useMutation({
+    mutationFn: async ({ pluginId, isActive }: { pluginId: number; isActive: boolean }) => {
+      return await apiRequest("PATCH", `/api/admin/plugins/${pluginId}`, { isActive });
+    },
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/plugins"] });
       toast({
         title: "Plugin atualizado",
-        description: "Status do plugin foi atualizado com sucesso.",
+        description: `Plugin ${variables.isActive ? 'ativado' : 'desativado'} com sucesso.`,
       });
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       toast({
         title: "Erro",
-        description: error.message,
+        description: error.message || "Erro ao atualizar plugin",
         variant: "destructive",
       });
-    }
+    },
+  });
+
+  const togglePluginStatus = (pluginId: number, isActive: boolean) => {
+    togglePluginMutation.mutate({ pluginId, isActive });
   };
 
   // Fetch current user data
