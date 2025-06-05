@@ -3008,61 +3008,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/reports", async (req, res) => {
     try {
-      // Revenue data for the last 12 months
+      // Revenue data for the last 12 months with real data
       const revenueResult = await db.execute(sql`
         SELECT 
           TO_CHAR(DATE_TRUNC('month', created_at), 'Mon') as month,
-          SUM(CAST(total AS DECIMAL)) as revenue
+          COALESCE(SUM(CAST(total AS DECIMAL)), 0) as revenue,
+          COUNT(*) as order_count
         FROM orders 
-        WHERE status = 'completed' 
-        AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '11 months')
+        WHERE created_at >= CURRENT_DATE - INTERVAL '12 months'
         GROUP BY DATE_TRUNC('month', created_at)
         ORDER BY DATE_TRUNC('month', created_at)
       `);
 
-      // Tenant growth data
-      const tenantGrowthResult = await db.execute(sql`
+      // Tenant performance data by revenue
+      const tenantPerformanceResult = await db.execute(sql`
         SELECT 
-          TO_CHAR(DATE_TRUNC('month', created_at), 'Mon') as month,
-          COUNT(*) as count
-        FROM tenants 
-        WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '11 months')
-        GROUP BY DATE_TRUNC('month', created_at)
-        ORDER BY DATE_TRUNC('month', created_at)
+          t.name as tenant_name,
+          t.category,
+          COUNT(o.id) as total_orders,
+          COALESCE(SUM(CAST(o.total AS DECIMAL)), 0) as total_revenue,
+          COUNT(CASE WHEN o.status = 'completed' THEN 1 END) as completed_orders
+        FROM tenants t
+        LEFT JOIN orders o ON t.id = o.tenant_id
+        WHERE t.status = 'active'
+        GROUP BY t.id, t.name, t.category
+        ORDER BY total_revenue DESC
+        LIMIT 10
       `);
 
-      // Category distribution
+      // Category distribution with real order data
       const categoryResult = await db.execute(sql`
         SELECT 
-          category as name,
-          COUNT(*) as count,
+          COALESCE(t.category, 'Sem Categoria') as name,
+          COUNT(DISTINCT t.id) as tenant_count,
+          COUNT(o.id) as order_count,
           COALESCE(SUM(CAST(o.total AS DECIMAL)), 0) as revenue
         FROM tenants t
-        LEFT JOIN orders o ON t.id = o.tenant_id AND o.status = 'completed'
+        LEFT JOIN orders o ON t.id = o.tenant_id
         GROUP BY t.category
-        ORDER BY count DESC
+        ORDER BY revenue DESC
+      `);
+
+      // Payment method analysis
+      const paymentMethodResult = await db.execute(sql`
+        SELECT 
+          COALESCE(payment_method, 'Não Informado') as method,
+          COUNT(*) as transaction_count,
+          COALESCE(SUM(CAST(total AS DECIMAL)), 0) as volume,
+          COUNT(CASE WHEN payment_status = 'succeeded' THEN 1 END) as successful_count
+        FROM orders
+        WHERE total IS NOT NULL AND total != '0'
+        GROUP BY payment_method
+        ORDER BY volume DESC
+      `);
+
+      // Monthly subscription revenue
+      const subscriptionRevenueResult = await db.execute(sql`
+        SELECT 
+          TO_CHAR(DATE_TRUNC('month', created_at), 'Mon') as month,
+          COALESCE(SUM(CAST(current_price AS DECIMAL)), 0) as subscription_revenue,
+          COUNT(*) as new_subscriptions
+        FROM plugin_subscriptions
+        WHERE status = 'active'
+        AND created_at >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY DATE_TRUNC('month', created_at)
       `);
 
       const revenueData = revenueResult.rows.map((row: any) => ({
         month: row.month,
-        revenue: parseFloat(row.revenue) || 0
+        revenue: parseFloat(row.revenue) || 0,
+        orderCount: parseInt(row.order_count) || 0
       }));
 
-      const tenantGrowthData = tenantGrowthResult.rows.map((row: any) => ({
-        month: row.month,
-        count: parseInt(row.count) || 0
+      const tenantPerformanceData = tenantPerformanceResult.rows.map((row: any) => ({
+        tenantName: row.tenant_name,
+        category: row.category || 'Sem Categoria',
+        totalOrders: parseInt(row.total_orders) || 0,
+        totalRevenue: parseFloat(row.total_revenue) || 0,
+        completedOrders: parseInt(row.completed_orders) || 0,
+        conversionRate: row.total_orders > 0 ? 
+          parseFloat(((row.completed_orders / row.total_orders) * 100).toFixed(1)) : 0
       }));
 
       const categoryDistribution = categoryResult.rows.map((row: any) => ({
-        name: row.name || 'Não definido',
-        count: parseInt(row.count) || 0,
+        name: row.name,
+        tenantCount: parseInt(row.tenant_count) || 0,
+        orderCount: parseInt(row.order_count) || 0,
         revenue: parseFloat(row.revenue) || 0
+      }));
+
+      const paymentMethodData = paymentMethodResult.rows.map((row: any) => {
+        const transactionCount = parseInt(row.transaction_count) || 0;
+        const successfulCount = parseInt(row.successful_count) || 0;
+        return {
+          method: row.method,
+          transactionCount,
+          volume: parseFloat(row.volume) || 0,
+          successRate: transactionCount > 0 ? 
+            parseFloat(((successfulCount / transactionCount) * 100).toFixed(1)) : 0
+        };
+      });
+
+      const subscriptionRevenueData = subscriptionRevenueResult.rows.map((row: any) => ({
+        month: row.month,
+        subscriptionRevenue: parseFloat(row.subscription_revenue) || 0,
+        newSubscriptions: parseInt(row.new_subscriptions) || 0
       }));
 
       res.json({
         revenueData,
-        tenantGrowthData,
-        categoryDistribution
+        tenantPerformanceData,
+        categoryDistribution,
+        paymentMethodData,
+        subscriptionRevenueData
       });
     } catch (error) {
       console.error("Error fetching admin reports:", error);

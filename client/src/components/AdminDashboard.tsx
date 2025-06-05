@@ -2989,99 +2989,156 @@ function FinancialManagement() {
           <Card>
             <CardHeader>
               <CardTitle>Relatórios Financeiros</CardTitle>
-              <CardDescription>Gere relatórios financeiros detalhados</CardDescription>
+              <CardDescription>Análise completa baseada em dados reais da plataforma</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {/* Report Types */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                {/* Revenue Chart */}
+                {reportsData && reportsData.revenueData && (
+                  <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <BarChart3 className="w-5 h-5" />
-                        Receita Mensal
-                      </CardTitle>
+                      <CardTitle>Evolução da Receita (12 meses)</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground">Relatório detalhado da receita mensal</p>
-                      <Button className="w-full mt-4" variant="outline">
-                        <Download className="w-4 h-4 mr-2" />
-                        Gerar Relatório
-                      </Button>
+                      <div className="h-64 w-full">
+                        <div className="flex items-end justify-between h-full space-x-2">
+                          {reportsData.revenueData.map((data: any, index: number) => (
+                            <div key={index} className="flex flex-col items-center flex-1">
+                              <div 
+                                className="bg-blue-500 w-full rounded-t"
+                                style={{ 
+                                  height: `${Math.max((data.revenue / Math.max(...reportsData.revenueData.map((d: any) => d.revenue))) * 200, 10)}px` 
+                                }}
+                              />
+                              <div className="text-xs mt-2 text-center">
+                                <div className="font-medium">{data.month}</div>
+                                <div className="text-muted-foreground">{formatCurrency(data.revenue)}</div>
+                                <div className="text-xs text-muted-foreground">{data.orderCount} pedidos</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
+                )}
 
-                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                {/* Tenant Performance */}
+                {reportsData && reportsData.tenantPerformanceData && (
+                  <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Users className="w-5 h-5" />
-                        Análise de Assinaturas
-                      </CardTitle>
+                      <CardTitle>Top 10 Lojas por Receita</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground">Métricas detalhadas de assinaturas</p>
-                      <Button className="w-full mt-4" variant="outline">
-                        <Download className="w-4 h-4 mr-2" />
-                        Gerar Relatório
-                      </Button>
+                      <div className="space-y-4">
+                        {reportsData.tenantPerformanceData.map((tenant: any, index: number) => (
+                          <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <span className="text-blue-600 font-semibold text-sm">{index + 1}</span>
+                              </div>
+                              <div>
+                                <p className="font-medium">{tenant.tenantName}</p>
+                                <p className="text-sm text-muted-foreground">{tenant.category}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium">{formatCurrency(tenant.totalRevenue)}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {tenant.totalOrders} pedidos • {tenant.conversionRate}% conversão
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
+                )}
 
-                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                {/* Category Distribution */}
+                {reportsData && reportsData.categoryDistribution && (
+                  <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Receipt className="w-5 h-5" />
-                        Relatório Fiscal
-                      </CardTitle>
+                      <CardTitle>Distribuição por Categoria</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground">Dados para declaração fiscal</p>
-                      <Button className="w-full mt-4" variant="outline">
-                        <Download className="w-4 h-4 mr-2" />
-                        Gerar Relatório
-                      </Button>
+                      <div className="space-y-4">
+                        {reportsData.categoryDistribution.map((category: any, index: number) => (
+                          <div key={index} className="flex items-center justify-between p-3 border rounded">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                                <span className="text-white font-semibold text-xs">
+                                  {category.name.substring(0, 2).toUpperCase()}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium">{category.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {category.tenantCount} lojas • {category.orderCount} pedidos
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium">{formatCurrency(category.revenue)}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
-                </div>
+                )}
 
-                {/* Quick Stats */}
+                {/* Payment Methods Analysis */}
+                {reportsData && reportsData.paymentMethodData && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Análise de Métodos de Pagamento</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {reportsData.paymentMethodData.map((method: any, index: number) => (
+                          <div key={index} className="p-4 border rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium">{method.method}</h4>
+                              <Badge variant="outline">{method.successRate}% sucesso</Badge>
+                            </div>
+                            <div className="space-y-1 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Volume:</span>
+                                <span className="font-medium">{formatCurrency(method.volume)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Transações:</span>
+                                <span className="font-medium">{method.transactionCount}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Quick Actions */}
                 <Card>
                   <CardHeader>
-                    <CardTitle>Resumo Financeiro</CardTitle>
+                    <CardTitle>Ações Rápidas</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {(revenueLoading || subscriptionLoading) ? (
-                      <div className="flex justify-center items-center h-32">
-                        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600">
-                            {formatCurrency(platformRevenue?.totalRevenue || 0)}
-                          </div>
-                          <p className="text-sm text-muted-foreground">Receita Total</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {subscriptionAnalytics?.activeSubscriptions || 0}
-                          </div>
-                          <p className="text-sm text-muted-foreground">Assinaturas Ativas</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {subscriptionAnalytics?.churnRate || 0}%
-                          </div>
-                          <p className="text-sm text-muted-foreground">Taxa de Churn</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-orange-600">
-                            {formatCurrency(subscriptionAnalytics?.mrr || 0)}
-                          </div>
-                          <p className="text-sm text-muted-foreground">MRR</p>
-                        </div>
-                      </div>
-                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <Download className="w-4 h-4" />
+                        Exportar Relatório Completo
+                      </Button>
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Relatório Fiscal
+                      </Button>
+                      <Button variant="outline" className="flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4" />
+                        Dashboard Executivo
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -3238,7 +3295,7 @@ export default function AdminDashboard() {
     queryKey: ['/api/admin/plugins'],
   });
 
-  const { data: reports } = useQuery({
+  const { data: reportsData, isLoading: reportsLoading } = useQuery({
     queryKey: ['/api/admin/reports'],
   });
 
