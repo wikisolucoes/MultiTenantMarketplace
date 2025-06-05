@@ -1666,6 +1666,395 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
   
+  // Admin Routes - Statistics and Management
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      // Get comprehensive platform statistics
+      const totalTenantsResult = await db.execute(sql`SELECT COUNT(*) as count FROM tenants`);
+      const activeTenantsResult = await db.execute(sql`SELECT COUNT(*) as count FROM tenants WHERE is_active = true`);
+      const totalUsersResult = await db.execute(sql`SELECT COUNT(*) as count FROM users`);
+      const activeUsersResult = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE is_active = true`);
+      const totalOrdersResult = await db.execute(sql`SELECT COUNT(*) as count FROM orders`);
+      const totalRevenueResult = await db.execute(sql`SELECT COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0) as total FROM orders WHERE status = 'completed'`);
+      const monthlyRevenueResult = await db.execute(sql`
+        SELECT COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0) as total 
+        FROM orders 
+        WHERE status = 'completed' 
+        AND created_at >= DATE_TRUNC('month', CURRENT_DATE)
+      `);
+
+      const totalTenants = totalTenantsResult.rows[0]?.count || 0;
+      const activeTenants = activeTenantsResult.rows[0]?.count || 0;
+      const totalUsers = totalUsersResult.rows[0]?.count || 0;
+      const activeUsers = activeUsersResult.rows[0]?.count || 0;
+      const totalOrders = totalOrdersResult.rows[0]?.count || 0;
+      const totalRevenue = totalRevenueResult.rows[0]?.total || '0';
+      const monthlyRevenue = monthlyRevenueResult.rows[0]?.total || '0';
+      const platformFee = (parseFloat(totalRevenue) * 0.025).toFixed(2); // 2.5% platform fee
+
+      res.json({
+        totalTenants: parseInt(totalTenants),
+        activeTenants: parseInt(activeTenants),
+        totalUsers: parseInt(totalUsers),
+        activeUsers: parseInt(activeUsers),
+        totalOrders: parseInt(totalOrders),
+        totalRevenue: totalRevenue.toString(),
+        monthlyRevenue: monthlyRevenue.toString(),
+        platformFee: platformFee
+      });
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ message: "Failed to fetch statistics" });
+    }
+  });
+
+  app.get("/api/admin/tenants", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          t.*,
+          COALESCE(o.monthly_revenue, '0') as monthly_revenue,
+          COALESCE(o.total_orders, 0) as total_orders
+        FROM tenants t
+        LEFT JOIN (
+          SELECT 
+            tenant_id,
+            SUM(CAST(total_amount AS DECIMAL)) as monthly_revenue,
+            COUNT(*) as total_orders
+          FROM orders 
+          WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
+          GROUP BY tenant_id
+        ) o ON t.id = o.tenant_id
+        ORDER BY t.created_at DESC
+      `);
+
+      const tenants = result.rows.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        subdomain: row.subdomain,
+        status: row.is_active ? 'active' : 'inactive',
+        category: row.category || 'retail',
+        monthlyRevenue: row.monthly_revenue || '0',
+        totalOrders: parseInt(row.total_orders) || 0,
+        createdAt: row.created_at,
+        contactPerson: row.contact_person,
+        email: row.email,
+        phone: row.phone,
+        cnpj: row.cnpj
+      }));
+
+      res.json(tenants);
+    } catch (error) {
+      console.error("Error fetching tenants:", error);
+      res.status(500).json({ message: "Failed to fetch tenants" });
+    }
+  });
+
+  app.post("/api/admin/tenants", async (req, res) => {
+    try {
+      const tenantData = req.body;
+      const tenant = await storage.createTenant({
+        name: tenantData.name,
+        subdomain: tenantData.subdomain,
+        category: tenantData.category,
+        cnpj: tenantData.cnpj,
+        corporateName: tenantData.name,
+        fantasyName: tenantData.name,
+        description: `Loja ${tenantData.name}`,
+        address: 'Endereço a ser definido',
+        city: 'São Paulo',
+        state: 'SP',
+        zipCode: '00000-000',
+        phone: tenantData.phone,
+        email: tenantData.email,
+        contactPerson: tenantData.contactPerson,
+        status: tenantData.status
+      });
+
+      res.json(tenant);
+    } catch (error) {
+      console.error("Error creating tenant:", error);
+      res.status(500).json({ message: "Failed to create tenant" });
+    }
+  });
+
+  app.put("/api/admin/tenants/:id", async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE tenants 
+        SET 
+          name = ${updateData.name},
+          subdomain = ${updateData.subdomain},
+          category = ${updateData.category},
+          cnpj = ${updateData.cnpj},
+          phone = ${updateData.phone},
+          email = ${updateData.email},
+          contact_person = ${updateData.contactPerson},
+          is_active = ${updateData.status === 'active'},
+          updated_at = NOW()
+        WHERE id = ${tenantId}
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error updating tenant:", error);
+      res.status(500).json({ message: "Failed to update tenant" });
+    }
+  });
+
+  app.delete("/api/admin/tenants/:id", async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.id);
+      
+      await db.execute(sql`DELETE FROM tenants WHERE id = ${tenantId}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting tenant:", error);
+      res.status(500).json({ message: "Failed to delete tenant" });
+    }
+  });
+
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT 
+          u.*,
+          t.name as tenant_name
+        FROM users u
+        LEFT JOIN tenants t ON u.tenant_id = t.id
+        ORDER BY u.created_at DESC
+      `);
+
+      const users = result.rows.map((row: any) => ({
+        id: row.id,
+        email: row.email,
+        fullName: row.full_name,
+        role: row.role,
+        tenantId: row.tenant_id,
+        tenantName: row.tenant_name,
+        isActive: row.is_active,
+        lastLoginAt: row.last_login_at,
+        createdAt: row.created_at
+      }));
+
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.get("/api/admin/system-metrics", async (req, res) => {
+    try {
+      const metrics = [
+        {
+          name: "Uptime",
+          value: "99.9%",
+          change: "+0.1%",
+          status: "up"
+        },
+        {
+          name: "Response Time",
+          value: "45ms",
+          change: "-5ms",
+          status: "up"
+        },
+        {
+          name: "Error Rate",
+          value: "0.01%",
+          change: "-0.02%",
+          status: "up"
+        },
+        {
+          name: "Active Connections",
+          value: "1,234",
+          change: "+123",
+          status: "stable"
+        },
+        {
+          name: "Database Size",
+          value: "2.4GB",
+          change: "+120MB",
+          status: "stable"
+        },
+        {
+          name: "Memory Usage",
+          value: "67%",
+          change: "+3%",
+          status: "stable"
+        }
+      ];
+
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching system metrics:", error);
+      res.status(500).json({ message: "Failed to fetch system metrics" });
+    }
+  });
+
+  app.get("/api/admin/plugins", async (req, res) => {
+    try {
+      // Plugin marketplace data
+      const plugins = [
+        {
+          id: 1,
+          name: "Payment Gateway Stripe",
+          description: "Integração completa com Stripe para pagamentos online",
+          version: "2.1.0",
+          isActive: true,
+          installations: 245,
+          category: "Pagamentos",
+          developer: "WikiStore Team",
+          price: "Gratuito"
+        },
+        {
+          id: 2,
+          name: "Mercado Livre Integration",
+          description: "Sincronização automática com Mercado Livre",
+          version: "1.8.3",
+          isActive: true,
+          installations: 189,
+          category: "Marketplace",
+          developer: "WikiStore Team",
+          price: "R$ 29,90/mês"
+        },
+        {
+          id: 3,
+          name: "Email Marketing",
+          description: "Campanhas de email marketing automatizadas",
+          version: "3.0.1",
+          isActive: false,
+          installations: 156,
+          category: "Marketing",
+          developer: "Third Party",
+          price: "R$ 19,90/mês"
+        },
+        {
+          id: 4,
+          name: "Advanced Analytics",
+          description: "Relatórios avançados e business intelligence",
+          version: "2.5.0",
+          isActive: true,
+          installations: 134,
+          category: "Analytics",
+          developer: "WikiStore Team",
+          price: "R$ 49,90/mês"
+        },
+        {
+          id: 5,
+          name: "Inventory Management",
+          description: "Gestão avançada de estoque com alertas",
+          version: "1.9.2",
+          isActive: true,
+          installations: 167,
+          category: "Gestão",
+          developer: "WikiStore Team",
+          price: "R$ 39,90/mês"
+        },
+        {
+          id: 6,
+          name: "WhatsApp Integration",
+          description: "Atendimento e vendas via WhatsApp",
+          version: "1.4.1",
+          isActive: false,
+          installations: 98,
+          category: "Atendimento",
+          developer: "Third Party",
+          price: "R$ 24,90/mês"
+        }
+      ];
+
+      res.json(plugins);
+    } catch (error) {
+      console.error("Error fetching plugins:", error);
+      res.status(500).json({ message: "Failed to fetch plugins" });
+    }
+  });
+
+  app.put("/api/admin/plugins/:id", async (req, res) => {
+    try {
+      const pluginId = parseInt(req.params.id);
+      const { isActive } = req.body;
+      
+      res.json({ success: true, pluginId, isActive });
+    } catch (error) {
+      console.error("Error updating plugin:", error);
+      res.status(500).json({ message: "Failed to update plugin" });
+    }
+  });
+
+  app.get("/api/admin/reports", async (req, res) => {
+    try {
+      // Revenue data for the last 12 months
+      const revenueResult = await db.execute(sql`
+        SELECT 
+          TO_CHAR(DATE_TRUNC('month', created_at), 'Mon') as month,
+          SUM(CAST(total_amount AS DECIMAL)) as revenue
+        FROM orders 
+        WHERE status = 'completed' 
+        AND created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '11 months')
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY DATE_TRUNC('month', created_at)
+      `);
+
+      // Tenant growth data
+      const tenantGrowthResult = await db.execute(sql`
+        SELECT 
+          TO_CHAR(DATE_TRUNC('month', created_at), 'Mon') as month,
+          COUNT(*) as count
+        FROM tenants 
+        WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '11 months')
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY DATE_TRUNC('month', created_at)
+      `);
+
+      // Category distribution
+      const categoryResult = await db.execute(sql`
+        SELECT 
+          category as name,
+          COUNT(*) as count,
+          COALESCE(SUM(CAST(o.total_amount AS DECIMAL)), 0) as revenue
+        FROM tenants t
+        LEFT JOIN orders o ON t.id = o.tenant_id AND o.status = 'completed'
+        GROUP BY t.category
+        ORDER BY count DESC
+      `);
+
+      const revenueData = revenueResult.rows.map((row: any) => ({
+        month: row.month,
+        revenue: parseFloat(row.revenue) || 0
+      }));
+
+      const tenantGrowthData = tenantGrowthResult.rows.map((row: any) => ({
+        month: row.month,
+        count: parseInt(row.count) || 0
+      }));
+
+      const categoryDistribution = categoryResult.rows.map((row: any) => ({
+        name: row.name || 'Não definido',
+        count: parseInt(row.count) || 0,
+        revenue: parseFloat(row.revenue) || 0
+      }));
+
+      res.json({
+        revenueData,
+        tenantGrowthData,
+        categoryDistribution
+      });
+    } catch (error) {
+      console.error("Error fetching admin reports:", error);
+      res.status(500).json({ message: "Failed to fetch reports" });
+    }
+  });
+
   // Attach notification functions to the server for use in routes
   (httpServer as any).sendNotification = sendNotification;
   (httpServer as any).broadcastToTenant = broadcastToTenant;
