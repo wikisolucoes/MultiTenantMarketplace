@@ -1,4 +1,4 @@
-const axios = require('axios');
+import axios from 'axios';
 
 const EXPRESS_BASE = 'http://localhost:5000';
 const NESTJS_BASE = 'http://localhost:5001';
