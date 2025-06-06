@@ -4858,6 +4858,13 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* Platform Settings Tab */}
+          {activeTab === "platform-settings" && (
+            <div className="space-y-6">
+              {renderPlatformSettings()}
+            </div>
+          )}
+
           {/* System Tab */}
           {activeTab === "system" && (
             <div className="space-y-6">

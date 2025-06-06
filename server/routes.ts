@@ -11,6 +11,22 @@ import {
   insertOrderSchema,
   loginSchema, 
   tenantRegistrationSchema,
+  users,
+  tenants,
+  products,
+  orders,
+  notifications,
+  pluginSubscriptions,
+  plugins,
+  pluginPlans,
+  customers,
+  notificationPreferences,
+  supportTickets,
+  supportTicketMessages,
+  userProfiles,
+  platformSettings,
+  platformFeatures,
+  platformMaintenance,
   type User,
   type Tenant,
   type Product,
@@ -20,7 +36,7 @@ import {
 } from "@shared/schema";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, eq, desc } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
