@@ -1690,13 +1690,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           u.full_name as agent_name,
           u.email as agent_email,
+          up.job_title as job_title,
           COUNT(st.id) as tickets_handled,
           AVG(st.satisfaction_rating) as avg_rating,
-          COUNT(CASE WHEN st.status = 'resolved' THEN 1 END) as resolved_count
+          COUNT(CASE WHEN st.status = 'resolved' THEN 1 END) as resolved_count,
+          COUNT(CASE WHEN st.status = 'closed' THEN 1 END) as closed_count
         FROM users u
+        LEFT JOIN user_profiles up ON u.id = up.user_id
         LEFT JOIN support_tickets st ON u.id = st.assigned_to
-        WHERE u.role = 'admin' 
-        GROUP BY u.id, u.full_name, u.email
+        WHERE u.is_active = true
+        GROUP BY u.id, u.full_name, u.email, up.job_title
+        HAVING COUNT(st.id) > 0 OR u.email LIKE '%admin%' OR u.email LIKE '%suporte%'
         ORDER BY tickets_handled DESC
       `);
 
@@ -1729,9 +1733,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamPerformance: teamPerformanceResult.rows.map(row => ({
             agentName: row.agent_name || 'Suporte',
             agentEmail: row.agent_email,
+            jobTitle: row.job_title || 'Analista de Suporte',
             ticketsHandled: Number(row.tickets_handled) || 0,
             avgRating: Number(row.avg_rating) || 0,
-            resolvedCount: Number(row.resolved_count) || 0
+            resolvedCount: Number(row.resolved_count) || 0,
+            closedCount: Number(row.closed_count) || 0
           }))
         }
       };

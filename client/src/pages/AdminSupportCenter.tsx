@@ -882,41 +882,42 @@ export default function AdminSupportCenter() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  { name: "Ana Silva", role: "Supervisor", tickets: 45, avgResponse: "1.2h", satisfaction: "4.9" },
-                  { name: "Carlos Santos", role: "Analista Sênior", tickets: 38, avgResponse: "1.8h", satisfaction: "4.7" },
-                  { name: "Maria Oliveira", role: "Analista", tickets: 42, avgResponse: "2.1h", satisfaction: "4.8" },
-                  { name: "João Costa", role: "Analista", tickets: 35, avgResponse: "2.3h", satisfaction: "4.6" },
-                ].map((member, index) => (
+                {analytics?.performance?.teamPerformance?.map((member: any, index: number) => (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                        {member.name.split(' ').map(n => n[0]).join('')}
+                        {member.agentName ? member.agentName.split(' ').map((n: string) => n[0]).join('') : 'SU'}
                       </div>
                       <div>
-                        <div className="font-medium">{member.name}</div>
-                        <div className="text-sm text-muted-foreground">{member.role}</div>
+                        <div className="font-medium">{member.agentName || 'Equipe de Suporte'}</div>
+                        <div className="text-sm text-muted-foreground">{member.jobTitle || member.agentEmail || 'suporte@wikistore.com'}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-6 text-sm">
                       <div className="text-center">
-                        <div className="font-medium">{member.tickets}</div>
+                        <div className="font-medium">{member.ticketsHandled || 0}</div>
                         <div className="text-muted-foreground">Tickets</div>
                       </div>
                       <div className="text-center">
-                        <div className="font-medium">{member.avgResponse}</div>
-                        <div className="text-muted-foreground">Resposta</div>
+                        <div className="font-medium">{member.resolvedCount || 0}</div>
+                        <div className="text-muted-foreground">Resolvidos</div>
                       </div>
                       <div className="text-center">
-                        <div className="font-medium">{member.satisfaction}</div>
-                        <div className="text-muted-foreground">Satisfação</div>
+                        <div className="font-medium">{member.avgRating ? member.avgRating.toFixed(1) : '0.0'}</div>
+                        <div className="text-muted-foreground">Avaliação</div>
                       </div>
                       <Button size="sm" variant="outline">
                         <UserPlus className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                ))}
+                )) || (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>Nenhum membro da equipe encontrado</p>
+                    <p className="text-sm">Configure usuários com função de suporte no sistema</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
