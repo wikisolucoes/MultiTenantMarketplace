@@ -888,6 +888,39 @@ export const customerLoginSchema = z.object({
   password: z.string().min(6),
 });
 
+// API credentials for public integrations
+export const apiCredentials = pgTable("api_credentials", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(), // User-friendly name for the credential
+  apiKey: varchar("api_key", { length: 64 }).unique().notNull(), // Public API key
+  apiSecret: varchar("api_secret", { length: 128 }).notNull(), // Secret key (hashed)
+  permissions: jsonb("permissions").notNull(), // Array of allowed endpoints/actions
+  isActive: boolean("is_active").default(true).notNull(),
+  lastUsed: timestamp("last_used"),
+  expiresAt: timestamp("expires_at"), // Optional expiration
+  rateLimit: integer("rate_limit").default(1000).notNull(), // Requests per hour
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// API usage logs for monitoring and analytics
+export const apiUsageLogs = pgTable("api_usage_logs", {
+  id: serial("id").primaryKey(),
+  credentialId: integer("credential_id").references(() => apiCredentials.id).notNull(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  endpoint: varchar("endpoint", { length: 255 }).notNull(),
+  method: varchar("method", { length: 10 }).notNull(), // GET, POST, PUT, DELETE
+  statusCode: integer("status_code").notNull(),
+  responseTime: integer("response_time"), // milliseconds
+  userAgent: text("user_agent"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  requestSize: integer("request_size"), // bytes
+  responseSize: integer("response_size"), // bytes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Email notifications table
 export const emailNotifications = pgTable("email_notifications", {
   id: serial("id").primaryKey(),
@@ -1072,3 +1105,24 @@ export type InsertSupportTicketMessage = z.infer<typeof insertSupportTicketMessa
 export type CreateSupportTicketData = z.infer<typeof supportTicketCreateSchema>;
 export type UpdateSupportTicketData = z.infer<typeof supportTicketUpdateSchema>;
 export type CreateSupportMessageData = z.infer<typeof supportMessageCreateSchema>;
+
+// API credentials schemas
+export const insertApiCredentialSchema = createInsertSchema(apiCredentials).omit({
+  id: true,
+  apiKey: true,
+  apiSecret: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsed: true,
+});
+
+export const insertApiUsageLogSchema = createInsertSchema(apiUsageLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+// API types
+export type ApiCredential = typeof apiCredentials.$inferSelect;
+export type InsertApiCredential = z.infer<typeof insertApiCredentialSchema>;
+export type ApiUsageLog = typeof apiUsageLogs.$inferSelect;
+export type InsertApiUsageLog = z.infer<typeof insertApiUsageLogSchema>;
