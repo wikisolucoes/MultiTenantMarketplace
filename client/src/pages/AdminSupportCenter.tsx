@@ -89,6 +89,19 @@ interface TicketMessage {
   createdAt: string;
 }
 
+interface TicketMessage {
+  id: number;
+  ticketId: number;
+  userId?: number;
+  senderType: string;
+  senderName: string;
+  message: string;
+  attachments?: string[];
+  isInternal: boolean;
+  messageType: string;
+  createdAt: string;
+}
+
 interface FAQ {
   id: number;
   question: string;
@@ -179,20 +192,23 @@ export default function AdminSupportCenter() {
   });
 
   const updateTicketStatusMutation = useMutation({
-    mutationFn: async ({ ticketId, status, assignedTo }: any) => {
-      return await apiRequest("PUT", `/api/admin/support-tickets/${ticketId}`, { status, assignedTo });
+    mutationFn: async ({ ticketId, status, assignedTo, priority }: any) => {
+      return await apiRequest("PUT", `/api/admin/support-tickets/${ticketId}`, { status, assignedTo, priority });
     },
     onSuccess: () => {
       toast({
         title: "Ticket Atualizado",
-        description: "Status do ticket foi atualizado.",
+        description: "Status do ticket foi atualizado com sucesso.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/support-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/support-analytics"] });
+      setSelectedTicket(null); // Close modal after successful update
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Update ticket error:", error);
       toast({
         title: "Erro",
-        description: "Erro ao atualizar ticket.",
+        description: "Erro ao atualizar ticket no banco de dados.",
         variant: "destructive",
       });
     },

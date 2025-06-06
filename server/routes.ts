@@ -1743,6 +1743,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin support ticket update route
+  app.put("/api/admin/support-tickets/:id", async (req, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      const { status, assignedTo, priority } = req.body;
+      
+      // Update ticket in database
+      const updateResult = await db.execute(sql`
+        UPDATE support_tickets 
+        SET 
+          status = ${status},
+          assigned_to = ${assignedTo || null},
+          priority = ${priority || 'medium'},
+          updated_at = NOW(),
+          resolved_at = CASE WHEN ${status} = 'resolved' AND resolved_at IS NULL THEN NOW() ELSE resolved_at END,
+          closed_at = CASE WHEN ${status} = 'closed' AND closed_at IS NULL THEN NOW() ELSE closed_at END
+        WHERE id = ${ticketId}
+        RETURNING *
+      `);
+
+      if (updateResult.rows.length === 0) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      const updatedTicket = updateResult.rows[0];
+      
+      // Add status change message to ticket conversation
+      await db.execute(sql`
+        INSERT INTO support_ticket_messages (
+          ticket_id, sender_type, sender_name, message, message_type, is_internal
+        ) VALUES (
+          ${ticketId}, 
+          'system', 
+          'Sistema', 
+          'Status alterado para: ${status}', 
+          'status_change', 
+          false
+        )
+      `);
+
+      res.json({
+        id: updatedTicket.id,
+        status: updatedTicket.status,
+        assignedTo: updatedTicket.assigned_to,
+        priority: updatedTicket.priority,
+        updatedAt: updatedTicket.updated_at
+      });
+    } catch (error) {
+      console.error("Error updating support ticket:", error);
+      res.status(500).json({ message: "Failed to update support ticket" });
+    }
+  });
+
+  // Admin support ticket messages route
+  app.get("/api/admin/support-tickets/:id/messages", async (req, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      
+      const messagesResult = await db.execute(sql`
+        SELECT 
+          stm.*,
+          u.full_name as user_name,
+          u.email as user_email
+        FROM support_ticket_messages stm
+        LEFT JOIN users u ON stm.user_id = u.id
+        WHERE stm.ticket_id = ${ticketId}
+        ORDER BY stm.created_at ASC
+      `);
+      
+      const messages = messagesResult.rows.map(row => ({
+        id: row.id,
+        ticketId: row.ticket_id,
+        userId: row.user_id,
+        senderType: row.sender_type,
+        senderName: row.sender_name || row.user_name || row.user_email,
+        message: row.message,
+        attachments: row.attachments || [],
+        isInternal: row.is_internal,
+        messageType: row.message_type,
+        createdAt: row.created_at
+      }));
+      
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching ticket messages:", error);
+      res.status(500).json({ message: "Failed to fetch ticket messages" });
+    }
+  });
+
+  // Admin support ticket message creation route
+  app.post("/api/admin/support-tickets/:id/messages", async (req, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      const { message, isInternal } = req.body;
+      
+      const messageResult = await db.execute(sql`
+        INSERT INTO support_ticket_messages (
+          ticket_id, sender_type, sender_name, message, is_internal, message_type
+        ) VALUES (
+          ${ticketId}, 
+          'support', 
+          'Equipe de Suporte', 
+          ${message}, 
+          ${isInternal || false}, 
+          'reply'
+        )
+        RETURNING *
+      `);
+
+      // Update ticket's first_response_at if this is the first response
+      await db.execute(sql`
+        UPDATE support_tickets 
+        SET 
+          first_response_at = COALESCE(first_response_at, NOW()),
+          updated_at = NOW()
+        WHERE id = ${ticketId}
+      `);
+
+      const newMessage = messageResult.rows[0];
+      
+      res.json({
+        id: newMessage.id,
+        ticketId: newMessage.ticket_id,
+        senderType: newMessage.sender_type,
+        senderName: newMessage.sender_name,
+        message: newMessage.message,
+        isInternal: newMessage.is_internal,
+        messageType: newMessage.message_type,
+        createdAt: newMessage.created_at
+      });
+    } catch (error) {
+      console.error("Error creating ticket message:", error);
+      res.status(500).json({ message: "Failed to create ticket message" });
+    }
+  });
+
   // Support Ticket Routes
   app.get("/api/support-tickets", async (req, res) => {
     try {
