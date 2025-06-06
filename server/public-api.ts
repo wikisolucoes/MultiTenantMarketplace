@@ -4,15 +4,11 @@ import {
   products, 
   productVariants, 
   orders, 
-  orderItems, 
   customers, 
   productCategories,
-  brands,
+  productBrands,
   apiCredentials,
-  tenants,
-  insertProductSchema,
-  insertOrderSchema,
-  insertCustomerSchema
+  tenants
 } from '@shared/schema';
 import { 
   authenticateApi, 
@@ -647,9 +643,9 @@ router.get('/brands', requirePermission('products:read'), async (req: Authentica
   try {
     const brandsList = await db
       .select()
-      .from(brands)
-      .where(eq(brands.tenantId, req.apiCredential!.tenantId))
-      .orderBy(asc(brands.name));
+      .from(productBrands)
+      .where(eq(productBrands.tenantId, req.apiCredential!.tenantId))
+      .orderBy(asc(productBrands.name));
 
     res.json({ data: brandsList });
   } catch (error) {

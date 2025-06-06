@@ -551,7 +551,7 @@ export const productCategories = pgTable("product_categories", {
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull(),
   description: text("description"),
-  parentId: integer("parent_id").references(() => productCategories.id),
+  parentId: integer("parent_id"),
   image: text("image"),
   icon: varchar("icon", { length: 100 }),
   isActive: boolean("is_active").default(true).notNull(),

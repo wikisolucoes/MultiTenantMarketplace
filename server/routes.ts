@@ -6,21 +6,13 @@ import {
   insertUserSchema, 
   insertTenantSchema,
   insertProductSchema,
-  insertBrandSchema,
-  insertProductCategorySchema,
   insertOrderSchema,
-  loginSchema, 
-  tenantRegistrationSchema,
+  insertCustomerSchema,
   users,
   tenants,
   products,
   orders,
-  notifications,
-  pluginSubscriptions,
-  plugins,
-  pluginPlans,
   customers,
-  notificationPreferences,
   supportTickets,
   supportTicketMessages,
   userProfiles,
@@ -33,11 +25,8 @@ import {
   type User,
   type Tenant,
   type Product,
-  type Brand,
-  type ProductCategory,
   type Order,
-  type ApiCredential,
-  insertApiCredentialSchema
+  type Customer
 } from "@shared/schema";
 import { storage } from "./storage";
 import { db } from "./db";
