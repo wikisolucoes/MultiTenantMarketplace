@@ -2282,9 +2282,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT 
           u.*,
-          t.name as tenant_name
+          t.name as tenant_name,
+          up.job_title,
+          up.access_level,
+          up.can_manage_products,
+          up.can_manage_orders,
+          up.can_view_financials,
+          up.can_manage_users,
+          up.can_manage_settings,
+          up.can_manage_themes,
+          up.can_manage_banners,
+          up.can_access_support,
+          up.last_activity_at,
+          up.login_attempts,
+          up.is_locked
         FROM users u
         LEFT JOIN tenants t ON u.tenant_id = t.id
+        LEFT JOIN user_profiles up ON u.id = up.user_id
         ORDER BY u.created_at DESC
       `);
 
@@ -2304,7 +2318,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastLoginAt: row.last_login_at,
         createdBy: row.created_by,
         createdAt: row.created_at,
-        updatedAt: row.updated_at
+        updatedAt: row.updated_at,
+        profile: row.access_level ? {
+          accessLevel: row.access_level || 'limited',
+          jobTitle: row.job_title || null,
+          canManageProducts: row.can_manage_products || false,
+          canManageOrders: row.can_manage_orders || false,
+          canViewFinancials: row.can_view_financials || false,
+          canManageUsers: row.can_manage_users || false,
+          canManageSettings: row.can_manage_settings || false,
+          canManageThemes: row.can_manage_themes || false,
+          canManageBanners: row.can_manage_banners || false,
+          canAccessSupport: row.can_access_support !== false,
+          lastActivityAt: row.last_activity_at,
+          loginAttempts: row.login_attempts || 0,
+          isLocked: row.is_locked || false
+        } : null
       }));
 
       res.json(users);
