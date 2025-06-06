@@ -168,11 +168,11 @@ export default function AdminHeader({ currentUser, onTabChange, activeTab }: Adm
                 <Home className="mr-2 h-4 w-4" />
                 <span>Ir para o Site</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onTabChange("settings")}>
+              <DropdownMenuItem onClick={() => onTabChange("user-profile")}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Minha Conta</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onTabChange("settings")}>
+              <DropdownMenuItem onClick={() => onTabChange("platform-settings")}>
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Configurações</span>
               </DropdownMenuItem>

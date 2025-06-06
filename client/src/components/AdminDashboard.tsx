@@ -71,7 +71,11 @@ import {
   PauseCircle,
   Calculator,
   Link,
-  Wrench
+  Wrench,
+  Key,
+  History,
+  ShieldCheck,
+  Camera
 } from "lucide-react";
 
 interface AdminStats {
@@ -3427,6 +3431,318 @@ function PlatformSettingsContent({ activeTab }: { activeTab: string }) {
   );
 }
 
+// User Profile Management Component
+function UserProfileManagement({ currentUser }: { currentUser: any }) {
+  const [activeProfileTab, setActiveProfileTab] = useState('personal');
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: userActivity, isLoading: activityLoading } = useQuery({
+    queryKey: ["/api/admin/user-activity", currentUser?.id],
+    enabled: !!currentUser?.id && activeProfileTab === 'activity'
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('PUT', `/api/admin/user-profile/${currentUser?.id}`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Perfil Atualizado",
+        description: "Suas informações foram atualizadas com sucesso.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/current-user"] });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar perfil.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('PUT', `/api/admin/change-password`, data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Senha Alterada",
+        description: "Sua senha foi alterada com sucesso.",
+      });
+      setIsPasswordDialogOpen(false);
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao alterar senha.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Minha Conta</h1>
+          <p className="text-muted-foreground">
+            Gerencie suas informações pessoais e configurações de segurança
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-6">
+        {/* Profile Navigation - Vertical Sidebar */}
+        <div className="w-64 shrink-0">
+          <nav className="space-y-2">
+            {[
+              { id: 'personal', label: 'Informações Pessoais', icon: User },
+              { id: 'security', label: 'Segurança', icon: ShieldCheck },
+              { id: 'activity', label: 'Atividade Recente', icon: History }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveProfileTab(tab.id)}
+                  className={`flex items-center gap-3 w-full px-3 py-2 text-left rounded-lg font-medium text-sm transition-colors ${
+                    activeProfileTab === tab.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Profile Content */}
+        <div className="flex-1">
+          {/* Personal Information Tab */}
+          {activeProfileTab === 'personal' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5" />
+                  Informações Pessoais
+                </CardTitle>
+                <CardDescription>
+                  Atualize suas informações básicas e dados de contato
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center gap-6">
+                  <div className="relative">
+                    <div className="w-20 h-20 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                      {currentUser?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || currentUser?.email?.[0] || 'A'}
+                    </div>
+                    <Button size="sm" variant="secondary" className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full p-0">
+                      <Camera className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">{currentUser?.fullName || 'Administrador'}</h3>
+                    <p className="text-muted-foreground">{currentUser?.email}</p>
+                    <Badge variant="secondary" className="mt-1">
+                      {currentUser?.role || 'Admin'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="firstName">Nome</Label>
+                    <Input 
+                      id="firstName" 
+                      defaultValue={currentUser?.fullName?.split(' ')[0] || ''} 
+                      placeholder="Seu nome"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lastName">Sobrenome</Label>
+                    <Input 
+                      id="lastName" 
+                      defaultValue={currentUser?.fullName?.split(' ').slice(1).join(' ') || ''} 
+                      placeholder="Seu sobrenome"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">E-mail</Label>
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      defaultValue={currentUser?.email || ''} 
+                      placeholder="seu@email.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Telefone</Label>
+                    <Input 
+                      id="phone" 
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="bio">Biografia</Label>
+                    <Textarea 
+                      id="bio" 
+                      placeholder="Conte um pouco sobre você..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button variant="outline">Cancelar</Button>
+                  <Button onClick={() => updateProfileMutation.mutate({})}>
+                    Salvar Alterações
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Security Tab */}
+          {activeProfileTab === 'security' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Key className="w-5 h-5" />
+                    Segurança da Conta
+                  </CardTitle>
+                  <CardDescription>
+                    Gerencie sua senha e configurações de segurança
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">Senha</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Última alteração: há 30 dias
+                        </p>
+                      </div>
+                      <Button onClick={() => setIsPasswordDialogOpen(true)}>
+                        Alterar Senha
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">Autenticação de Dois Fatores</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Adicione uma camada extra de segurança
+                        </p>
+                      </div>
+                      <Switch />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <h4 className="font-medium">Sessões Ativas</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Gerencie onde você está logado
+                        </p>
+                      </div>
+                      <Button variant="outline">
+                        Ver Sessões
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Password Change Dialog */}
+              <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Alterar Senha</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="currentPassword">Senha Atual</Label>
+                      <Input id="currentPassword" type="password" />
+                    </div>
+                    <div>
+                      <Label htmlFor="newPassword">Nova Senha</Label>
+                      <Input id="newPassword" type="password" />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                      <Input id="confirmPassword" type="password" />
+                    </div>
+                    <div className="flex justify-end gap-3">
+                      <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={() => changePasswordMutation.mutate({})}>
+                        Alterar Senha
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+
+          {/* Activity Tab */}
+          {activeProfileTab === 'activity' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Atividade Recente
+                </CardTitle>
+                <CardDescription>
+                  Visualize suas ações recentes na plataforma
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {activityLoading ? (
+                  <div className="flex justify-center items-center h-32">
+                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {[
+                      { action: 'Login realizado', time: '2 horas atrás', ip: '192.168.1.1' },
+                      { action: 'Configurações atualizadas', time: '1 dia atrás', ip: '192.168.1.1' },
+                      { action: 'Usuário criado', time: '2 dias atrás', ip: '192.168.1.1' },
+                      { action: 'Login realizado', time: '3 dias atrás', ip: '192.168.1.2' }
+                    ].map((activity, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <div className="font-medium">{activity.action}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {activity.time} • IP: {activity.ip}
+                          </div>
+                        </div>
+                        <Badge variant="outline">
+                          Sucesso
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [activePlatformTab, setActivePlatformTab] = useState('general');
@@ -4912,6 +5228,13 @@ export default function AdminDashboard() {
                   <PlatformSettingsContent activeTab={activePlatformTab} />
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* User Profile Tab */}
+          {activeTab === "user-profile" && (
+            <div className="space-y-6">
+              <UserProfileManagement currentUser={currentUser} />
             </div>
           )}
 
