@@ -3290,6 +3290,27 @@ export default function AdminDashboard() {
 
   const { data: systemMetrics } = useQuery({
     queryKey: ['/api/admin/system-metrics'],
+    refetchInterval: 30000 // Refresh every 30 seconds
+  });
+
+  const { data: systemStatus } = useQuery({
+    queryKey: ['/api/admin/system/status'],
+    refetchInterval: 15000 // Refresh every 15 seconds
+  });
+
+  const { data: databasePerformance } = useQuery({
+    queryKey: ['/api/admin/system/database-performance'],
+    refetchInterval: 60000 // Refresh every minute
+  });
+
+  const { data: apiAnalytics } = useQuery({
+    queryKey: ['/api/admin/system/api-analytics'],
+    refetchInterval: 30000 // Refresh every 30 seconds
+  });
+
+  const { data: securityLogs } = useQuery({
+    queryKey: ['/api/admin/system/security-logs'],
+    refetchInterval: 30000 // Refresh every 30 seconds
   });
 
   const { data: plugins } = useQuery({
@@ -4568,57 +4589,40 @@ export default function AdminDashboard() {
             <div className="space-y-6">
               {/* System Status Overview */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Sistema</CardTitle>
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">Online</div>
-                    <p className="text-xs text-muted-foreground">
-                      Uptime: 99.9%
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Database</CardTitle>
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">Saudável</div>
-                    <p className="text-xs text-muted-foreground">
-                      Conectado
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">API</CardTitle>
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">Ativo</div>
-                    <p className="text-xs text-muted-foreground">
-                      Resposta menor que 100ms
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">WebSocket</CardTitle>
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">Conectado</div>
-                    <p className="text-xs text-muted-foreground">
-                      {adminStats.activeUsers} conexões
-                    </p>
-                  </CardContent>
-                </Card>
+                {systemStatus?.services?.map((service: any, index: number) => (
+                  <Card key={index}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">{service.name}</CardTitle>
+                      <div className={`w-3 h-3 rounded-full ${
+                        service.status === 'operational' ? 'bg-green-500' :
+                        service.status === 'maintenance' ? 'bg-yellow-500' : 'bg-red-500'
+                      }`} />
+                    </CardHeader>
+                    <CardContent>
+                      <div className={`text-2xl font-bold ${
+                        service.status === 'operational' ? 'text-green-600' :
+                        service.status === 'maintenance' ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {service.status === 'operational' ? 'Online' :
+                         service.status === 'maintenance' ? 'Manutenção' : 'Offline'}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {service.uptime} - {service.responseTime}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )) || Array.from({ length: 4 }).map((_, index) => (
+                  <Card key={index}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Carregando...</CardTitle>
+                      <div className="w-3 h-3 rounded-full bg-gray-300" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-gray-400">---</div>
+                      <p className="text-xs text-muted-foreground">Aguardando dados</p>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
 
               {/* Real-time Metrics */}
