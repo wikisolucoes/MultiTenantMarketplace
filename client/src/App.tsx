@@ -16,6 +16,8 @@ import TaxConfiguration from "@/pages/TaxConfiguration";
 import PluginSubscriptions from "@/pages/PluginSubscriptions";
 import EnhancedProductManagement from "@/pages/EnhancedProductManagement";
 import NotificationDemo from "@/pages/NotificationDemo";
+import MerchantSupportCenter from "@/pages/MerchantSupportCenter";
+import AdminSupportCenter from "@/pages/AdminSupportCenter";
 
 function AppRouter() {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
@@ -74,6 +76,12 @@ function AppRouter() {
       </Route>
       <Route path="/notifications-demo">
         {isAuth && userRole === "merchant" ? <NotificationDemo /> : <Home />}
+      </Route>
+      <Route path="/support">
+        {isAuth && userRole === "merchant" ? <MerchantSupportCenter /> : <Home />}
+      </Route>
+      <Route path="/admin-support">
+        {isAuth && userRole === "admin" ? <AdminSupportCenter /> : <Home />}
       </Route>
       <Route path="/storefront/*" component={StorefrontSPA} />
       <Route path="/themes" component={StorefrontThemed} />
