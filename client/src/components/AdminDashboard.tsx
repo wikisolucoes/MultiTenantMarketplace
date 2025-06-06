@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import AdminHeader from "./AdminHeader";
+import AdminSupportCenter from "@/pages/AdminSupportCenter";
 import { 
   Store, 
   Users, 
@@ -4726,6 +4727,13 @@ export default function AdminDashboard() {
           {activeTab === "subscriptions" && (
             <div className="space-y-6">
               <SubscriptionManagement />
+            </div>
+          )}
+
+          {/* Support Center Tab */}
+          {activeTab === "support" && (
+            <div className="space-y-6">
+              <AdminSupportCenter />
             </div>
           )}
 
