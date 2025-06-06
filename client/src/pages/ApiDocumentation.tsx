@@ -489,7 +489,7 @@ export default function ApiDocumentation() {
                     Acesse a documentação interativa completa com exemplos e testes em tempo real
                   </p>
                   <Button asChild className="gap-2">
-                    <a href="/api-docs" target="_blank" rel="noopener noreferrer">
+                    <a href="/api/docs" target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-4 w-4" />
                       Abrir Documentação Swagger
                     </a>

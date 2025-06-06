@@ -471,7 +471,7 @@ const options = {
 export const specs = swaggerJsdoc(options);
 
 export function setupSwagger(app: Express) {
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs, {
     customSiteTitle: 'WikiStore API Documentation',
     customCss: `
       .swagger-ui .topbar { display: none }
