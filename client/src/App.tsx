@@ -18,6 +18,9 @@ import EnhancedProductManagement from "@/pages/EnhancedProductManagement";
 import NotificationDemo from "@/pages/NotificationDemo";
 import MerchantSupportCenter from "@/pages/MerchantSupportCenter";
 import AdminSupportCenter from "@/pages/AdminSupportCenter";
+import CelcoinIntegration from "@/pages/CelcoinIntegration";
+import ApiDocumentation from "@/pages/ApiDocumentation";
+import ApiCredentials from "@/pages/ApiCredentials";
 
 function AppRouter() {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
@@ -82,6 +85,15 @@ function AppRouter() {
       </Route>
       <Route path="/admin-support">
         {isAuth && userRole === "admin" ? <AdminSupportCenter /> : <Home />}
+      </Route>
+      <Route path="/celcoin">
+        {isAuth && (userRole === "admin" || userRole === "merchant") ? <CelcoinIntegration /> : <Home />}
+      </Route>
+      <Route path="/api-docs">
+        {isAuth && userRole === "admin" ? <ApiDocumentation /> : <Home />}
+      </Route>
+      <Route path="/api-credentials">
+        {isAuth && userRole === "merchant" ? <ApiCredentials /> : <Home />}
       </Route>
       <Route path="/storefront/*" component={StorefrontSPA} />
       <Route path="/themes" component={StorefrontThemed} />

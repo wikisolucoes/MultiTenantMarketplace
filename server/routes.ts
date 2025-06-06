@@ -45,6 +45,7 @@ import { generateApiCredentials } from "./api-auth";
 import publicApiRouter from "./public-api";
 import { setupSwagger } from "./swagger-config";
 import { generateApiDocsHTML } from "./api-docs-html";
+import { celcoinApi } from "./celcoin-integration";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -4569,6 +4570,302 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/documentation', (req, res) => {
     res.setHeader('Content-Type', 'text/html');
     res.send(generateApiDocsHTML());
+  });
+
+  // CELCOIN PAYMENT INTEGRATION ROUTES
+  
+  // Create PIX Payment
+  app.post('/api/celcoin/pix/create', async (req, res) => {
+    try {
+      const { amount, tenantId, orderId, customerData } = req.body;
+      
+      // Get tenant information for merchant data
+      const tenant = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+      if (!tenant.length) {
+        return res.status(400).json({ message: 'Tenant not found' });
+      }
+      
+      const merchantData = {
+        postalCode: tenant[0].address?.postalCode || '01000000',
+        city: tenant[0].address?.city || 'São Paulo',
+        merchantCategoryCode: '5999',
+        name: tenant[0].name
+      };
+
+      const pixPayment = await celcoinApi.createPixPayment({
+        merchant: merchantData,
+        amount: parseFloat(amount),
+        correlationID: `PIX_${orderId}_${Date.now()}`,
+        expiresDate: new Date(Date.now() + 30 * 60000).toISOString(), // 30 minutes
+        payer: customerData ? {
+          name: customerData.name,
+          email: customerData.email,
+          cpf: customerData.cpf
+        } : undefined
+      });
+
+      // Save transaction to ledger
+      await db.insert(ledgerEntries).values({
+        tenantId,
+        transactionType: 'pending_credit',
+        amount: amount.toString(),
+        description: `PIX Payment - Order ${orderId}`,
+        referenceType: 'order',
+        referenceId: orderId.toString(),
+        celcoinTransactionId: pixPayment.transactionId,
+        metadata: { 
+          paymentType: 'pix',
+          pixKey: pixPayment.pixCopiaECola,
+          qrCode: pixPayment.emvqrcps 
+        }
+      });
+
+      res.json({
+        success: true,
+        transactionId: pixPayment.transactionId,
+        pixKey: pixPayment.pixCopiaECola,
+        qrCode: pixPayment.emvqrcps,
+        expirationDate: pixPayment.expirationDate
+      });
+    } catch (error: any) {
+      console.error('Error creating PIX payment:', error);
+      res.status(500).json({ message: error.message || 'Failed to create PIX payment' });
+    }
+  });
+
+  // Create Boleto Payment
+  app.post('/api/celcoin/boleto/create', async (req, res) => {
+    try {
+      const { amount, tenantId, orderId, customerData } = req.body;
+      
+      if (!customerData || !customerData.name || !customerData.cpf || !customerData.address) {
+        return res.status(400).json({ message: 'Customer data is required for boleto' });
+      }
+
+      // Get tenant information
+      const tenant = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+      if (!tenant.length) {
+        return res.status(400).json({ message: 'Tenant not found' });
+      }
+
+      const merchantData = {
+        postalCode: tenant[0].address?.postalCode || '01000000',
+        city: tenant[0].address?.city || 'São Paulo',
+        merchantCategoryCode: '5999',
+        name: tenant[0].name
+      };
+
+      const boletoPayment = await celcoinApi.createBoleto({
+        merchant: merchantData,
+        amount: parseFloat(amount),
+        correlationID: `BOL_${orderId}_${Date.now()}`,
+        expiresDate: new Date(Date.now() + 7 * 24 * 60 * 60000).toISOString(), // 7 days
+        payer: {
+          name: customerData.name,
+          email: customerData.email,
+          cpf: customerData.cpf,
+          address: customerData.address
+        }
+      });
+
+      // Save transaction to ledger
+      await db.insert(ledgerEntries).values({
+        tenantId,
+        transactionType: 'pending_credit',
+        amount: amount.toString(),
+        description: `Boleto Payment - Order ${orderId}`,
+        referenceType: 'order',
+        referenceId: orderId.toString(),
+        celcoinTransactionId: boletoPayment.transactionId,
+        metadata: { 
+          paymentType: 'boleto',
+          digitableLine: boletoPayment.digitableLine,
+          barCode: boletoPayment.barCode,
+          pdf: boletoPayment.pdf
+        }
+      });
+
+      res.json({
+        success: true,
+        transactionId: boletoPayment.transactionId,
+        digitableLine: boletoPayment.digitableLine,
+        barCode: boletoPayment.barCode,
+        pdf: boletoPayment.pdf,
+        expirationDate: boletoPayment.expirationDate
+      });
+    } catch (error: any) {
+      console.error('Error creating boleto:', error);
+      res.status(500).json({ message: error.message || 'Failed to create boleto' });
+    }
+  });
+
+  // Check Payment Status
+  app.get('/api/celcoin/payment/status/:transactionId', async (req, res) => {
+    try {
+      const { transactionId } = req.params;
+      
+      // Get payment status from Celcoin
+      const pixStatus = await celcoinApi.getPixPaymentStatus(transactionId);
+      
+      // Update local transaction if status changed
+      if (pixStatus.status === 'PAID') {
+        const ledgerEntry = await db.select().from(ledgerEntries)
+          .where(eq(ledgerEntries.celcoinTransactionId, transactionId))
+          .limit(1);
+          
+        if (ledgerEntry.length > 0) {
+          await db.update(ledgerEntries)
+            .set({ 
+              transactionType: 'credit',
+              updatedAt: new Date()
+            })
+            .where(eq(ledgerEntries.celcoinTransactionId, transactionId));
+        }
+      }
+
+      res.json({
+        success: true,
+        status: pixStatus.status,
+        transactionId,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('Error checking payment status:', error);
+      res.status(500).json({ message: error.message || 'Failed to check payment status' });
+    }
+  });
+
+  // Get Celcoin Account Balance
+  app.get('/api/celcoin/account/balance', async (req, res) => {
+    try {
+      const balance = await celcoinApi.getAccountBalance();
+      
+      res.json({
+        success: true,
+        available: balance.available,
+        blocked: balance.blocked,
+        total: balance.total,
+        currency: 'BRL',
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('Error getting Celcoin balance:', error);
+      res.status(500).json({ message: error.message || 'Failed to get account balance' });
+    }
+  });
+
+  // Get Account Statement
+  app.get('/api/celcoin/account/statement', async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      const statement = await celcoinApi.getAccountStatement(
+        startDate as string || new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
+        endDate as string || new Date().toISOString()
+      );
+
+      res.json({
+        success: true,
+        transactions: statement,
+        period: {
+          startDate: startDate || new Date(Date.now() - 30 * 24 * 60 * 60000).toISOString(),
+          endDate: endDate || new Date().toISOString()
+        }
+      });
+    } catch (error: any) {
+      console.error('Error getting account statement:', error);
+      res.status(500).json({ message: error.message || 'Failed to get account statement' });
+    }
+  });
+
+  // Create Withdrawal
+  app.post('/api/celcoin/withdrawal/create', async (req, res) => {
+    try {
+      const { amount, tenantId, bankAccount } = req.body;
+      
+      if (!bankAccount || !bankAccount.bank || !bankAccount.agency || !bankAccount.account) {
+        return res.status(400).json({ message: 'Bank account information is required' });
+      }
+
+      const withdrawal = await celcoinApi.createWithdrawal(parseFloat(amount), bankAccount);
+
+      // Save withdrawal to ledger
+      await db.insert(ledgerEntries).values({
+        tenantId,
+        transactionType: 'debit',
+        amount: amount.toString(),
+        description: `Withdrawal to ${bankAccount.bank} - ${bankAccount.account}`,
+        referenceType: 'withdrawal',
+        referenceId: withdrawal.id,
+        celcoinTransactionId: withdrawal.id,
+        metadata: { 
+          withdrawalType: 'bank_transfer',
+          bankAccount: bankAccount
+        }
+      });
+
+      res.json({
+        success: true,
+        withdrawalId: withdrawal.id,
+        status: withdrawal.status,
+        estimatedDate: withdrawal.estimatedDate
+      });
+    } catch (error: any) {
+      console.error('Error creating withdrawal:', error);
+      res.status(500).json({ message: error.message || 'Failed to create withdrawal' });
+    }
+  });
+
+  // Celcoin Webhook for payment notifications
+  app.post('/api/celcoin/webhook', async (req, res) => {
+    try {
+      const signature = req.headers['x-celcoin-signature'] as string;
+      const payload = JSON.stringify(req.body);
+      
+      // Validate webhook signature (if configured)
+      if (process.env.CELCOIN_WEBHOOK_SECRET && signature) {
+        const isValid = celcoinApi.validateWebhookSignature(
+          payload, 
+          signature, 
+          process.env.CELCOIN_WEBHOOK_SECRET
+        );
+        
+        if (!isValid) {
+          return res.status(401).json({ message: 'Invalid webhook signature' });
+        }
+      }
+
+      const { event, data } = req.body;
+      
+      if (event === 'payment.approved' || event === 'payment.paid') {
+        // Update ledger entry status
+        await db.update(ledgerEntries)
+          .set({ 
+            transactionType: 'credit',
+            updatedAt: new Date()
+          })
+          .where(eq(ledgerEntries.celcoinTransactionId, data.transactionId));
+          
+        // Update order status if applicable
+        const ledgerEntry = await db.select().from(ledgerEntries)
+          .where(eq(ledgerEntries.celcoinTransactionId, data.transactionId))
+          .limit(1);
+          
+        if (ledgerEntry.length > 0 && ledgerEntry[0].referenceType === 'order') {
+          await db.update(orders)
+            .set({ 
+              paymentStatus: 'succeeded',
+              updatedAt: new Date()
+            })
+            .where(eq(orders.id, parseInt(ledgerEntry[0].referenceId)));
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error processing Celcoin webhook:', error);
+      res.status(500).json({ message: error.message || 'Failed to process webhook' });
+    }
   });
 
   // API CREDENTIALS MANAGEMENT FOR MERCHANTS
