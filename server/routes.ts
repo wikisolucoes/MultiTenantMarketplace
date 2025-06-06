@@ -2471,6 +2471,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform Settings Management
+  app.get("/api/admin/platform/settings", async (req, res) => {
+    try {
+      const { category } = req.query;
+      
+      let query = sql`
+        SELECT 
+          ps.*,
+          u.full_name as last_modified_by_name
+        FROM platform_settings ps
+        LEFT JOIN users u ON ps.last_modified_by = u.id
+      `;
+      
+      if (category) {
+        query = sql`${query} WHERE ps.category = ${category as string}`;
+      }
+      
+      query = sql`${query} ORDER BY ps.category, ps.key`;
+      
+      const settingsResult = await db.execute(query);
+      
+      // Group settings by category
+      const settingsByCategory = settingsResult.rows.reduce((acc: any, setting: any) => {
+        if (!acc[setting.category]) {
+          acc[setting.category] = [];
+        }
+        acc[setting.category].push({
+          ...setting,
+          value: setting.data_type === 'json' ? JSON.parse(setting.value || '{}') : 
+                 setting.data_type === 'boolean' ? setting.value === 'true' :
+                 setting.data_type === 'number' ? Number(setting.value) : setting.value
+        });
+        return acc;
+      }, {});
+
+      res.json(settingsByCategory);
+    } catch (error) {
+      console.error("Error fetching platform settings:", error);
+      res.status(500).json({ message: "Failed to fetch platform settings" });
+    }
+  });
+
+  app.put("/api/admin/platform/settings/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { value } = req.body;
+      const userId = (req as any).user?.claims?.sub;
+
+      const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+
+      await db.execute(sql`
+        UPDATE platform_settings 
+        SET 
+          value = ${stringValue},
+          last_modified_by = ${userId},
+          updated_at = NOW()
+        WHERE id = ${Number(id)}
+      `);
+
+      res.json({ message: "Setting updated successfully" });
+    } catch (error) {
+      console.error("Error updating platform setting:", error);
+      res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
+  // Platform Features Management
+  app.get("/api/admin/platform/features", async (req, res) => {
+    try {
+      const featuresResult = await db.execute(sql`
+        SELECT 
+          pf.*,
+          u1.full_name as created_by_name,
+          u2.full_name as enabled_by_name
+        FROM platform_features pf
+        LEFT JOIN users u1 ON pf.created_by = u1.id
+        LEFT JOIN users u2 ON pf.enabled_by = u2.id
+        ORDER BY pf.name
+      `);
+
+      res.json(featuresResult.rows);
+    } catch (error) {
+      console.error("Error fetching platform features:", error);
+      res.status(500).json({ message: "Failed to fetch platform features" });
+    }
+  });
+
+  app.post("/api/admin/platform/features", async (req, res) => {
+    try {
+      const { name, description, rolloutPercentage, targetTenants, metadata } = req.body;
+      const userId = (req as any).user?.claims?.sub;
+
+      const result = await db.execute(sql`
+        INSERT INTO platform_features (
+          name, description, rollout_percentage, target_tenants, metadata, created_by
+        ) VALUES (
+          ${name}, ${description}, ${rolloutPercentage || 0}, 
+          ${JSON.stringify(targetTenants || [])}, ${JSON.stringify(metadata || {})}, ${userId}
+        ) RETURNING *
+      `);
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error creating platform feature:", error);
+      res.status(500).json({ message: "Failed to create platform feature" });
+    }
+  });
+
+  app.put("/api/admin/platform/features/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isEnabled, rolloutPercentage, targetTenants, metadata } = req.body;
+      const userId = (req as any).user?.claims?.sub;
+
+      await db.execute(sql`
+        UPDATE platform_features 
+        SET 
+          is_enabled = ${isEnabled},
+          rollout_percentage = ${rolloutPercentage || 0},
+          target_tenants = ${JSON.stringify(targetTenants || [])},
+          metadata = ${JSON.stringify(metadata || {})},
+          enabled_by = ${userId},
+          enabled_at = ${isEnabled ? 'NOW()' : null},
+          updated_at = NOW()
+        WHERE id = ${Number(id)}
+      `);
+
+      res.json({ message: "Feature updated successfully" });
+    } catch (error) {
+      console.error("Error updating platform feature:", error);
+      res.status(500).json({ message: "Failed to update feature" });
+    }
+  });
+
+  // Platform Maintenance Management
+  app.get("/api/admin/platform/maintenance", async (req, res) => {
+    try {
+      const maintenanceResult = await db.execute(sql`
+        SELECT 
+          pm.*,
+          u.full_name as created_by_name
+        FROM platform_maintenance pm
+        LEFT JOIN users u ON pm.created_by = u.id
+        ORDER BY pm.scheduled_start DESC
+      `);
+
+      res.json(maintenanceResult.rows);
+    } catch (error) {
+      console.error("Error fetching platform maintenance:", error);
+      res.status(500).json({ message: "Failed to fetch platform maintenance" });
+    }
+  });
+
+  app.post("/api/admin/platform/maintenance", async (req, res) => {
+    try {
+      const { 
+        title, description, maintenanceType, severity, affectedServices,
+        scheduledStart, scheduledEnd, notifyUsers, showBanner, bannerMessage 
+      } = req.body;
+      const userId = (req as any).user?.claims?.sub;
+
+      const result = await db.execute(sql`
+        INSERT INTO platform_maintenance (
+          title, description, maintenance_type, severity, affected_services,
+          scheduled_start, scheduled_end, notify_users, show_banner, banner_message, created_by
+        ) VALUES (
+          ${title}, ${description}, ${maintenanceType}, ${severity}, 
+          ${JSON.stringify(affectedServices || [])}, ${scheduledStart}, ${scheduledEnd},
+          ${notifyUsers}, ${showBanner}, ${bannerMessage}, ${userId}
+        ) RETURNING *
+      `);
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error creating platform maintenance:", error);
+      res.status(500).json({ message: "Failed to create platform maintenance" });
+    }
+  });
+
   // System monitoring - Security Logs
   app.get("/api/admin/system/security-logs", async (req, res) => {
     try {
@@ -2479,13 +2658,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           u.email,
           u.role,
-          u.last_login_ip as ip_address,
-          u.last_login_at as timestamp,
+          '127.0.0.1' as ip_address,
+          u.last_login_at as created_at,
           CASE 
-            WHEN u.failed_login_attempts > 0 THEN 'failed_login'
-            ELSE 'successful_login'
+            WHEN u.is_active = false THEN 'account_locked'
+            ELSE 'login_success'
           END as event_type,
-          u.failed_login_attempts
+          'User login activity' as description,
+          u.id as user_id
         FROM users u 
         WHERE u.last_login_at >= NOW() - INTERVAL '24 hours'
         ORDER BY u.last_login_at DESC

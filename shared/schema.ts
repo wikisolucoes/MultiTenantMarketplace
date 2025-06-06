@@ -61,6 +61,58 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Platform settings and configurations
+export const platformSettings = pgTable("platform_settings", {
+  id: serial("id").primaryKey(),
+  category: varchar("category", { length: 50 }).notNull(), // 'general', 'email', 'payment', 'security', 'integrations', 'tax', 'notification'
+  key: varchar("key", { length: 100 }).notNull(),
+  value: text("value"),
+  dataType: varchar("data_type", { length: 20 }).default("string").notNull(), // 'string', 'number', 'boolean', 'json'
+  isPublic: boolean("is_public").default(false).notNull(), // If setting can be accessed by tenants
+  description: text("description"),
+  validationRules: jsonb("validation_rules"), // JSON with validation rules
+  lastModifiedBy: integer("last_modified_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Platform feature flags
+export const platformFeatures = pgTable("platform_features", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  isEnabled: boolean("is_enabled").default(false).notNull(),
+  rolloutPercentage: integer("rollout_percentage").default(0).notNull(), // 0-100
+  targetTenants: jsonb("target_tenants"), // Array of tenant IDs for selective rollout
+  metadata: jsonb("metadata"), // Additional feature configuration
+  createdBy: integer("created_by").references(() => users.id),
+  enabledBy: integer("enabled_by").references(() => users.id),
+  enabledAt: timestamp("enabled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Platform maintenance and system announcements
+export const platformMaintenance = pgTable("platform_maintenance", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  maintenanceType: varchar("maintenance_type", { length: 50 }).notNull(), // 'scheduled', 'emergency', 'update'
+  severity: varchar("severity", { length: 20 }).default("low").notNull(), // 'low', 'medium', 'high', 'critical'
+  affectedServices: jsonb("affected_services"), // Array of service names
+  scheduledStart: timestamp("scheduled_start"),
+  scheduledEnd: timestamp("scheduled_end"),
+  actualStart: timestamp("actual_start"),
+  actualEnd: timestamp("actual_end"),
+  status: varchar("status", { length: 20 }).default("scheduled").notNull(), // 'scheduled', 'in_progress', 'completed', 'cancelled'
+  notifyUsers: boolean("notify_users").default(true).notNull(),
+  showBanner: boolean("show_banner").default(false).notNull(),
+  bannerMessage: text("banner_message"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // User profiles with additional details and permissions
 export const userProfiles = pgTable("user_profiles", {
   id: serial("id").primaryKey(),
