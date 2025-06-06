@@ -68,7 +68,10 @@ import {
   Code,
   User,
   PlayCircle,
-  PauseCircle
+  PauseCircle,
+  Calculator,
+  Link,
+  Wrench
 } from "lucide-react";
 
 interface AdminStats {
