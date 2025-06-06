@@ -51,7 +51,7 @@ const navigationItems = [
   { id: "communications", label: "Comunicação", icon: Mail },
   { id: "reports", label: "Relatórios", icon: BarChart3 },
   { id: "system", label: "Sistema", icon: Activity },
-  { id: "settings", label: "Configurações", icon: Settings },
+  { id: "platform-settings", label: "Configurações da Plataforma", icon: Settings },
 ];
 
 export default function AdminHeader({ currentUser, onTabChange, activeTab }: AdminHeaderProps) {

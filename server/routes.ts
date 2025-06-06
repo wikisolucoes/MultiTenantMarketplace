@@ -4009,6 +4009,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Platform Settings API Routes
+  app.get('/api/admin/platform/settings/:category?', async (req, res) => {
+    try {
+      const { category } = req.params;
+      
+      let query = db.select({
+        id: platformSettings.id,
+        category: platformSettings.category,
+        key: platformSettings.key,
+        value: platformSettings.value,
+        data_type: platformSettings.dataType,
+        is_public: platformSettings.isPublic,
+        description: platformSettings.description,
+        last_modified_by_name: sql<string>`COALESCE(u.first_name || ' ' || u.last_name, u.email)`,
+        created_at: platformSettings.createdAt,
+        updated_at: platformSettings.updatedAt
+      })
+      .from(platformSettings)
+      .leftJoin(users, eq(platformSettings.lastModifiedBy, users.id));
+
+      if (category) {
+        query = query.where(eq(platformSettings.category, category));
+      }
+
+      const settings = await query;
+      
+      if (category) {
+        res.json({
+          [category]: settings
+        });
+      } else {
+        // Group by category
+        const grouped = settings.reduce((acc: any, setting: any) => {
+          if (!acc[setting.category]) {
+            acc[setting.category] = [];
+          }
+          acc[setting.category].push(setting);
+          return acc;
+        }, {});
+        
+        res.json(grouped);
+      }
+    } catch (error) {
+      console.error('Error fetching platform settings:', error);
+      res.status(500).json({ message: 'Failed to fetch platform settings' });
+    }
+  });
+
+  app.put('/api/admin/platform/settings/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { value } = req.body;
+      
+      const [updated] = await db
+        .update(platformSettings)
+        .set({
+          value: value?.toString(),
+          lastModifiedBy: 1, // Admin user
+          updatedAt: new Date()
+        })
+        .where(eq(platformSettings.id, Number(id)))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating platform setting:', error);
+      res.status(500).json({ message: 'Failed to update platform setting' });
+    }
+  });
+
+  app.get('/api/admin/platform/features', async (req, res) => {
+    try {
+      const features = await db.select({
+        id: platformFeatures.id,
+        name: platformFeatures.name,
+        description: platformFeatures.description,
+        is_enabled: platformFeatures.isEnabled,
+        rollout_percentage: platformFeatures.rolloutPercentage,
+        target_tenants: platformFeatures.targetTenants,
+        metadata: platformFeatures.metadata,
+        created_by_name: sql<string>`COALESCE(creator.first_name || ' ' || creator.last_name, creator.email)`,
+        enabled_by_name: sql<string>`COALESCE(enabler.first_name || ' ' || enabler.last_name, enabler.email)`,
+        enabled_at: platformFeatures.enabledAt,
+        created_at: platformFeatures.createdAt,
+        updated_at: platformFeatures.updatedAt
+      })
+      .from(platformFeatures)
+      .leftJoin(users.as('creator'), eq(platformFeatures.createdBy, users.as('creator').id))
+      .leftJoin(users.as('enabler'), eq(platformFeatures.enabledBy, users.as('enabler').id))
+      .orderBy(platformFeatures.name);
+
+      res.json(features);
+    } catch (error) {
+      console.error('Error fetching platform features:', error);
+      res.status(500).json({ message: 'Failed to fetch platform features' });
+    }
+  });
+
+  app.put('/api/admin/platform/features/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isEnabled, rolloutPercentage, targetTenants, metadata } = req.body;
+      
+      const [updated] = await db
+        .update(platformFeatures)
+        .set({
+          isEnabled,
+          rolloutPercentage,
+          targetTenants,
+          metadata,
+          enabledBy: isEnabled ? 1 : null, // Admin user
+          enabledAt: isEnabled ? new Date() : null,
+          updatedAt: new Date()
+        })
+        .where(eq(platformFeatures.id, Number(id)))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating platform feature:', error);
+      res.status(500).json({ message: 'Failed to update platform feature' });
+    }
+  });
+
+  app.get('/api/admin/platform/maintenance', async (req, res) => {
+    try {
+      const maintenance = await db.select({
+        id: platformMaintenance.id,
+        title: platformMaintenance.title,
+        description: platformMaintenance.description,
+        maintenance_type: platformMaintenance.maintenanceType,
+        severity: platformMaintenance.severity,
+        affected_services: platformMaintenance.affectedServices,
+        scheduled_start: platformMaintenance.scheduledStart,
+        scheduled_end: platformMaintenance.scheduledEnd,
+        actual_start: platformMaintenance.actualStart,
+        actual_end: platformMaintenance.actualEnd,
+        status: platformMaintenance.status,
+        notify_users: platformMaintenance.notifyUsers,
+        show_banner: platformMaintenance.showBanner,
+        banner_message: platformMaintenance.bannerMessage,
+        created_by_name: sql<string>`COALESCE(u.first_name || ' ' || u.last_name, u.email)`,
+        created_at: platformMaintenance.createdAt,
+        updated_at: platformMaintenance.updatedAt
+      })
+      .from(platformMaintenance)
+      .leftJoin(users, eq(platformMaintenance.createdBy, users.id))
+      .orderBy(desc(platformMaintenance.createdAt));
+
+      res.json(maintenance);
+    } catch (error) {
+      console.error('Error fetching platform maintenance:', error);
+      res.status(500).json({ message: 'Failed to fetch platform maintenance' });
+    }
+  });
+
+  app.post('/api/admin/platform/maintenance', async (req, res) => {
+    try {
+      const {
+        title,
+        description,
+        maintenanceType,
+        severity,
+        affectedServices,
+        scheduledStart,
+        scheduledEnd,
+        notifyUsers,
+        showBanner,
+        bannerMessage
+      } = req.body;
+      
+      const [created] = await db
+        .insert(platformMaintenance)
+        .values({
+          title,
+          description,
+          maintenanceType,
+          severity,
+          affectedServices,
+          scheduledStart: scheduledStart ? new Date(scheduledStart) : null,
+          scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : null,
+          notifyUsers,
+          showBanner,
+          bannerMessage,
+          createdBy: 1, // Admin user
+          status: 'scheduled'
+        })
+        .returning();
+
+      res.json(created);
+    } catch (error) {
+      console.error('Error creating platform maintenance:', error);
+      res.status(500).json({ message: 'Failed to create platform maintenance' });
+    }
+  });
+
   // Attach notification functions to the server for use in routes
   (httpServer as any).sendNotification = sendNotification;
   (httpServer as any).broadcastToTenant = broadcastToTenant;
