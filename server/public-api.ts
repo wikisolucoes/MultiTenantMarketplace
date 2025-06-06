@@ -24,13 +24,52 @@ import {
 import { eq, and, desc, asc, sql, like, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 
+/**
+ * @swagger
+ * tags:
+ *   - name: API Info
+ *     description: Informações da API e autenticação
+ *   - name: Products
+ *     description: Gerenciamento de produtos
+ *   - name: Orders
+ *     description: Gerenciamento de pedidos
+ *   - name: Customers
+ *     description: Gerenciamento de clientes
+ *   - name: Categories
+ *     description: Gerenciamento de categorias
+ *   - name: Brands
+ *     description: Gerenciamento de marcas
+ */
+
 const router = Router();
 
 // Apply authentication and logging to all routes
 router.use(authenticateApi);
 router.use(logApiUsage);
 
-// API Info endpoint
+/**
+ * @swagger
+ * /info:
+ *   get:
+ *     summary: Informações da API
+ *     description: Retorna informações sobre a API, permissões da credencial e endpoints disponíveis
+ *     tags: [API Info]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Informações da API
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiInfo'
+ *       401:
+ *         description: Não autorizado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/info', (req: AuthenticatedApiRequest, res) => {
   res.json({
     version: '1.0.0',
@@ -70,7 +109,79 @@ router.get('/info', (req: AuthenticatedApiRequest, res) => {
   });
 });
 
-// PRODUCTS ENDPOINTS
+/**
+ * @swagger
+ * /products:
+ *   get:
+ *     summary: Listar produtos
+ *     description: Retorna uma lista paginada de produtos com filtros opcionais
+ *     tags: [Products]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Número da página
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 50
+ *         description: Itens por página
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Buscar por nome, descrição ou SKU
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: integer
+ *         description: Filtrar por ID da categoria
+ *       - in: query
+ *         name: brand
+ *         schema:
+ *           type: integer
+ *         description: Filtrar por ID da marca
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, inactive, draft]
+ *         description: Filtrar por status
+ *     responses:
+ *       200:
+ *         description: Lista de produtos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Product'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *       401:
+ *         description: Não autorizado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Sem permissão
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/products', requirePermission('products:read'), async (req: AuthenticatedApiRequest, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
