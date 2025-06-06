@@ -8,178 +8,243 @@ import {
   boolean,
   serial,
   jsonb,
-  foreignKey,
   date,
   bigint,
-  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Core tenant table
 export const tenants = pgTable("tenants", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   subdomain: varchar("subdomain", { length: 255 }).unique().notNull(),
   isActive: boolean("is_active").default(true).notNull(),
-  // Theme and customization settings
   activeTheme: varchar("active_theme", { length: 50 }).default("modern").notNull(),
-  logo: text("logo"), // Logo URL
-  favicon: text("favicon"), // Favicon URL
-  primaryColor: varchar("primary_color", { length: 7 }).default("#0891b2"), // Hex color
+  logo: text("logo"),
+  favicon: text("favicon"),
+  primaryColor: varchar("primary_color", { length: 7 }).default("#0891b2"),
   secondaryColor: varchar("secondary_color", { length: 7 }).default("#0e7490"),
   accentColor: varchar("accent_color", { length: 7 }).default("#06b6d4"),
-  // Store configuration
   storeDescription: text("store_description"),
   contactEmail: varchar("contact_email", { length: 255 }),
   contactPhone: varchar("contact_phone", { length: 20 }),
   whatsappNumber: varchar("whatsapp_number", { length: 20 }),
-  address: jsonb("address"), // Full address object
-  socialLinks: jsonb("social_links"), // Instagram, Facebook, etc.
-  businessHours: jsonb("business_hours"), // Opening hours
+  address: jsonb("address"),
+  socialLinks: jsonb("social_links"),
+  businessHours: jsonb("business_hours"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).unique().notNull(),
-  password: varchar("password", { length: 255 }).notNull(),
-  fullName: varchar("full_name", { length: 255 }).notNull(),
-  document: varchar("document", { length: 20 }).notNull(),
-  documentType: varchar("document_type", { length: 10 }).notNull(), // 'cpf' or 'cnpj'
-  phone: varchar("phone", { length: 20 }),
-  role: varchar("role", { length: 50 }).default("merchant").notNull(), // 'admin', 'merchant'
   tenantId: integer("tenant_id").references(() => tenants.id),
-  // Profile and permissions
+  firstName: varchar("first_name", { length: 255 }),
+  lastName: varchar("last_name", { length: 255 }),
+  isActive: boolean("is_active").default(true),
+  password: varchar("password", { length: 255 }),
+  phone: varchar("phone", { length: 20 }),
+  cpf: varchar("cpf", { length: 20 }),
+  role: varchar("role", { length: 50 }).default("user"),
   profileImage: text("profile_image"),
+  preferences: jsonb("preferences"),
+  lastLoginIp: varchar("last_login_ip", { length: 45 }),
+  loginCount: integer("login_count").default(0),
+  emailVerified: boolean("email_verified").default(false),
+  phoneVerified: boolean("phone_verified").default(false),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  twoFactorSecret: varchar("two_factor_secret", { length: 32 }),
+  backupCodes: jsonb("backup_codes"),
+  lastPasswordChange: timestamp("last_password_change"),
+  passwordResetToken: varchar("password_reset_token", { length: 255 }),
+  passwordResetExpires: timestamp("password_reset_expires"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// API credentials for public API access
+export const apiCredentials = pgTable("api_credentials", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  apiKey: varchar("api_key", { length: 255 }).unique().notNull(),
+  secretHash: varchar("secret_hash", { length: 255 }).notNull(),
+  permissions: jsonb("permissions").notNull(),
+  rateLimit: integer("rate_limit").default(1000).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
-  permissions: jsonb("permissions"), // Array of permission strings
-  lastLoginAt: timestamp("last_login_at"),
-  createdBy: integer("created_by").references(() => users.id),
+  lastUsedAt: timestamp("last_used_at"),
+  expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Platform settings and configurations
-export const platformSettings = pgTable("platform_settings", {
+// API rate limits
+export const apiRateLimits = pgTable("api_rate_limits", {
   id: serial("id").primaryKey(),
-  category: varchar("category", { length: 50 }).notNull(), // 'general', 'email', 'payment', 'security', 'integrations', 'tax', 'notification'
-  key: varchar("key", { length: 100 }).notNull(),
-  value: text("value"),
-  dataType: varchar("data_type", { length: 20 }).default("string").notNull(), // 'string', 'number', 'boolean', 'json'
-  isPublic: boolean("is_public").default(false).notNull(), // If setting can be accessed by tenants
-  description: text("description"),
-  validationRules: jsonb("validation_rules"), // JSON with validation rules
-  lastModifiedBy: integer("last_modified_by").references(() => users.id),
+  credentialId: integer("credential_id").references(() => apiCredentials.id).notNull(),
+  endpoint: varchar("endpoint", { length: 255 }).notNull(),
+  requestCount: integer("request_count").default(0).notNull(),
+  windowStart: timestamp("window_start").notNull(),
+  windowEnd: timestamp("window_end").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Platform feature flags
-export const platformFeatures = pgTable("platform_features", {
+// API usage logs
+export const apiUsageLogs = pgTable("api_usage_logs", {
   id: serial("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull().unique(),
-  description: text("description"),
-  isEnabled: boolean("is_enabled").default(false).notNull(),
-  rolloutPercentage: integer("rollout_percentage").default(0).notNull(), // 0-100
-  targetTenants: jsonb("target_tenants"), // Array of tenant IDs for selective rollout
-  metadata: jsonb("metadata"), // Additional feature configuration
-  createdBy: integer("created_by").references(() => users.id),
-  enabledBy: integer("enabled_by").references(() => users.id),
-  enabledAt: timestamp("enabled_at"),
+  credentialId: integer("credential_id").references(() => apiCredentials.id).notNull(),
+  endpoint: varchar("endpoint", { length: 255 }).notNull(),
+  method: varchar("method", { length: 10 }).notNull(),
+  statusCode: integer("status_code").notNull(),
+  responseTime: integer("response_time").notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }).notNull(),
+  userAgent: text("user_agent"),
+  requestSize: integer("request_size"),
+  responseSize: integer("response_size"),
+  errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Platform maintenance and system announcements
-export const platformMaintenance = pgTable("platform_maintenance", {
+// Balance snapshots
+export const balanceSnapshots = pgTable("balance_snapshots", {
   id: serial("id").primaryKey(),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description").notNull(),
-  maintenanceType: varchar("maintenance_type", { length: 50 }).notNull(), // 'scheduled', 'emergency', 'update'
-  severity: varchar("severity", { length: 20 }).default("low").notNull(), // 'low', 'medium', 'high', 'critical'
-  affectedServices: jsonb("affected_services"), // Array of service names
-  scheduledStart: timestamp("scheduled_start"),
-  scheduledEnd: timestamp("scheduled_end"),
-  actualStart: timestamp("actual_start"),
-  actualEnd: timestamp("actual_end"),
-  status: varchar("status", { length: 20 }).default("scheduled").notNull(), // 'scheduled', 'in_progress', 'completed', 'cancelled'
-  notifyUsers: boolean("notify_users").default(true).notNull(),
-  showBanner: boolean("show_banner").default(false).notNull(),
-  bannerMessage: text("banner_message"),
-  createdBy: integer("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// User profiles with additional details and permissions
-export const userProfiles = pgTable("user_profiles", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  accessLevel: varchar("access_level", { length: 50 }).default("limited").notNull(), // 'full', 'limited', 'readonly'
-  departmentId: integer("department_id"),
-  jobTitle: varchar("job_title", { length: 255 }),
-  // Specific permissions
-  canManageProducts: boolean("can_manage_products").default(false).notNull(),
-  canManageOrders: boolean("can_manage_orders").default(false).notNull(),
-  canViewFinancials: boolean("can_view_financials").default(false).notNull(),
-  canManageUsers: boolean("can_manage_users").default(false).notNull(),
-  canManageSettings: boolean("can_manage_settings").default(false).notNull(),
-  canManageThemes: boolean("can_manage_themes").default(false).notNull(),
-  canManageBanners: boolean("can_manage_banners").default(false).notNull(),
-  canAccessSupport: boolean("can_access_support").default(true).notNull(),
-  // Activity tracking
-  lastActivityAt: timestamp("last_activity_at"),
-  loginAttempts: integer("login_attempts").default(0).notNull(),
-  isLocked: boolean("is_locked").default(false).notNull(),
-  lockedUntil: timestamp("locked_until"),
+  snapshotDate: date("snapshot_date").notNull(),
+  balance: decimal("balance", { precision: 15, scale: 2 }).notNull(),
+  availableBalance: decimal("available_balance", { precision: 15, scale: 2 }).notNull(),
+  blockedBalance: decimal("blocked_balance", { precision: 15, scale: 2 }).notNull(),
+  totalIncoming: decimal("total_incoming", { precision: 15, scale: 2 }).notNull(),
+  totalOutgoing: decimal("total_outgoing", { precision: 15, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Support ticket system
-export const supportTickets = pgTable("support_tickets", {
+// Bank accounts
+export const bankAccounts = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
-  ticketNumber: varchar("ticket_number", { length: 50 }).unique().notNull(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description").notNull(),
-  category: varchar("category", { length: 50 }).notNull(), // 'bug', 'feature', 'support', 'billing', 'technical'
-  priority: varchar("priority", { length: 20 }).default("medium").notNull(), // 'low', 'medium', 'high', 'urgent'
-  status: varchar("status", { length: 20 }).default("open").notNull(), // 'open', 'in_progress', 'waiting_response', 'resolved', 'closed'
-  assignedTo: integer("assigned_to"), // Support team member ID (optional)
-  attachments: jsonb("attachments"), // Array of file URLs/paths
-  tags: jsonb("tags"), // Array of tags for categorization
-  // Customer satisfaction
-  satisfactionRating: integer("satisfaction_rating"), // 1-5 stars
-  satisfactionComment: text("satisfaction_comment"),
-  // Tracking
-  firstResponseAt: timestamp("first_response_at"),
-  resolvedAt: timestamp("resolved_at"),
-  closedAt: timestamp("closed_at"),
-  lastUpdatedBy: integer("last_updated_by"),
+  accountType: varchar("account_type", { length: 20 }).notNull(),
+  bankCode: varchar("bank_code", { length: 10 }).notNull(),
+  bankName: varchar("bank_name", { length: 255 }).notNull(),
+  agencyNumber: varchar("agency_number", { length: 10 }).notNull(),
+  accountNumber: varchar("account_number", { length: 20 }).notNull(),
+  accountDigit: varchar("account_digit", { length: 2 }),
+  accountHolderName: varchar("account_holder_name", { length: 255 }).notNull(),
+  accountHolderDocument: varchar("account_holder_document", { length: 20 }).notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  verificationStatus: varchar("verification_status", { length: 20 }).default("pending").notNull(),
+  verifiedAt: timestamp("verified_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Support ticket messages/comments
-export const supportTicketMessages = pgTable("support_ticket_messages", {
+// Celcoin accounts
+export const celcoinAccounts = pgTable("celcoin_accounts", {
   id: serial("id").primaryKey(),
-  ticketId: integer("ticket_id").references(() => supportTickets.id).notNull(),
-  userId: integer("user_id").references(() => users.id),
-  senderType: varchar("sender_type", { length: 20 }).notNull(), // 'user', 'support', 'system'
-  senderName: varchar("sender_name", { length: 255 }).notNull(),
-  message: text("message").notNull(),
-  attachments: jsonb("attachments"), // Array of file URLs/paths
-  isInternal: boolean("is_internal").default(false).notNull(), // Internal notes for support team
-  messageType: varchar("message_type", { length: 20 }).default("reply").notNull(), // 'reply', 'note', 'status_change'
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  celcoinAccountId: varchar("celcoin_account_id", { length: 255 }).notNull(),
+  status: varchar("status", { length: 20 }).default("active").notNull(),
+  balance: decimal("balance", { precision: 15, scale: 2 }).default("0").notNull(),
+  blockedBalance: decimal("blocked_balance", { precision: 15, scale: 2 }).default("0").notNull(),
+  accountType: varchar("account_type", { length: 50 }).notNull(),
+  lastSyncAt: timestamp("last_sync_at"),
+  syncFrequency: integer("sync_frequency").default(300).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Celcoin transaction log
+export const celcoinTransactionLog = pgTable("celcoin_transaction_log", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  celcoinTransactionId: varchar("celcoin_transaction_id", { length: 255 }).notNull(),
+  correlationId: varchar("correlation_id", { length: 255 }).notNull(),
+  transactionType: varchar("transaction_type", { length: 50 }).notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
+  pixKey: varchar("pix_key", { length: 255 }),
+  boletoLine: text("boleto_line"),
+  qrCode: text("qr_code"),
+  expiresAt: timestamp("expires_at"),
+  paidAt: timestamp("paid_at"),
+  errorCode: varchar("error_code", { length: 50 }),
+  errorMessage: text("error_message"),
+  rawResponse: jsonb("raw_response"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Customer addresses
+export const customerAddresses = pgTable("customer_addresses", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  type: varchar("type", { length: 20 }).default("shipping").notNull(),
+  label: varchar("label", { length: 50 }),
+  street: varchar("street", { length: 255 }).notNull(),
+  number: varchar("number", { length: 20 }).notNull(),
+  complement: varchar("complement", { length: 100 }),
+  neighborhood: varchar("neighborhood", { length: 100 }).notNull(),
+  city: varchar("city", { length: 100 }).notNull(),
+  state: varchar("state", { length: 2 }).notNull(),
+  postalCode: varchar("postal_code", { length: 10 }).notNull(),
+  country: varchar("country", { length: 2 }).default("BR").notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Customer order items
+export const customerOrderItems = pgTable("customer_order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").references(() => customerOrders.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  variantId: integer("variant_id").references(() => productVariants.id),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0").notNull(),
+  productName: varchar("product_name", { length: 255 }).notNull(),
+  productSku: varchar("product_sku", { length: 100 }),
+  productImage: text("product_image"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Customer accounts for storefront
+// Customer orders
+export const customerOrders = pgTable("customer_orders", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  orderNumber: varchar("order_number", { length: 50 }).unique().notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  paymentStatus: varchar("payment_status", { length: 20 }).default("pending").notNull(),
+  shippingStatus: varchar("shipping_status", { length: 20 }).default("pending").notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }).default("0").notNull(),
+  shippingAmount: decimal("shipping_amount", { precision: 10, scale: 2 }).default("0").notNull(),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default("0").notNull(),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }),
+  paymentId: varchar("payment_id", { length: 255 }),
+  shippingAddress: jsonb("shipping_address"),
+  billingAddress: jsonb("billing_address"),
+  notes: text("notes"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  shippedAt: timestamp("shipped_at"),
+  deliveredAt: timestamp("delivered_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Customers
 export const customers = pgTable("customers", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
@@ -190,970 +255,677 @@ export const customers = pgTable("customers", {
   phone: varchar("phone", { length: 20 }),
   cpf: varchar("cpf", { length: 20 }),
   birthDate: timestamp("birth_date"),
-  gender: varchar("gender", { length: 20 }), // 'masculino', 'feminino', 'outro'
+  gender: varchar("gender", { length: 20 }),
   isActive: boolean("is_active").default(true).notNull(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   emailVerificationToken: varchar("email_verification_token", { length: 255 }),
   emailVerificationExpires: timestamp("email_verification_expires"),
   passwordResetToken: varchar("password_reset_token", { length: 255 }),
   passwordResetExpires: timestamp("password_reset_expires"),
-  // 2FA fields
   twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
-  twoFactorSecret: varchar("two_factor_secret", { length: 255 }),
-  twoFactorBackupCodes: jsonb("two_factor_backup_codes"), // Array of backup codes
-  twoFactorLastUsed: timestamp("two_factor_last_used"),
-  // Security fields
-  failedLoginAttempts: integer("failed_login_attempts").default(0).notNull(),
-  lockoutUntil: timestamp("lockout_until"),
-  // Social login fields
-  googleId: varchar("google_id", { length: 255 }),
-  appleId: varchar("apple_id", { length: 255 }),
-  facebookId: varchar("facebook_id", { length: 255 }),
+  twoFactorSecret: varchar("two_factor_secret", { length: 32 }),
+  backupCodes: jsonb("backup_codes"),
+  preferences: jsonb("preferences"),
   lastLoginAt: timestamp("last_login_at"),
   lastLoginIp: varchar("last_login_ip", { length: 45 }),
+  loginCount: integer("login_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Customer login sessions for enhanced security
-export const customerSessions = pgTable("customer_sessions", {
+// Email notifications
+export const emailNotifications = pgTable("email_notifications", {
   id: serial("id").primaryKey(),
-  customerId: integer("customer_id").references(() => customers.id).notNull(),
-  sessionToken: varchar("session_token", { length: 255 }).notNull().unique(),
-  deviceInfo: jsonb("device_info"), // Browser, OS, device type
-  ipAddress: varchar("ip_address", { length: 45 }),
-  location: varchar("location", { length: 255 }), // City, country
-  isActive: boolean("is_active").default(true).notNull(),
-  lastAccessedAt: timestamp("last_accessed_at").defaultNow().notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
+  tenantId: integer("tenant_id").references(() => tenants.id),
+  recipientEmail: varchar("recipient_email", { length: 255 }).notNull(),
+  recipientName: varchar("recipient_name", { length: 255 }),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  htmlContent: text("html_content").notNull(),
+  textContent: text("text_content"),
+  templateId: varchar("template_id", { length: 100 }),
+  templateData: jsonb("template_data"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"),
+  clickedAt: timestamp("clicked_at"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0).notNull(),
+  maxRetries: integer("max_retries").default(3).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Customer security events log
-export const customerSecurityEvents = pgTable("customer_security_events", {
-  id: serial("id").primaryKey(),
-  customerId: integer("customer_id").references(() => customers.id).notNull(),
-  eventType: varchar("event_type", { length: 50 }).notNull(), // 'login', 'password_change', '2fa_enabled', 'suspicious_activity'
-  description: text("description"),
-  ipAddress: varchar("ip_address", { length: 45 }),
-  userAgent: text("user_agent"),
-  metadata: jsonb("metadata"), // Additional event-specific data
-  severity: varchar("severity", { length: 20 }).default("info").notNull(), // 'info', 'warning', 'critical'
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Theme banners/carousel management
-export const storefrontBanners = pgTable("storefront_banners", {
+// Ledger entries
+export const ledgerEntries = pgTable("ledger_entries", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
-  imageUrl: text("image_url").notNull(),
-  mobileImageUrl: text("mobile_image_url"), // Optional mobile-specific image
-  linkUrl: text("link_url"), // Where banner links to
-  linkText: varchar("link_text", { length: 100 }), // CTA text
-  position: integer("position").default(0).notNull(), // Display order
-  isActive: boolean("is_active").default(true).notNull(),
-  showOnThemes: jsonb("show_on_themes").default(['modern', 'classic', 'minimal', 'bold', 'elegant']), // Which themes to show on
-  startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
-  clickCount: integer("click_count").default(0).notNull(),
+  transactionId: varchar("transaction_id", { length: 255 }).notNull(),
+  entryType: varchar("entry_type", { length: 20 }).notNull(),
+  accountType: varchar("account_type", { length: 50 }).notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  description: text("description").notNull(),
+  referenceType: varchar("reference_type", { length: 50 }),
+  referenceId: varchar("reference_id", { length: 255 }),
+  balanceAfter: decimal("balance_after", { precision: 15, scale: 2 }),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Theme customization sections
-export const themeCustomizations = pgTable("theme_customizations", {
+// NFe configurations
+export const nfeConfigurations = pgTable("nfe_configurations", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  themeName: varchar("theme_name", { length: 50 }).notNull(), // 'modern', 'classic', etc.
-  sectionName: varchar("section_name", { length: 50 }).notNull(), // 'hero', 'features', 'testimonials', etc.
-  isEnabled: boolean("is_enabled").default(true).notNull(),
-  position: integer("position").default(0).notNull(),
-  content: jsonb("content").notNull(), // Section-specific content and settings
+  certificateP12: text("certificate_p12"),
+  certificatePassword: varchar("certificate_password", { length: 255 }),
+  environment: varchar("environment", { length: 20 }).default("homologacao").notNull(),
+  cnpj: varchar("cnpj", { length: 20 }).notNull(),
+  inscricaoEstadual: varchar("inscricao_estadual", { length: 50 }),
+  razaoSocial: varchar("razao_social", { length: 255 }).notNull(),
+  nomeFantasia: varchar("nome_fantasia", { length: 255 }),
+  endereco: jsonb("endereco").notNull(),
+  lastSequenceNumber: integer("last_sequence_number").default(0).notNull(),
+  isActive: boolean("is_active").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Customer addresses
-export const customerAddresses = pgTable("customer_addresses", {
-  id: serial("id").primaryKey(),
-  customerId: integer("customer_id").references(() => customers.id).notNull(),
-  type: varchar("type", { length: 50 }).notNull(), // 'billing', 'shipping', 'both'
-  isDefault: boolean("is_default").default(false).notNull(),
-  firstName: varchar("first_name", { length: 255 }).notNull(),
-  lastName: varchar("last_name", { length: 255 }).notNull(),
-  company: varchar("company", { length: 255 }),
-  address1: varchar("address1", { length: 255 }).notNull(),
-  address2: varchar("address2", { length: 255 }),
-  city: varchar("city", { length: 255 }).notNull(),
-  state: varchar("state", { length: 100 }).notNull(),
-  zipCode: varchar("zip_code", { length: 20 }).notNull(),
-  country: varchar("country", { length: 100 }).default("Brasil").notNull(),
-  phone: varchar("phone", { length: 20 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const brands = pgTable("brands", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  logoUrl: varchar("logo_url", { length: 500 }),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const productCategories = pgTable("product_categories", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  parentId: integer("parent_id"),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({
-  parentReference: foreignKey({
-    columns: [table.parentId],
-    foreignColumns: [table.id],
-  }),
-}));
-
-export const products = pgTable("products", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  sku: varchar("sku", { length: 255 }),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
-  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
-  stock: integer("stock").default(0).notNull(),
-  minStock: integer("min_stock").default(0).notNull(),
-  maxStock: integer("max_stock").default(100).notNull(),
-  brandId: integer("brand_id").references(() => brands.id),
-  categoryId: integer("category_id").references(() => productCategories.id),
-  isActive: boolean("is_active").default(true).notNull(),
-  isFeatured: boolean("is_featured").default(false).notNull(),
-  tags: text("tags"),
-  weight: decimal("weight", { precision: 8, scale: 3 }),
-  dimensionsLength: decimal("dimensions_length", { precision: 8, scale: 2 }),
-  dimensionsWidth: decimal("dimensions_width", { precision: 8, scale: 2 }),
-  dimensionsHeight: decimal("dimensions_height", { precision: 8, scale: 2 }),
-  
-  // SEO fields
-  slug: varchar("slug", { length: 255 }),
-  metaTitle: varchar("meta_title", { length: 255 }),
-  metaDescription: text("meta_description"),
-  metaKeywords: text("meta_keywords"),
-  
-  // Promotional pricing
-  promotionalPrice: decimal("promotional_price", { precision: 10, scale: 2 }),
-  promotionalStartDate: timestamp("promotional_start_date"),
-  promotionalEndDate: timestamp("promotional_end_date"),
-  
-  // Customer type pricing
-  priceB2B: decimal("price_b2b", { precision: 10, scale: 2 }),
-  priceB2C: decimal("price_b2c", { precision: 10, scale: 2 }),
-  
-  // Reward points
-  rewardPointsB2B: integer("reward_points_b2b").default(0),
-  rewardPointsB2C: integer("reward_points_b2c").default(0),
-  
-  // Product availability and settings
-  availabilityDate: timestamp("availability_date"),
-  requiresShipping: boolean("requires_shipping").default(true),
-  isDigital: boolean("is_digital").default(false),
-  hasUnlimitedStock: boolean("has_unlimited_stock").default(false),
-  
-  // Brazilian tax fields
-  ncm: varchar("ncm", { length: 10 }),
-  cest: varchar("cest", { length: 7 }),
-  cfop: varchar("cfop", { length: 4 }),
-  icmsOrigin: varchar("icms_origin", { length: 1 }),
-  icmsCst: varchar("icms_cst", { length: 3 }),
-  icmsRate: decimal("icms_rate", { precision: 5, scale: 2 }),
-  ipiCst: varchar("ipi_cst", { length: 2 }),
-  ipiRate: decimal("ipi_rate", { precision: 5, scale: 2 }),
-  pisCst: varchar("pis_cst", { length: 2 }),
-  pisRate: decimal("pis_rate", { precision: 5, scale: 2 }),
-  cofinsCst: varchar("cofins_cst", { length: 2 }),
-  cofinsRate: decimal("cofins_rate", { precision: 5, scale: 2 }),
-  productUnit: varchar("product_unit", { length: 10 }),
-  grossWeight: decimal("gross_weight", { precision: 8, scale: 3 }),
-  netWeight: decimal("net_weight", { precision: 8, scale: 3 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const productImages = pgTable("product_images", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-  variantId: integer("variant_id").references(() => productVariants.id, { onDelete: "cascade" }),
-  url: varchar("url", { length: 500 }).notNull(),
-  altText: varchar("alt_text", { length: 255 }),
-  sortOrder: integer("sort_order").default(0).notNull(),
-  isPrimary: boolean("is_primary").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const productSpecifications = pgTable("product_specifications", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  value: text("value").notNull(),
-  sortOrder: integer("sort_order").default(0).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const productPromotions = pgTable("product_promotions", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description"),
-  discountType: varchar("discount_type", { length: 20 }).notNull(), // 'percentage', 'fixed_amount'
-  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date").notNull(),
-  isActive: boolean("is_active").default(true).notNull(),
-  usageLimit: integer("usage_limit"),
-  usageCount: integer("usage_count").default(0).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const productPromotionProducts = pgTable("product_promotion_products", {
-  id: serial("id").primaryKey(),
-  promotionId: integer("promotion_id").references(() => productPromotions.id, { onDelete: "cascade" }).notNull(),
-  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-});
-
-export const bulkPricingRules = pgTable("bulk_pricing_rules", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-  minQuantity: integer("min_quantity").notNull(),
-  maxQuantity: integer("max_quantity"),
-  pricePerUnit: decimal("price_per_unit", { precision: 10, scale: 2 }).notNull(),
-  discountPercentage: decimal("discount_percentage", { precision: 5, scale: 2 }),
-  isActive: boolean("is_active").default(true).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const productVariants = pgTable("product_variants", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
-  name: varchar("name", { length: 255 }).notNull(), // e.g., "Tamanho", "Cor"
-  value: varchar("value", { length: 255 }).notNull(), // e.g., "M", "Azul"
-  price: decimal("price", { precision: 10, scale: 2 }),
-  stock: integer("stock").default(0),
-  sku: varchar("sku", { length: 100 }),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
+// Orders
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  customerName: text("customer_name"),
-  customerEmail: text("customer_email"),
-  customerDocument: varchar("customer_document", { length: 20 }),
+  customerId: integer("customer_id"),
+  orderNumber: varchar("order_number", { length: 50 }).unique().notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  paymentStatus: varchar("payment_status", { length: 20 }).default("pending").notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }),
+  total: varchar("total", { length: 20 }).notNull(),
+  subtotal: varchar("subtotal", { length: 20 }),
+  taxAmount: varchar("tax_amount", { length: 20 }),
+  shippingAmount: varchar("shipping_amount", { length: 20 }),
+  discountAmount: varchar("discount_amount", { length: 20 }),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  customerName: varchar("customer_name", { length: 255 }),
+  customerEmail: varchar("customer_email", { length: 255 }),
   customerPhone: varchar("customer_phone", { length: 20 }),
-  customerAddress: text("customer_address"),
-  customerCity: text("customer_city"),
-  customerState: text("customer_state"),
-  customerZipCode: text("customer_zip_code"),
-  total: decimal("total", { precision: 10, scale: 2 }),
-  taxTotal: decimal("tax_total", { precision: 10, scale: 2 }),
-  status: text("status").default("pending").notNull(),
-  paymentMethod: text("payment_method"),
-  paymentStatus: text("payment_status"),
-  celcoinTransactionId: text("celcoin_transaction_id"),
   shippingAddress: jsonb("shipping_address"),
-  items: jsonb("items"),
-  nfeKey: text("nfe_key"),
-  nfeNumber: text("nfe_number"),
-  nfeStatus: text("nfe_status"),
-  nfeXml: text("nfe_xml"),
-  nfeProtocol: text("nfe_protocol"),
-  nfeErrorMessage: text("nfe_error_message"),
-  trackingCode: text("tracking_code"),
+  billingAddress: jsonb("billing_address"),
   notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const orderItems = pgTable("order_items", {
-  id: serial("id").primaryKey(),
-  orderId: integer("order_id").references(() => orders.id).notNull(),
-  productId: integer("product_id").references(() => products.id).notNull(),
-  productName: text("product_name").notNull(),
-  productSku: text("product_sku"),
-  quantity: integer("quantity").notNull(),
-  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
-  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
-  taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
-  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const orderHistory = pgTable("order_history", {
-  id: serial("id").primaryKey(),
-  orderId: integer("order_id").references(() => orders.id).notNull(),
-  status: text("status").notNull(),
-  comment: text("comment"),
-  userId: integer("user_id").references(() => users.id),
-  userType: text("user_type").default("admin"),
-  notifyCustomer: boolean("notify_customer").default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const notifications = pgTable("notifications", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  type: varchar("type", { length: 50 }).notNull(), // 'order', 'payment', 'stock', 'system', 'promotion'
-  title: varchar("title", { length: 255 }).notNull(),
-  message: text("message").notNull(),
-  data: jsonb("data"), // Additional data for the notification
-  priority: varchar("priority", { length: 20 }).default("normal"), // 'low', 'normal', 'high', 'urgent'
-  isRead: boolean("is_read").default(false),
-  actionUrl: varchar("action_url", { length: 500 }), // URL to redirect when clicked
-  expiresAt: timestamp("expires_at"), // For time-sensitive notifications
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull()
-});
-
-export const notificationPreferences = pgTable("notification_preferences", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  emailNotifications: boolean("email_notifications").default(true),
-  browserNotifications: boolean("browser_notifications").default(true),
-  orderNotifications: boolean("order_notifications").default(true),
-  paymentNotifications: boolean("payment_notifications").default(true),
-  stockNotifications: boolean("stock_notifications").default(true),
-  systemNotifications: boolean("system_notifications").default(true),
-  promotionNotifications: boolean("promotion_notifications").default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull()
-});
-
-// Plugins table
-export const plugins = pgTable("plugins", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
-  displayName: varchar("display_name", { length: 255 }),
-  description: text("description"),
-  version: varchar("version", { length: 50 }).default("1.0.0").notNull(),
-  category: varchar("category", { length: 100 }).notNull(),
-  isActive: boolean("is_active").default(true).notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).default("0.00"),
-  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).default("0.00"),
-  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }).default("0.00"),
-  features: jsonb("features"),
-  icon: varchar("icon", { length: 255 }),
-  slug: varchar("slug", { length: 255 }).notNull().unique(),
-  developer: varchar("developer", { length: 255 }).default("WikiStore Team"),
-  supportUrl: varchar("support_url", { length: 500 }),
-  documentationUrl: varchar("documentation_url", { length: 500 }),
-  minimumRequirements: jsonb("minimum_requirements"),
+  internalNotes: text("internal_notes"),
+  trackingNumber: varchar("tracking_number", { length: 100 }),
+  shippedAt: timestamp("shipped_at"),
+  deliveredAt: timestamp("delivered_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  refundAmount: varchar("refund_amount", { length: 20 }),
+  refundedAt: timestamp("refunded_at"),
   metadata: jsonb("metadata"),
-  isPublic: boolean("is_public").default(true).notNull(),
-  downloadCount: integer("download_count").default(0).notNull(),
-  rating: decimal("rating", { precision: 3, scale: 2 }).default("0.00"),
-  ratingCount: integer("rating_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Plugin subscription plans
+// Plan plugins
+export const planPlugins = pgTable("plan_plugins", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id").references(() => subscriptionPlans.id).notNull(),
+  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
+  isIncluded: boolean("is_included").default(true).notNull(),
+  maxUsage: integer("max_usage"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Platform features
+export const platformFeatures = pgTable("platform_features", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  isEnabled: boolean("is_enabled").default(false).notNull(),
+  rolloutPercentage: integer("rollout_percentage").default(0).notNull(),
+  targetTenants: jsonb("target_tenants"),
+  metadata: jsonb("metadata"),
+  createdBy: integer("created_by").references(() => users.id),
+  enabledBy: integer("enabled_by").references(() => users.id),
+  enabledAt: timestamp("enabled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Platform maintenance
+export const platformMaintenance = pgTable("platform_maintenance", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  maintenanceType: varchar("maintenance_type", { length: 50 }).notNull(),
+  severity: varchar("severity", { length: 20 }).default("low").notNull(),
+  affectedServices: jsonb("affected_services"),
+  scheduledStart: timestamp("scheduled_start"),
+  scheduledEnd: timestamp("scheduled_end"),
+  actualStart: timestamp("actual_start"),
+  actualEnd: timestamp("actual_end"),
+  status: varchar("status", { length: 20 }).default("scheduled").notNull(),
+  notifyUsers: boolean("notify_users").default(true).notNull(),
+  showBanner: boolean("show_banner").default(false).notNull(),
+  bannerMessage: text("banner_message"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Platform settings
+export const platformSettings = pgTable("platform_settings", {
+  id: serial("id").primaryKey(),
+  category: varchar("category", { length: 50 }).notNull(),
+  key: varchar("key", { length: 100 }).notNull(),
+  value: text("value"),
+  dataType: varchar("data_type", { length: 20 }).default("string").notNull(),
+  isPublic: boolean("is_public").default(false).notNull(),
+  description: text("description"),
+  validationRules: jsonb("validation_rules"),
+  lastModifiedBy: integer("last_modified_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Plugin plans
 export const pluginPlans = pgTable("plugin_plans", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull(),
-  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }),
-  maxTenants: integer("max_tenants").default(1).notNull(), // How many stores can use this plan
-  features: jsonb("features").notNull(), // List of included plugin IDs and features
+  type: varchar("type", { length: 20 }).default("subscription").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  billingCycle: varchar("billing_cycle", { length: 20 }),
+  features: jsonb("features"),
+  maxUsers: integer("max_users"),
+  maxStorage: bigint("max_storage", { mode: 'number' }),
+  maxApiCalls: integer("max_api_calls"),
   isActive: boolean("is_active").default(true).notNull(),
-  displayOrder: integer("display_order").default(0).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Individual plugin subscriptions and plan subscriptions
+// Plugin subscription history
+export const pluginSubscriptionHistory = pgTable("plugin_subscription_history", {
+  id: serial("id").primaryKey(),
+  subscriptionId: integer("subscription_id").references(() => pluginSubscriptions.id).notNull(),
+  action: varchar("action", { length: 50 }).notNull(),
+  reason: text("reason"),
+  oldStatus: varchar("old_status", { length: 20 }),
+  newStatus: varchar("new_status", { length: 20 }),
+  amount: decimal("amount", { precision: 10, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  metadata: jsonb("metadata"),
+  performedBy: integer("performed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Plugin subscriptions
 export const pluginSubscriptions = pgTable("plugin_subscriptions", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  pluginId: integer("plugin_id").references(() => plugins.id), // NULL for plan subscriptions
-  planId: integer("plan_id").references(() => pluginPlans.id), // NULL for individual plugin subscriptions
-  subscriptionType: varchar("subscription_type", { length: 20 }).notNull(), // 'plugin' or 'plan'
-  status: varchar("status", { length: 20 }).default("active").notNull(), // 'active', 'cancelled', 'expired', 'suspended'
-  billingCycle: varchar("billing_cycle", { length: 20 }).notNull(), // 'monthly', 'yearly', 'lifetime'
-  currentPrice: decimal("current_price", { precision: 10, scale: 2 }).notNull(),
-  nextBillingDate: timestamp("next_billing_date"),
-  lastBillingDate: timestamp("last_billing_date"),
-  cancelledAt: timestamp("cancelled_at"),
-  expiresAt: timestamp("expires_at"),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
+  planId: integer("plan_id").references(() => pluginPlans.id),
+  status: varchar("status", { length: 20 }).default("active").notNull(),
+  startDate: timestamp("start_date").defaultNow().notNull(),
+  endDate: timestamp("end_date"),
+  renewalDate: timestamp("renewal_date"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  billingCycle: varchar("billing_cycle", { length: 20 }),
   autoRenew: boolean("auto_renew").default(true).notNull(),
-  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
-  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
-  paymentMethod: varchar("payment_method", { length: 50 }).default("stripe"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Plugin usage
+export const pluginUsage = pgTable("plugin_usage", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
+  subscriptionId: integer("subscription_id").references(() => pluginSubscriptions.id),
+  usageType: varchar("usage_type", { length: 50 }).notNull(),
+  amount: integer("amount").default(1).notNull(),
+  unit: varchar("unit", { length: 20 }).default("count").notNull(),
+  metadata: jsonb("metadata"),
+  recordedAt: timestamp("recorded_at").defaultNow().notNull(),
+});
+
+// Plugins
+export const plugins = pgTable("plugins", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  displayName: varchar("display_name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).unique().notNull(),
+  description: text("description"),
+  version: varchar("version", { length: 20 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  developer: varchar("developer", { length: 255 }).notNull(),
+  developerWebsite: varchar("developer_website", { length: 255 }),
+  supportEmail: varchar("support_email", { length: 255 }),
+  icon: varchar("icon", { length: 255 }),
+  screenshots: jsonb("screenshots"),
+  features: jsonb("features"),
+  requirements: jsonb("requirements"),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }),
+  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).default("BRL"),
+  hasFreeTrial: boolean("has_free_trial").default(false),
+  trialDays: integer("trial_days"),
+  isActive: boolean("is_active").default(true).notNull(),
+  isFeatured: boolean("is_featured").default(false),
+  downloadCount: integer("download_count").default(0),
+  rating: decimal("rating", { precision: 3, scale: 2 }),
+  reviewCount: integer("review_count").default(0),
+  tags: jsonb("tags"),
+  metadata: jsonb("metadata"),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Product brands
+export const productBrands = pgTable("product_brands", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull(),
+  description: text("description"),
+  logo: text("logo"),
+  website: varchar("website", { length: 255 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Product categories
+export const productCategories = pgTable("product_categories", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull(),
+  description: text("description"),
+  parentId: integer("parent_id").references(() => productCategories.id),
+  image: text("image"),
+  icon: varchar("icon", { length: 100 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  seoTitle: varchar("seo_title", { length: 255 }),
+  seoDescription: text("seo_description"),
+  seoKeywords: text("seo_keywords"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Product images
+export const productImages = pgTable("product_images", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  variantId: integer("variant_id").references(() => productVariants.id),
+  url: text("url").notNull(),
+  altText: varchar("alt_text", { length: 255 }),
+  isPrimary: boolean("is_primary").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  fileSize: integer("file_size"),
+  width: integer("width"),
+  height: integer("height"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Product reviews
+export const productReviews = pgTable("product_reviews", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  orderId: integer("order_id").references(() => orders.id),
+  rating: integer("rating").notNull(),
+  title: varchar("title", { length: 255 }),
+  comment: text("comment"),
+  isVerifiedPurchase: boolean("is_verified_purchase").default(false).notNull(),
+  isApproved: boolean("is_approved").default(false).notNull(),
+  helpfulCount: integer("helpful_count").default(0).notNull(),
+  reportCount: integer("report_count").default(0).notNull(),
+  moderatedBy: integer("moderated_by").references(() => users.id),
+  moderatedAt: timestamp("moderated_at"),
+  moderationNotes: text("moderation_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Product specifications
+export const productSpecifications = pgTable("product_specifications", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  value: text("value").notNull(),
+  unit: varchar("unit", { length: 50 }),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isHighlight: boolean("is_highlight").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Product variants
+export const productVariants = pgTable("product_variants", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  sku: varchar("sku", { length: 100 }).unique(),
+  barcode: varchar("barcode", { length: 100 }),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  weight: decimal("weight", { precision: 8, scale: 3 }),
+  weightUnit: varchar("weight_unit", { length: 10 }).default("kg"),
+  dimensions: jsonb("dimensions"),
+  stock: integer("stock").default(0).notNull(),
+  lowStockThreshold: integer("low_stock_threshold").default(5),
+  trackQuantity: boolean("track_quantity").default(true).notNull(),
+  allowBackorder: boolean("allow_backorder").default(false).notNull(),
+  requiresShipping: boolean("requires_shipping").default(true).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  variantOptions: jsonb("variant_options"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Products
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull(),
+  description: text("description"),
+  shortDescription: text("short_description"),
+  sku: varchar("sku", { length: 100 }),
+  barcode: varchar("barcode", { length: 100 }),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  categoryId: integer("category_id").references(() => productCategories.id),
+  brandId: integer("brand_id").references(() => productBrands.id),
+  type: varchar("type", { length: 50 }).default("physical").notNull(),
+  status: varchar("status", { length: 20 }).default("draft").notNull(),
+  visibility: varchar("visibility", { length: 20 }).default("visible").notNull(),
+  weight: decimal("weight", { precision: 8, scale: 3 }),
+  weightUnit: varchar("weight_unit", { length: 10 }).default("kg"),
+  dimensions: jsonb("dimensions"),
+  stock: integer("stock").default(0).notNull(),
+  lowStockThreshold: integer("low_stock_threshold").default(5),
+  trackQuantity: boolean("track_quantity").default(true).notNull(),
+  allowBackorder: boolean("allow_backorder").default(false).notNull(),
+  requiresShipping: boolean("requires_shipping").default(true).notNull(),
+  isFeatured: boolean("is_featured").default(false).notNull(),
+  isDigital: boolean("is_digital").default(false).notNull(),
+  digitalFiles: jsonb("digital_files"),
+  tags: jsonb("tags"),
+  seoTitle: varchar("seo_title", { length: 255 }),
+  seoDescription: text("seo_description"),
+  seoKeywords: text("seo_keywords"),
+  taxClass: varchar("tax_class", { length: 50 }),
+  ncmCode: varchar("ncm_code", { length: 20 }),
+  cfopCode: varchar("cfop_code", { length: 10 }),
+  viewCount: integer("view_count").default(0),
+  orderCount: integer("order_count").default(0),
+  averageRating: decimal("average_rating", { precision: 3, scale: 2 }),
+  reviewCount: integer("review_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Reconciliation records
+export const reconciliationRecords = pgTable("reconciliation_records", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  recordDate: date("record_date").notNull(),
+  recordType: varchar("record_type", { length: 50 }).notNull(),
+  platformBalance: decimal("platform_balance", { precision: 15, scale: 2 }).notNull(),
+  celcoinBalance: decimal("celcoin_balance", { precision: 15, scale: 2 }).notNull(),
+  discrepancy: decimal("discrepancy", { precision: 15, scale: 2 }).notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  notes: text("notes"),
+  reconciledBy: integer("reconciled_by").references(() => users.id),
+  reconciledAt: timestamp("reconciled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Security audit log
+export const securityAuditLog = pgTable("security_audit_log", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  tenantId: integer("tenant_id").references(() => tenants.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  resourceType: varchar("resource_type", { length: 50 }),
+  resourceId: varchar("resource_id", { length: 255 }),
+  oldValues: jsonb("old_values"),
+  newValues: jsonb("new_values"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  severity: varchar("severity", { length: 20 }).default("info").notNull(),
+  status: varchar("status", { length: 20 }).default("success").notNull(),
+  errorMessage: text("error_message"),
+  sessionId: varchar("session_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Subscription plans
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).unique().notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  billingCycle: varchar("billing_cycle", { length: 20 }).notNull(),
+  trialDays: integer("trial_days").default(0).notNull(),
+  features: jsonb("features"),
+  limits: jsonb("limits"),
+  isActive: boolean("is_active").default(true).notNull(),
+  isPopular: boolean("is_popular").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Support FAQs
+export const supportFaqs = pgTable("support_faqs", {
+  id: serial("id").primaryKey(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  tags: jsonb("tags"),
+  isPublished: boolean("is_published").default(true).notNull(),
+  viewCount: integer("view_count").default(0).notNull(),
+  helpfulCount: integer("helpful_count").default(0).notNull(),
+  notHelpfulCount: integer("not_helpful_count").default(0).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Support ticket messages
+export const supportTicketMessages = pgTable("support_ticket_messages", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").references(() => supportTickets.id).notNull(),
+  userId: integer("user_id").references(() => users.id),
+  senderType: varchar("sender_type", { length: 20 }).notNull(),
+  senderName: varchar("sender_name", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  attachments: jsonb("attachments"),
+  isInternal: boolean("is_internal").default(false).notNull(),
+  messageType: varchar("message_type", { length: 20 }).default("reply").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Support tickets
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  ticketNumber: varchar("ticket_number", { length: 50 }).unique().notNull(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  priority: varchar("priority", { length: 20 }).default("medium").notNull(),
+  status: varchar("status", { length: 20 }).default("open").notNull(),
+  assignedTo: integer("assigned_to"),
+  attachments: jsonb("attachments"),
+  tags: jsonb("tags"),
+  satisfactionRating: integer("satisfaction_rating"),
+  satisfactionComment: text("satisfaction_comment"),
+  firstResponseAt: timestamp("first_response_at"),
+  resolvedAt: timestamp("resolved_at"),
+  closedAt: timestamp("closed_at"),
+  lastUpdatedBy: integer("last_updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Tenant plugin subscriptions
+export const tenantPluginSubscriptions = pgTable("tenant_plugin_subscriptions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
+  subscriptionId: integer("subscription_id").references(() => pluginSubscriptions.id),
+  status: varchar("status", { length: 20 }).default("active").notNull(),
+  activatedAt: timestamp("activated_at").defaultNow().notNull(),
+  deactivatedAt: timestamp("deactivated_at"),
+  config: jsonb("config"),
+  usage: jsonb("usage"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Tenant subscriptions
+export const tenantSubscriptions = pgTable("tenant_subscriptions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  planId: integer("plan_id").references(() => subscriptionPlans.id).notNull(),
+  status: varchar("status", { length: 20 }).default("active").notNull(),
+  startDate: timestamp("start_date").defaultNow().notNull(),
+  endDate: timestamp("end_date"),
+  renewalDate: timestamp("renewal_date"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  billingCycle: varchar("billing_cycle", { length: 20 }).notNull(),
+  autoRenew: boolean("auto_renew").default(true).notNull(),
+  trialEndsAt: timestamp("trial_ends_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  paymentMethod: varchar("payment_method", { length: 50 }),
+  lastPaymentAt: timestamp("last_payment_at"),
+  nextPaymentAt: timestamp("next_payment_at"),
+  failedPaymentCount: integer("failed_payment_count").default(0).notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Transactions
+export const transactions = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  orderId: integer("order_id").references(() => orders.id),
+  transactionId: varchar("transaction_id", { length: 255 }).unique().notNull(),
+  type: varchar("type", { length: 50 }).notNull(),
+  method: varchar("method", { length: 50 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  feeAmount: decimal("fee_amount", { precision: 15, scale: 2 }),
+  netAmount: decimal("net_amount", { precision: 15, scale: 2 }),
+  gatewayTransactionId: varchar("gateway_transaction_id", { length: 255 }),
+  gatewayResponse: jsonb("gateway_response"),
+  description: text("description"),
+  metadata: jsonb("metadata"),
+  processedAt: timestamp("processed_at"),
+  settledAt: timestamp("settled_at"),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User profiles
+export const userProfiles = pgTable("user_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  accessLevel: varchar("access_level", { length: 50 }).default("limited").notNull(),
+  departmentId: integer("department_id"),
+  jobTitle: varchar("job_title", { length: 255 }),
+  canManageProducts: boolean("can_manage_products").default(false).notNull(),
+  canManageOrders: boolean("can_manage_orders").default(false).notNull(),
+  canViewFinancials: boolean("can_view_financials").default(false).notNull(),
+  canManageUsers: boolean("can_manage_users").default(false).notNull(),
+  canManageSettings: boolean("can_manage_settings").default(false).notNull(),
+  canManageThemes: boolean("can_manage_themes").default(false).notNull(),
+  canManageBanners: boolean("can_manage_banners").default(false).notNull(),
+  canAccessSupport: boolean("can_access_support").default(true).notNull(),
+  lastActivityAt: timestamp("last_activity_at"),
+  loginAttempts: integer("login_attempts").default(0).notNull(),
+  isLocked: boolean("is_locked").default(false).notNull(),
+  lockedUntil: timestamp("locked_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Wishlist
+export const wishlist = pgTable("wishlist", {
+  id: serial("id").primaryKey(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  productId: integer("product_id").references(() => products.id).notNull(),
+  variantId: integer("variant_id").references(() => productVariants.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Withdrawals
+export const withdrawals = pgTable("withdrawals", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  bankAccountId: integer("bank_account_id").references(() => bankAccounts.id).notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  requestedBy: integer("requested_by").references(() => users.id).notNull(),
+  processedBy: integer("processed_by").references(() => users.id),
+  gatewayTransactionId: varchar("gateway_transaction_id", { length: 255 }),
+  gatewayResponse: jsonb("gateway_response"),
+  feeAmount: decimal("fee_amount", { precision: 15, scale: 2 }),
+  netAmount: decimal("net_amount", { precision: 15, scale: 2 }),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  processedAt: timestamp("processed_at"),
+  completedAt: timestamp("completed_at"),
+  failureReason: text("failure_reason"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Plugin subscription history for billing tracking
-export const pluginSubscriptionHistory = pgTable("plugin_subscription_history", {
-  id: serial("id").primaryKey(),
-  subscriptionId: integer("subscription_id").notNull().references(() => pluginSubscriptions.id),
-  action: varchar("action", { length: 50 }).notNull(), // 'created', 'renewed', 'cancelled', 'suspended', 'reactivated'
-  amount: decimal("amount", { precision: 10, scale: 2 }),
-  stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }),
-  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
-  paymentStatus: varchar("payment_status", { length: 50 }), // 'pending', 'succeeded', 'failed'
-  description: text("description"),
-  metadata: jsonb("metadata"), // Additional data for the transaction
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Plugin usage analytics
-export const pluginUsage = pgTable("plugin_usage", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  pluginId: integer("plugin_id").notNull().references(() => plugins.id),
-  usageDate: date("usage_date").notNull(),
-  usageCount: integer("usage_count").default(0).notNull(),
-  apiCalls: integer("api_calls").default(0).notNull(),
-  dataProcessed: bigint("data_processed", { mode: "number" }).default(0), // in bytes
-  metadata: jsonb("metadata"), // Plugin-specific usage data
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Ledger entries for financial tracking
-export const ledgerEntries = pgTable("ledger_entries", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  transactionType: varchar("transaction_type", { length: 50 }).notNull(), // 'credit', 'debit'
-  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
-  runningBalance: decimal("running_balance", { precision: 15, scale: 2 }).notNull(),
-  description: text("description").notNull(),
-  referenceType: varchar("reference_type", { length: 50 }), // 'order', 'withdrawal', 'celcoin_transaction'
-  referenceId: varchar("reference_id", { length: 100 }),
-  celcoinTransactionId: varchar("celcoin_transaction_id", { length: 100 }),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Withdrawals table
-export const withdrawals = pgTable("withdrawals", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
-  fee: decimal("fee", { precision: 15, scale: 2 }).default("0").notNull(),
-  netAmount: decimal("net_amount", { precision: 15, scale: 2 }).notNull(),
-  bankAccount: jsonb("bank_account").notNull(),
-  status: varchar("status", { length: 20 }).default("pending").notNull(),
-  celcoinTransactionId: varchar("celcoin_transaction_id", { length: 100 }),
-  processedAt: timestamp("processed_at"),
-  errorMessage: text("error_message"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Relations
-export const tenantsRelations = relations(tenants, ({ many }) => ({
-  users: many(users),
-  customers: many(customers),
-  brands: many(brands),
-  categories: many(productCategories),
-  products: many(products),
-  promotions: many(productPromotions),
-  orders: many(orders),
-}));
-
-export const usersRelations = relations(users, ({ one, many }) => ({
-  tenant: one(tenants, { fields: [users.tenantId], references: [tenants.id] }),
-  notifications: many(notifications),
-  notificationPreferences: many(notificationPreferences),
-}));
-
-export const notificationsRelations = relations(notifications, ({ one }) => ({
-  tenant: one(tenants, { fields: [notifications.tenantId], references: [tenants.id] }),
-  user: one(users, { fields: [notifications.userId], references: [users.id] }),
-}));
-
-export const notificationPreferencesRelations = relations(notificationPreferences, ({ one }) => ({
-  user: one(users, { fields: [notificationPreferences.userId], references: [users.id] }),
-  tenant: one(tenants, { fields: [notificationPreferences.tenantId], references: [tenants.id] }),
-}));
-
-export const customersRelations = relations(customers, ({ one, many }) => ({
-  tenant: one(tenants, {
-    fields: [customers.tenantId],
-    references: [tenants.id],
-  }),
-  addresses: many(customerAddresses),
-}));
-
-export const customerAddressesRelations = relations(customerAddresses, ({ one }) => ({
-  customer: one(customers, {
-    fields: [customerAddresses.customerId],
-    references: [customers.id],
-  }),
-}));
-
-export const brandsRelations = relations(brands, ({ one, many }) => ({
-  tenant: one(tenants, { fields: [brands.tenantId], references: [tenants.id] }),
-  products: many(products),
-}));
-
-export const productCategoriesRelations = relations(productCategories, ({ one, many }) => ({
-  tenant: one(tenants, { fields: [productCategories.tenantId], references: [tenants.id] }),
-  parent: one(productCategories, { fields: [productCategories.parentId], references: [productCategories.id] }),
-  children: many(productCategories),
-  products: many(products),
-}));
-
-export const productsRelations = relations(products, ({ one, many }) => ({
-  tenant: one(tenants, { fields: [products.tenantId], references: [tenants.id] }),
-  brand: one(brands, { fields: [products.brandId], references: [brands.id] }),
-  category: one(productCategories, { fields: [products.categoryId], references: [productCategories.id] }),
-  images: many(productImages),
-  specifications: many(productSpecifications),
-  bulkPricingRules: many(bulkPricingRules),
-  variants: many(productVariants),
-  orders: many(orders),
-}));
-
-export const productImagesRelations = relations(productImages, ({ one }) => ({
-  product: one(products, { fields: [productImages.productId], references: [products.id] }),
-}));
-
-export const productSpecificationsRelations = relations(productSpecifications, ({ one }) => ({
-  product: one(products, { fields: [productSpecifications.productId], references: [products.id] }),
-}));
-
-export const productPromotionsRelations = relations(productPromotions, ({ one, many }) => ({
-  tenant: one(tenants, { fields: [productPromotions.tenantId], references: [tenants.id] }),
-  products: many(productPromotionProducts),
-}));
-
-export const productPromotionProductsRelations = relations(productPromotionProducts, ({ one }) => ({
-  promotion: one(productPromotions, { fields: [productPromotionProducts.promotionId], references: [productPromotions.id] }),
-  product: one(products, { fields: [productPromotionProducts.productId], references: [products.id] }),
-}));
-
-export const bulkPricingRulesRelations = relations(bulkPricingRules, ({ one }) => ({
-  product: one(products, { fields: [bulkPricingRules.productId], references: [products.id] }),
-}));
-
-export const productVariantsRelations = relations(productVariants, ({ one }) => ({
-  product: one(products, { fields: [productVariants.productId], references: [products.id] }),
-}));
-
-export const ordersRelations = relations(orders, ({ one }) => ({
-  tenant: one(tenants, { fields: [orders.tenantId], references: [tenants.id] }),
-}));
-
-// Plugin subscription relations
-export const pluginPlansRelations = relations(pluginPlans, ({ many }) => ({
-  subscriptions: many(pluginSubscriptions),
-}));
-
-export const pluginSubscriptionsRelations = relations(pluginSubscriptions, ({ one, many }) => ({
-  tenant: one(tenants, { fields: [pluginSubscriptions.tenantId], references: [tenants.id] }),
-  plugin: one(plugins, { fields: [pluginSubscriptions.pluginId], references: [plugins.id] }),
-  plan: one(pluginPlans, { fields: [pluginSubscriptions.planId], references: [pluginPlans.id] }),
-  history: many(pluginSubscriptionHistory),
-}));
-
-export const pluginSubscriptionHistoryRelations = relations(pluginSubscriptionHistory, ({ one }) => ({
-  subscription: one(pluginSubscriptions, { fields: [pluginSubscriptionHistory.subscriptionId], references: [pluginSubscriptions.id] }),
-}));
-
-export const pluginUsageRelations = relations(pluginUsage, ({ one }) => ({
-  tenant: one(tenants, { fields: [pluginUsage.tenantId], references: [tenants.id] }),
-  plugin: one(plugins, { fields: [pluginUsage.pluginId], references: [plugins.id] }),
-}));
-
-// Plan-Plugin relationships
-export const planPlugins = pgTable("plan_plugins", {
-  id: serial("id").primaryKey(),
-  planId: integer("plan_id").references(() => pluginPlans.id).notNull(),
-  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
-  isRequired: boolean("is_required").default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  uniquePlanPlugin: unique().on(table.planId, table.pluginId),
-}));
-
-export const planPluginsRelations = relations(planPlugins, ({ one }) => ({
-  plan: one(pluginPlans, { fields: [planPlugins.planId], references: [pluginPlans.id] }),
-  plugin: one(plugins, { fields: [planPlugins.pluginId], references: [plugins.id] }),
-}));
-
-// Zod schemas for validation
-export const insertTenantSchema = createInsertSchema(tenants).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertBrandSchema = createInsertSchema(brands).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertProductCategorySchema = createInsertSchema(productCategories).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertProductSchema = createInsertSchema(products).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertProductImageSchema = createInsertSchema(productImages).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertProductSpecificationSchema = createInsertSchema(productSpecifications).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertProductPromotionSchema = createInsertSchema(productPromotions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertPlanPluginSchema = createInsertSchema(planPlugins).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertBulkPricingRuleSchema = createInsertSchema(bulkPricingRules).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertProductVariantSchema = createInsertSchema(productVariants).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertOrderSchema = createInsertSchema(orders).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertNotificationSchema = createInsertSchema(notifications).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-// Additional validation schemas
-export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-});
-
-export const tenantRegistrationSchema = z.object({
-  domain: z.string().min(3).max(50).regex(/^[a-zA-Z0-9-]+$/),
-  tenantName: z.string().min(1).max(100),
-  adminEmail: z.string().email(),
-  adminPassword: z.string().min(6),
-  adminFullName: z.string().min(1).max(100),
-  adminDocument: z.string().min(11).max(14),
-  adminDocumentType: z.enum(["cpf", "cnpj"]),
-  adminPhone: z.string().min(10).max(15),
-});
-
-// Customer schemas
-export const insertCustomerSchema = createInsertSchema(customers).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  lastLoginAt: true,
-});
-
-export const insertCustomerAddressSchema = createInsertSchema(customerAddresses).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const customerLoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-});
-
-// API credentials for public integrations
-export const apiCredentials = pgTable("api_credentials", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  name: varchar("name", { length: 255 }).notNull(), // User-friendly name for the credential
-  apiKey: varchar("api_key", { length: 64 }).unique().notNull(), // Public API key
-  apiSecret: varchar("api_secret", { length: 128 }).notNull(), // Secret key (hashed)
-  permissions: jsonb("permissions").notNull(), // Array of allowed endpoints/actions
-  isActive: boolean("is_active").default(true).notNull(),
-  lastUsed: timestamp("last_used"),
-  expiresAt: timestamp("expires_at"), // Optional expiration
-  rateLimit: integer("rate_limit").default(1000).notNull(), // Requests per hour
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// API usage logs for monitoring and analytics
-export const apiUsageLogs = pgTable("api_usage_logs", {
-  id: serial("id").primaryKey(),
-  credentialId: integer("credential_id").references(() => apiCredentials.id).notNull(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  endpoint: varchar("endpoint", { length: 255 }).notNull(),
-  method: varchar("method", { length: 10 }).notNull(), // GET, POST, PUT, DELETE
-  statusCode: integer("status_code").notNull(),
-  responseTime: integer("response_time"), // milliseconds
-  userAgent: text("user_agent"),
-  ipAddress: varchar("ip_address", { length: 45 }),
-  requestSize: integer("request_size"), // bytes
-  responseSize: integer("response_size"), // bytes
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Email notifications table
-export const emailNotifications = pgTable("email_notifications", {
-  id: serial("id").primaryKey(),
-  title: varchar("title", { length: 255 }).notNull(),
-  message: text("message").notNull(),
-  recipientType: varchar("recipient_type", { length: 50 }).notNull(), // 'all', 'specific', 'tenant'
-  recipientIds: jsonb("recipient_ids"), // Array of user IDs or tenant IDs
-  sentCount: integer("sent_count").default(0),
-  failedCount: integer("failed_count").default(0),
-  status: varchar("status", { length: 20 }).default("pending"), // 'pending', 'sending', 'completed', 'failed'
-  createdBy: integer("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  sentAt: timestamp("sent_at"),
-});
-
-export type EmailNotification = typeof emailNotifications.$inferSelect;
-export type InsertEmailNotification = typeof emailNotifications.$inferInsert;
-
-export const insertEmailNotificationSchema = createInsertSchema(emailNotifications).omit({
-  id: true,
-  createdAt: true,
-  sentAt: true,
-});
-
-export const customerRegisterSchema = z.object({
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
-  email: z.string().email(),
-  password: z.string().min(6),
-  phone: z.string().optional(),
-  cpf: z.string().optional(),
-  birthDate: z.string().optional(),
-  gender: z.enum(["masculino", "feminino", "outro"]).optional(),
-});
-
-export const socialLoginSchema = z.object({
-  provider: z.enum(["google", "apple", "facebook"]),
-  providerId: z.string(),
-  email: z.string().email(),
-  firstName: z.string(),
-  lastName: z.string(),
-});
-
 // Type exports
 export type Tenant = typeof tenants.$inferSelect;
-export type InsertTenant = z.infer<typeof insertTenantSchema>;
-
+export type InsertTenant = typeof tenants.$inferInsert;
 export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-
-export type Brand = typeof brands.$inferSelect;
-export type InsertBrand = z.infer<typeof insertBrandSchema>;
-
-export type ProductCategory = typeof productCategories.$inferSelect;
-export type InsertProductCategory = z.infer<typeof insertProductCategorySchema>;
-
+export type InsertUser = typeof users.$inferInsert;
 export type Product = typeof products.$inferSelect;
-export type InsertProduct = z.infer<typeof insertProductSchema>;
-
-export type ProductImage = typeof productImages.$inferSelect;
-export type InsertProductImage = z.infer<typeof insertProductImageSchema>;
-
-export type ProductSpecification = typeof productSpecifications.$inferSelect;
-export type InsertProductSpecification = z.infer<typeof insertProductSpecificationSchema>;
-
-export type ProductPromotion = typeof productPromotions.$inferSelect;
-export type InsertProductPromotion = z.infer<typeof insertProductPromotionSchema>;
-
-export type ProductPromotionProduct = typeof productPromotionProducts.$inferSelect;
-
-export type BulkPricingRule = typeof bulkPricingRules.$inferSelect;
-export type InsertBulkPricingRule = z.infer<typeof insertBulkPricingRuleSchema>;
-
-export type ProductVariant = typeof productVariants.$inferSelect;
-export type InsertProductVariant = z.infer<typeof insertProductVariantSchema>;
-
+export type InsertProduct = typeof products.$inferInsert;
 export type Order = typeof orders.$inferSelect;
-export type InsertOrder = z.infer<typeof insertOrderSchema>;
-
-export type Notification = typeof notifications.$inferSelect;
-export type InsertNotification = z.infer<typeof insertNotificationSchema>;
-
-export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
-export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
-
+export type InsertOrder = typeof orders.$inferInsert;
 export type Customer = typeof customers.$inferSelect;
-export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+export type InsertCustomer = typeof customers.$inferInsert;
 
-export type CustomerAddress = typeof customerAddresses.$inferSelect;
-export type InsertCustomerAddress = z.infer<typeof insertCustomerAddressSchema>;
+// Zod schemas
+export const insertTenantSchema = createInsertSchema(tenants);
+export const insertUserSchema = createInsertSchema(users);
+export const insertProductSchema = createInsertSchema(products);
+export const insertOrderSchema = createInsertSchema(orders);
+export const insertCustomerSchema = createInsertSchema(customers);
 
-export type StorefrontBanner = typeof storefrontBanners.$inferSelect;
-export type InsertStorefrontBanner = typeof storefrontBanners.$inferInsert;
-
-export type ThemeCustomization = typeof themeCustomizations.$inferSelect;
-export type InsertThemeCustomization = typeof themeCustomizations.$inferInsert;
-
-// User profile and support ticket schemas
-export const insertUserProfileSchema = createInsertSchema(userProfiles);
-export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({ 
-  id: true, 
-  ticketNumber: true,
-  createdAt: true, 
-  updatedAt: true 
-});
-export const insertSupportTicketMessageSchema = createInsertSchema(supportTicketMessages).omit({ 
-  id: true, 
-  createdAt: true 
-});
-
-// Additional schemas for user management
-export const userPermissionSchema = z.object({
-  canManageProducts: z.boolean().default(false),
-  canManageOrders: z.boolean().default(false),
-  canViewFinancials: z.boolean().default(false),
-  canManageUsers: z.boolean().default(false),
-  canManageSettings: z.boolean().default(false),
-  canManageThemes: z.boolean().default(false),
-  canManageBanners: z.boolean().default(false),
-  canAccessSupport: z.boolean().default(true),
-});
-
-export const createUserSchema = z.object({
-  email: z.string().email("Email inválido"),
-  fullName: z.string().min(1, "Nome completo é obrigatório"),
-  document: z.string().min(11, "Documento inválido"),
-  documentType: z.enum(["cpf", "cnpj"]),
-  phone: z.string().optional(),
-  role: z.enum(["admin", "merchant"]).default("merchant"),
-  jobTitle: z.string().optional(),
-  accessLevel: z.enum(["full", "limited", "readonly"]).default("limited"),
-  permissions: userPermissionSchema,
-});
-
-export const updateUserSchema = createUserSchema.partial().extend({
-  id: z.number(),
-  isActive: z.boolean().optional(),
-});
-
-export const supportTicketCreateSchema = z.object({
-  title: z.string().min(1, "Título é obrigatório"),
-  description: z.string().min(10, "Descrição deve ter pelo menos 10 caracteres"),
-  category: z.enum(["bug", "feature", "support", "billing", "technical"]),
-  priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
-  attachments: z.array(z.string()).optional(),
-  tags: z.array(z.string()).optional(),
-});
-
-export const supportTicketUpdateSchema = z.object({
-  status: z.enum(["open", "in_progress", "waiting_response", "resolved", "closed"]).optional(),
-  priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
-  assignedTo: z.number().optional(),
-  satisfactionRating: z.number().min(1).max(5).optional(),
-  satisfactionComment: z.string().optional(),
-});
-
-export const supportMessageCreateSchema = z.object({
-  message: z.string().min(1, "Mensagem é obrigatória"),
-  attachments: z.array(z.string()).optional(),
-  isInternal: z.boolean().default(false),
-  messageType: z.enum(["reply", "note", "status_change"]).default("reply"),
-});
-
-export type LoginData = z.infer<typeof loginSchema>;
-export type TenantRegistrationData = z.infer<typeof tenantRegistrationSchema>;
-export type CustomerLoginData = z.infer<typeof customerLoginSchema>;
-export type CustomerRegisterData = z.infer<typeof customerRegisterSchema>;
-export type SocialLoginData = z.infer<typeof socialLoginSchema>;
-
-// User profile types
-export type UserProfile = typeof userProfiles.$inferSelect;
-export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
-export type CreateUserData = z.infer<typeof createUserSchema>;
-export type UpdateUserData = z.infer<typeof updateUserSchema>;
-export type UserPermissions = z.infer<typeof userPermissionSchema>;
-
-// Support ticket types
-export type SupportTicket = typeof supportTickets.$inferSelect;
-export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
-export type SupportTicketMessage = typeof supportTicketMessages.$inferSelect;
-export type InsertSupportTicketMessage = z.infer<typeof insertSupportTicketMessageSchema>;
-export type CreateSupportTicketData = z.infer<typeof supportTicketCreateSchema>;
-export type UpdateSupportTicketData = z.infer<typeof supportTicketUpdateSchema>;
-export type CreateSupportMessageData = z.infer<typeof supportMessageCreateSchema>;
-
-// API credentials schemas
-export const insertApiCredentialSchema = createInsertSchema(apiCredentials).omit({
-  id: true,
-  apiKey: true,
-  apiSecret: true,
-  createdAt: true,
-  updatedAt: true,
-  lastUsed: true,
-});
-
-export const insertApiUsageLogSchema = createInsertSchema(apiUsageLogs).omit({
-  id: true,
-  createdAt: true,
-});
-
-// API types
-export type ApiCredential = typeof apiCredentials.$inferSelect;
-export type InsertApiCredential = z.infer<typeof insertApiCredentialSchema>;
-export type ApiUsageLog = typeof apiUsageLogs.$inferSelect;
-export type InsertApiUsageLog = z.infer<typeof insertApiUsageLogSchema>;
+// Relations would go here...
