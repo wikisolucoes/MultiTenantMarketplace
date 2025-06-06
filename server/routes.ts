@@ -27,16 +27,22 @@ import {
   platformSettings,
   platformFeatures,
   platformMaintenance,
+  apiCredentials,
+  apiUsageLogs,
   type User,
   type Tenant,
   type Product,
   type Brand,
   type ProductCategory,
-  type Order
+  type Order,
+  type ApiCredential,
+  insertApiCredentialSchema
 } from "@shared/schema";
 import { storage } from "./storage";
 import { db } from "./db";
-import { sql, eq, desc } from "drizzle-orm";
+import { sql, eq, desc, and } from "drizzle-orm";
+import { generateApiCredentials } from "./api-auth";
+import publicApiRouter from "./public-api";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -4548,6 +4554,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating platform maintenance:', error);
       res.status(500).json({ message: 'Failed to create platform maintenance' });
+    }
+  });
+
+  // PUBLIC API ROUTES
+  app.use('/api/public/v1', publicApiRouter);
+
+  // API CREDENTIALS MANAGEMENT FOR MERCHANTS
+  app.get('/api/merchant/credentials', async (req, res) => {
+    try {
+      const userId = 1; // From session
+      const tenantId = 5; // From session
+
+      const credentials = await db
+        .select()
+        .from(apiCredentials)
+        .where(and(
+          eq(apiCredentials.userId, userId),
+          eq(apiCredentials.tenantId, tenantId)
+        ))
+        .orderBy(desc(apiCredentials.createdAt));
+
+      // Don't return the actual secret
+      const safeCredentials = credentials.map(cred => ({
+        ...cred,
+        apiSecret: undefined
+      }));
+
+      res.json(safeCredentials);
+    } catch (error) {
+      console.error('Error fetching API credentials:', error);
+      res.status(500).json({ message: 'Failed to fetch API credentials' });
+    }
+  });
+
+  app.post('/api/merchant/credentials', async (req, res) => {
+    try {
+      const userId = 1; // From session
+      const tenantId = 5; // From session
+      const { name, permissions, rateLimit, expiresAt } = req.body;
+
+      // Validate permissions
+      const validPermissions = [
+        'products:read', 'products:write', 'products:delete',
+        'orders:read', 'orders:write',
+        'customers:read', 'customers:write',
+        '*' // Full access
+      ];
+
+      if (!Array.isArray(permissions) || !permissions.every(p => validPermissions.includes(p))) {
+        return res.status(400).json({ 
+          error: 'Invalid permissions',
+          valid_permissions: validPermissions
+        });
+      }
+
+      const { apiKey, apiSecret, hashedSecret } = generateApiCredentials();
+
+      const [credential] = await db
+        .insert(apiCredentials)
+        .values({
+          userId,
+          tenantId,
+          name,
+          apiKey,
+          apiSecret: hashedSecret,
+          permissions: permissions,
+          rateLimit: rateLimit || 1000,
+          expiresAt: expiresAt ? new Date(expiresAt) : null
+        })
+        .returning();
+
+      res.status(201).json({
+        id: credential.id,
+        name: credential.name,
+        apiKey: credential.apiKey,
+        apiSecret: apiSecret, // Only shown once
+        permissions: credential.permissions,
+        rateLimit: credential.rateLimit,
+        expiresAt: credential.expiresAt,
+        createdAt: credential.createdAt,
+        message: 'API credentials created successfully. Save the secret key - it will not be shown again.'
+      });
+    } catch (error) {
+      console.error('Error creating API credentials:', error);
+      res.status(500).json({ message: 'Failed to create API credentials' });
+    }
+  });
+
+  app.put('/api/merchant/credentials/:id', async (req, res) => {
+    try {
+      const userId = 1; // From session
+      const tenantId = 5; // From session
+      const credentialId = parseInt(req.params.id);
+      const { name, permissions, rateLimit, isActive, expiresAt } = req.body;
+
+      const [updated] = await db
+        .update(apiCredentials)
+        .set({
+          name,
+          permissions,
+          rateLimit,
+          isActive,
+          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          updatedAt: new Date()
+        })
+        .where(and(
+          eq(apiCredentials.id, credentialId),
+          eq(apiCredentials.userId, userId),
+          eq(apiCredentials.tenantId, tenantId)
+        ))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ message: 'API credential not found' });
+      }
+
+      res.json({
+        ...updated,
+        apiSecret: undefined
+      });
+    } catch (error) {
+      console.error('Error updating API credentials:', error);
+      res.status(500).json({ message: 'Failed to update API credentials' });
+    }
+  });
+
+  app.delete('/api/merchant/credentials/:id', async (req, res) => {
+    try {
+      const userId = 1; // From session
+      const tenantId = 5; // From session
+      const credentialId = parseInt(req.params.id);
+
+      const [deleted] = await db
+        .delete(apiCredentials)
+        .where(and(
+          eq(apiCredentials.id, credentialId),
+          eq(apiCredentials.userId, userId),
+          eq(apiCredentials.tenantId, tenantId)
+        ))
+        .returning({ id: apiCredentials.id });
+
+      if (!deleted) {
+        return res.status(404).json({ message: 'API credential not found' });
+      }
+
+      res.json({ message: 'API credential deleted successfully', id: deleted.id });
+    } catch (error) {
+      console.error('Error deleting API credentials:', error);
+      res.status(500).json({ message: 'Failed to delete API credentials' });
+    }
+  });
+
+  app.get('/api/merchant/credentials/:id/usage', async (req, res) => {
+    try {
+      const userId = 1; // From session
+      const tenantId = 5; // From session
+      const credentialId = parseInt(req.params.id);
+
+      // Verify credential ownership
+      const [credential] = await db
+        .select()
+        .from(apiCredentials)
+        .where(and(
+          eq(apiCredentials.id, credentialId),
+          eq(apiCredentials.userId, userId),
+          eq(apiCredentials.tenantId, tenantId)
+        ));
+
+      if (!credential) {
+        return res.status(404).json({ message: 'API credential not found' });
+      }
+
+      // Get usage stats
+      const usageLogs = await db
+        .select({
+          endpoint: apiUsageLogs.endpoint,
+          method: apiUsageLogs.method,
+          count: sql<number>`count(*)`,
+          avgResponseTime: sql<number>`avg(${apiUsageLogs.responseTime})`,
+          lastUsed: sql<Date>`max(${apiUsageLogs.createdAt})`
+        })
+        .from(apiUsageLogs)
+        .where(eq(apiUsageLogs.credentialId, credentialId))
+        .groupBy(apiUsageLogs.endpoint, apiUsageLogs.method)
+        .orderBy(desc(sql`count(*)`));
+
+      res.json({
+        credential: {
+          id: credential.id,
+          name: credential.name,
+          lastUsed: credential.lastUsed
+        },
+        usage: usageLogs
+      });
+    } catch (error) {
+      console.error('Error fetching API usage:', error);
+      res.status(500).json({ message: 'Failed to fetch API usage' });
     }
   });
 
