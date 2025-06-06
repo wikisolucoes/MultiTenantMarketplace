@@ -4873,41 +4873,45 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Platform Settings Navigation */}
-              <div className="border-b">
-                <nav className="flex space-x-8">
-                  {[
-                    { id: 'general', label: 'Geral', icon: Settings },
-                    { id: 'email', label: 'E-mail', icon: Mail },
-                    { id: 'payment', label: 'Pagamentos', icon: CreditCard },
-                    { id: 'security', label: 'Segurança', icon: Shield },
-                    { id: 'tax', label: 'Impostos', icon: Calculator },
-                    { id: 'integrations', label: 'Integrações', icon: Link },
-                    { id: 'notifications', label: 'Notificações', icon: Bell },
-                    { id: 'features', label: 'Recursos', icon: Zap },
-                    { id: 'maintenance', label: 'Manutenção', icon: Wrench }
-                  ].map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActivePlatformTab(tab.id)}
-                        className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
-                          activePlatformTab === tab.id
-                            ? 'border-primary text-primary'
-                            : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </nav>
-              </div>
+              <div className="flex gap-6">
+                {/* Platform Settings Navigation - Vertical Sidebar */}
+                <div className="w-64 shrink-0">
+                  <nav className="space-y-2">
+                    {[
+                      { id: 'general', label: 'Geral', icon: Settings },
+                      { id: 'email', label: 'E-mail', icon: Mail },
+                      { id: 'payment', label: 'Pagamentos', icon: CreditCard },
+                      { id: 'security', label: 'Segurança', icon: Shield },
+                      { id: 'tax', label: 'Impostos', icon: Calculator },
+                      { id: 'integrations', label: 'Integrações', icon: Link },
+                      { id: 'notifications', label: 'Notificações', icon: Bell },
+                      { id: 'features', label: 'Recursos', icon: Zap },
+                      { id: 'maintenance', label: 'Manutenção', icon: Wrench }
+                    ].map((tab) => {
+                      const Icon = tab.icon;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActivePlatformTab(tab.id)}
+                          className={`flex items-center gap-3 w-full px-3 py-2 text-left rounded-lg font-medium text-sm transition-colors ${
+                            activePlatformTab === tab.id
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          <span>{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
 
-              {/* Platform Settings Content */}
-              <PlatformSettingsContent activeTab={activePlatformTab} />
+                {/* Platform Settings Content */}
+                <div className="flex-1">
+                  <PlatformSettingsContent activeTab={activePlatformTab} />
+                </div>
+              </div>
             </div>
           )}
 
