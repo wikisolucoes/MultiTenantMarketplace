@@ -44,6 +44,7 @@ import { sql, eq, desc, and } from "drizzle-orm";
 import { generateApiCredentials } from "./api-auth";
 import publicApiRouter from "./public-api";
 import { setupSwagger } from "./swagger-config";
+import { generateApiDocsHTML } from "./api-docs-html";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -4563,6 +4564,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup Swagger API Documentation
   setupSwagger(app);
+  
+  // Static HTML API documentation endpoint
+  app.get('/api/documentation', (req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(generateApiDocsHTML());
+  });
 
   // API CREDENTIALS MANAGEMENT FOR MERCHANTS
   app.get('/api/merchant/credentials', async (req, res) => {
