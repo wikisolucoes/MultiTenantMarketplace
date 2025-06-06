@@ -647,25 +647,31 @@ export default function AdminSupportCenter() {
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-60 overflow-y-auto">
-                        {messages.map((message: TicketMessage) => (
-                          <div key={message.id} className={`flex ${
-                            message.senderType === 'user' ? 'justify-start' : 'justify-end'
-                          }`}>
-                            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                              message.senderType === 'user' 
-                                ? 'bg-muted' 
-                                : message.isInternal
-                                ? 'bg-yellow-100 border border-yellow-300'
-                                : 'bg-primary text-primary-foreground'
+                        {Array.isArray(messages) && messages.length > 0 ? (
+                          messages.map((message: any) => (
+                            <div key={message.id} className={`flex ${
+                              message.senderType === 'user' ? 'justify-start' : 'justify-end'
                             }`}>
-                              <div className="text-xs opacity-75 mb-1">
-                                {message.senderName} • {new Date(message.createdAt).toLocaleString('pt-BR')}
-                                {message.isInternal && <span className="ml-2 text-yellow-600">Interno</span>}
+                              <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                message.senderType === 'user' 
+                                  ? 'bg-muted' 
+                                  : message.isInternal
+                                  ? 'bg-yellow-100 border border-yellow-300'
+                                  : 'bg-primary text-primary-foreground'
+                              }`}>
+                                <div className="text-xs opacity-75 mb-1">
+                                  {message.senderName} • {new Date(message.createdAt).toLocaleString('pt-BR')}
+                                  {message.isInternal && <span className="ml-2 text-yellow-600">Interno</span>}
+                                </div>
+                                <div className="text-sm whitespace-pre-wrap">{message.message}</div>
                               </div>
-                              <div className="text-sm">{message.message}</div>
                             </div>
+                          ))
+                        ) : (
+                          <div className="text-center text-muted-foreground py-4">
+                            Nenhuma mensagem na conversação
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
                   </div>
