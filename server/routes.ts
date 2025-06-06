@@ -1770,6 +1770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedTicket = updateResult.rows[0];
       
       // Add status change message to ticket conversation
+      const statusMessage = `Status alterado para: ${status}`;
       await db.execute(sql`
         INSERT INTO support_ticket_messages (
           ticket_id, sender_type, sender_name, message, message_type, is_internal
@@ -1777,7 +1778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ${ticketId}, 
           'system', 
           'Sistema', 
-          'Status alterado para: ${status}', 
+          ${statusMessage}, 
           'status_change', 
           false
         )
