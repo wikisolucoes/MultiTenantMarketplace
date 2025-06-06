@@ -4861,7 +4861,50 @@ export default function AdminDashboard() {
           {/* Platform Settings Tab */}
           {activeTab === "platform-settings" && (
             <div className="space-y-6">
-              {renderPlatformSettings()}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">Configurações da Plataforma</h1>
+                  <p className="text-muted-foreground">
+                    Configure recursos, manutenção e configurações globais da plataforma
+                  </p>
+                </div>
+              </div>
+
+              {/* Platform Settings Navigation */}
+              <div className="border-b">
+                <nav className="flex space-x-8">
+                  {[
+                    { id: 'general', label: 'Geral', icon: Settings },
+                    { id: 'email', label: 'E-mail', icon: Mail },
+                    { id: 'payment', label: 'Pagamentos', icon: CreditCard },
+                    { id: 'security', label: 'Segurança', icon: Shield },
+                    { id: 'tax', label: 'Impostos', icon: Calculator },
+                    { id: 'integrations', label: 'Integrações', icon: Link },
+                    { id: 'notifications', label: 'Notificações', icon: Bell },
+                    { id: 'features', label: 'Recursos', icon: Zap },
+                    { id: 'maintenance', label: 'Manutenção', icon: Wrench }
+                  ].map((tab) => {
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActivePlatformTab(tab.id)}
+                        className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
+                          activePlatformTab === tab.id
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              {/* Platform Settings Content */}
+              <PlatformSettingsContent activeTab={activePlatformTab} />
             </div>
           )}
 
