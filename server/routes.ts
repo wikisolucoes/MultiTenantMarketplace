@@ -43,6 +43,7 @@ import { db } from "./db";
 import { sql, eq, desc, and } from "drizzle-orm";
 import { generateApiCredentials } from "./api-auth";
 import publicApiRouter from "./public-api";
+import { setupSwagger } from "./swagger-config";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -4559,6 +4560,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // PUBLIC API ROUTES
   app.use('/api/public/v1', publicApiRouter);
+
+  // Setup Swagger API Documentation
+  setupSwagger(app);
 
   // API CREDENTIALS MANAGEMENT FOR MERCHANTS
   app.get('/api/merchant/credentials', async (req, res) => {
