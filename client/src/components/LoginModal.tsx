@@ -58,16 +58,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       setUser(data.user);
       toast({
         title: "Login realizado com sucesso!",
-        description: `Bem-vindo, ${data.user.fullName}!`,
+        description: `Bem-vindo, ${data.user.full_name || data.user.email}!`,
       });
       onClose();
 
-      // Redirect based on user role
-      if (data.user.role === "admin") {
-        window.location.href = "/admin";
-      } else if (data.user.role === "merchant") {
-        window.location.href = "/merchant";
-      }
+      // Trigger auth change event to update App component
+      window.dispatchEvent(new Event('authChange'));
+
+      // Small delay to ensure state is updated before redirect
+      setTimeout(() => {
+        if (data.user.role === "admin") {
+          window.location.href = "/admin";
+        } else if (data.user.role === "merchant") {
+          window.location.href = "/merchant";
+        }
+      }, 100);
     },
     onError: (error: any) => {
       toast({
