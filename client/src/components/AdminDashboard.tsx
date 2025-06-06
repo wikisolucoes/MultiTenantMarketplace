@@ -56,6 +56,10 @@ import {
   Target,
   XCircle,
   FileBarChart,
+  Bell,
+  Save,
+  ToggleLeft,
+  ToggleRight,
   ArrowUpRight,
   Info,
   Puzzle,
@@ -3151,8 +3155,278 @@ function FinancialManagement() {
   );
 }
 
+// Platform Settings Content Component
+function PlatformSettingsContent({ activeTab }: { activeTab: string }) {
+  const { data: settings, isLoading: settingsLoading, refetch: refetchSettings } = useQuery({
+    queryKey: ["/api/admin/platform/settings", activeTab],
+  });
+
+  const { data: features, isLoading: featuresLoading, refetch: refetchFeatures } = useQuery({
+    queryKey: ["/api/admin/platform/features"],
+    enabled: activeTab === 'features'
+  });
+
+  const { data: maintenance, isLoading: maintenanceLoading, refetch: refetchMaintenance } = useQuery({
+    queryKey: ["/api/admin/platform/maintenance"],
+    enabled: activeTab === 'maintenance'
+  });
+
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const updateSettingMutation = useMutation({
+    mutationFn: async ({ id, value }: { id: number; value: any }) => {
+      return await apiRequest('PUT', `/api/admin/platform/settings/${id}`, { value });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/platform/settings"] });
+      toast({
+        title: "Configuração atualizada",
+        description: "A configuração foi salva com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateFeatureMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      return await apiRequest('PUT', `/api/admin/platform/features/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/platform/features"] });
+      toast({
+        title: "Recurso atualizado",
+        description: "O recurso foi atualizado com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createMaintenanceMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest('POST', '/api/admin/platform/maintenance', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/platform/maintenance"] });
+      toast({
+        title: "Manutenção agendada",
+        description: "A manutenção foi agendada com sucesso.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSettingChange = (setting: any, newValue: any) => {
+    updateSettingMutation.mutate({ id: setting.id, value: newValue });
+  };
+
+  const handleFeatureToggle = (feature: any, isEnabled: boolean) => {
+    updateFeatureMutation.mutate({ 
+      id: feature.id, 
+      data: { 
+        isEnabled,
+        rolloutPercentage: feature.rollout_percentage,
+        targetTenants: feature.target_tenants,
+        metadata: feature.metadata
+      }
+    });
+  };
+
+  if (settingsLoading && activeTab !== 'features' && activeTab !== 'maintenance') {
+    return (
+      <div className="flex justify-center items-center h-32">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  if (activeTab === 'features') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Gerenciamento de Recursos</CardTitle>
+          <CardDescription>
+            Configure recursos da plataforma e controle o rollout para tenants específicos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {featuresLoading ? (
+            <div className="flex justify-center items-center h-32">
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {features?.map((feature: any) => (
+                <div key={feature.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <h4 className="font-medium">{feature.name}</h4>
+                      <Badge variant={feature.is_enabled ? 'default' : 'secondary'}>
+                        {feature.is_enabled ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{feature.description}</p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                      <span>Rollout: {feature.rollout_percentage}%</span>
+                      {feature.created_by_name && (
+                        <span>Criado por: {feature.created_by_name}</span>
+                      )}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={feature.is_enabled}
+                    onCheckedChange={(checked) => handleFeatureToggle(feature, checked)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (activeTab === 'maintenance') {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Gerenciamento de Manutenção</CardTitle>
+            <CardDescription>
+              Agende e gerencie manutenções da plataforma
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {maintenanceLoading ? (
+              <div className="flex justify-center items-center h-32">
+                <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {maintenance?.length > 0 ? (
+                  maintenance.map((item: any) => (
+                    <div key={item.id} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">{item.title}</h4>
+                        <Badge variant={item.severity === 'critical' ? 'destructive' : 'default'}>
+                          {item.severity}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                        <span>Tipo: {item.maintenance_type}</span>
+                        <span>Status: {item.status}</span>
+                        {item.scheduled_start && (
+                          <span>Início: {new Date(item.scheduled_start).toLocaleString('pt-BR')}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhuma manutenção agendada</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const categorySettings = settings?.[activeTab] || [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          Configurações de {activeTab === 'general' ? 'Geral' : 
+                           activeTab === 'email' ? 'E-mail' :
+                           activeTab === 'payment' ? 'Pagamentos' :
+                           activeTab === 'security' ? 'Segurança' :
+                           activeTab === 'tax' ? 'Impostos' :
+                           activeTab === 'integrations' ? 'Integrações' :
+                           activeTab === 'notifications' ? 'Notificações' : activeTab}
+        </CardTitle>
+        <CardDescription>
+          Configure as opções para esta categoria
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {categorySettings.map((setting: any) => (
+            <div key={setting.id} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">{setting.key.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</Label>
+                  {setting.description && (
+                    <p className="text-xs text-muted-foreground mt-1">{setting.description}</p>
+                  )}
+                </div>
+                {setting.data_type === 'boolean' ? (
+                  <Switch
+                    checked={setting.value === true || setting.value === 'true'}
+                    onCheckedChange={(checked) => handleSettingChange(setting, checked)}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type={setting.data_type === 'number' ? 'number' : 'text'}
+                      value={setting.value || ''}
+                      onChange={(e) => {
+                        const value = setting.data_type === 'number' ? 
+                          Number(e.target.value) : e.target.value;
+                        handleSettingChange(setting, value);
+                      }}
+                      className="w-48"
+                    />
+                    {setting.last_modified_by_name && (
+                      <span className="text-xs text-muted-foreground">
+                        por {setting.last_modified_by_name}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Separator />
+            </div>
+          ))}
+          
+          {categorySettings.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Settings className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhuma configuração disponível para esta categoria</p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
+  const [activePlatformTab, setActivePlatformTab] = useState('general');
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isCreateTenantOpen, setIsCreateTenantOpen] = useState(false);
