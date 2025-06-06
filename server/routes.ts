@@ -1583,6 +1583,166 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Support Routes
+  app.get("/api/admin/support-tickets", async (req, res) => {
+    try {
+      const ticketsResult = await db.execute(sql`
+        SELECT 
+          st.*,
+          u.email as user_email,
+          u.full_name as user_name,
+          t.name as tenant_name
+        FROM support_tickets st
+        LEFT JOIN users u ON st.user_id = u.id
+        LEFT JOIN tenants t ON st.tenant_id = t.id
+        ORDER BY st.created_at DESC
+      `);
+      
+      const tickets = ticketsResult.rows.map(row => ({
+        id: row.id,
+        ticketNumber: row.ticket_number,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        priority: row.priority,
+        status: row.status,
+        assignedTo: row.assigned_to,
+        satisfactionRating: row.satisfaction_rating,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        tenantId: row.tenant_id,
+        userId: row.user_id,
+        userName: row.user_name || row.user_email,
+        tenantName: row.tenant_name,
+        firstResponseAt: row.first_response_at,
+        resolvedAt: row.resolved_at
+      }));
+      
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching admin support tickets:", error);
+      res.status(500).json({ message: "Failed to fetch support tickets" });
+    }
+  });
+
+  app.get("/api/admin/faqs", async (req, res) => {
+    try {
+      const faqsResult = await db.execute(sql`
+        SELECT * FROM support_faqs 
+        ORDER BY category, question
+      `);
+      
+      const faqs = faqsResult.rows.map(row => ({
+        id: row.id,
+        question: row.question,
+        answer: row.answer,
+        category: row.category,
+        isActive: row.is_published,
+        viewCount: row.view_count || 0,
+        helpfulCount: row.helpful_count || 0,
+        createdAt: row.created_at
+      }));
+      
+      res.json(faqs);
+    } catch (error) {
+      console.error("Error fetching FAQs:", error);
+      res.status(500).json({ message: "Failed to fetch FAQs" });
+    }
+  });
+
+  app.get("/api/admin/support-analytics", async (req, res) => {
+    try {
+      // Get comprehensive support analytics from database
+      const ticketStatsResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total_tickets,
+          COUNT(CASE WHEN status = 'open' THEN 1 END) as open_tickets,
+          COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_tickets,
+          COUNT(CASE WHEN status = 'resolved' THEN 1 END) as resolved_tickets,
+          COUNT(CASE WHEN status = 'closed' THEN 1 END) as closed_tickets,
+          COUNT(CASE WHEN priority = 'urgent' THEN 1 END) as urgent_tickets,
+          COUNT(CASE WHEN priority = 'high' THEN 1 END) as high_priority_tickets,
+          AVG(satisfaction_rating) as avg_satisfaction,
+          COUNT(CASE WHEN satisfaction_rating IS NOT NULL THEN 1 END) as rated_tickets
+        FROM support_tickets
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+      `);
+
+      const faqStatsResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total_faqs,
+          COUNT(CASE WHEN is_published = true THEN 1 END) as published_faqs,
+          SUM(view_count) as total_views,
+          SUM(helpful_count) as total_helpful,
+          AVG(view_count) as avg_views_per_faq
+        FROM support_faqs
+      `);
+
+      const responseTimeResult = await db.execute(sql`
+        SELECT 
+          AVG(EXTRACT(EPOCH FROM (first_response_at - created_at))/3600) as avg_first_response_hours,
+          AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/3600) as avg_resolution_hours
+        FROM support_tickets
+        WHERE first_response_at IS NOT NULL OR resolved_at IS NOT NULL
+      `);
+
+      const teamPerformanceResult = await db.execute(sql`
+        SELECT 
+          u.full_name as agent_name,
+          u.email as agent_email,
+          COUNT(st.id) as tickets_handled,
+          AVG(st.satisfaction_rating) as avg_rating,
+          COUNT(CASE WHEN st.status = 'resolved' THEN 1 END) as resolved_count
+        FROM users u
+        LEFT JOIN support_tickets st ON u.id = st.assigned_to
+        WHERE u.role = 'admin' 
+        GROUP BY u.id, u.full_name, u.email
+        ORDER BY tickets_handled DESC
+      `);
+
+      const ticketStats = ticketStatsResult.rows[0];
+      const faqStats = faqStatsResult.rows[0];
+      const responseTime = responseTimeResult.rows[0];
+
+      const analytics = {
+        overview: {
+          totalTickets: Number(ticketStats.total_tickets) || 0,
+          openTickets: Number(ticketStats.open_tickets) || 0,
+          inProgressTickets: Number(ticketStats.in_progress_tickets) || 0,
+          resolvedTickets: Number(ticketStats.resolved_tickets) || 0,
+          closedTickets: Number(ticketStats.closed_tickets) || 0,
+          urgentTickets: Number(ticketStats.urgent_tickets) || 0,
+          highPriorityTickets: Number(ticketStats.high_priority_tickets) || 0,
+          avgSatisfaction: Number(ticketStats.avg_satisfaction) || 0,
+          ratedTickets: Number(ticketStats.rated_tickets) || 0
+        },
+        faqMetrics: {
+          totalFaqs: Number(faqStats.total_faqs) || 0,
+          publishedFaqs: Number(faqStats.published_faqs) || 0,
+          totalViews: Number(faqStats.total_views) || 0,
+          totalHelpful: Number(faqStats.total_helpful) || 0,
+          avgViewsPerFaq: Number(faqStats.avg_views_per_faq) || 0
+        },
+        performance: {
+          avgFirstResponseHours: Number(responseTime.avg_first_response_hours) || 0,
+          avgResolutionHours: Number(responseTime.avg_resolution_hours) || 0,
+          teamPerformance: teamPerformanceResult.rows.map(row => ({
+            agentName: row.agent_name || 'Suporte',
+            agentEmail: row.agent_email,
+            ticketsHandled: Number(row.tickets_handled) || 0,
+            avgRating: Number(row.avg_rating) || 0,
+            resolvedCount: Number(row.resolved_count) || 0
+          }))
+        }
+      };
+
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching support analytics:", error);
+      res.status(500).json({ message: "Failed to fetch support analytics" });
+    }
+  });
+
   // Support Ticket Routes
   app.get("/api/support-tickets", async (req, res) => {
     try {
