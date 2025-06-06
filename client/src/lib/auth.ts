@@ -39,12 +39,12 @@ export function isAuthenticated(): boolean {
 
 export function isAdmin(): boolean {
   const user = getUser();
-  return user?.role === "admin";
+  return user?.tenantId === null;
 }
 
 export function isMerchant(): boolean {
   const user = getUser();
-  return user?.role === "merchant";
+  return user?.tenantId !== null && user?.tenantId !== undefined;
 }
 
 export function getUserTenantId(): number | null {

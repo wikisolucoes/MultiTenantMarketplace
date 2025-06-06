@@ -62,17 +62,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       });
       onClose();
 
-      // Trigger auth change event to update App component
-      window.dispatchEvent(new Event('authChange'));
-
-      // Small delay to ensure state is updated before redirect
-      setTimeout(() => {
-        if (data.user.role === "admin") {
-          window.location.href = "/admin";
-        } else if (data.user.role === "merchant") {
-          window.location.href = "/merchant";
-        }
-      }, 100);
+      // Immediate redirect based on tenantId (merchants have tenantId, admins don't)
+      if (data.user.tenantId === null) {
+        window.location.replace("/admin");
+      } else {
+        window.location.replace("/merchant");
+      }
     },
     onError: (error: any) => {
       toast({
