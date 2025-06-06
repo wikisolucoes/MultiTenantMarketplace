@@ -638,6 +638,37 @@ export const pluginUsage = pgTable("plugin_usage", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Ledger entries for financial tracking
+export const ledgerEntries = pgTable("ledger_entries", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  transactionType: varchar("transaction_type", { length: 50 }).notNull(), // 'credit', 'debit'
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  runningBalance: decimal("running_balance", { precision: 15, scale: 2 }).notNull(),
+  description: text("description").notNull(),
+  referenceType: varchar("reference_type", { length: 50 }), // 'order', 'withdrawal', 'celcoin_transaction'
+  referenceId: varchar("reference_id", { length: 100 }),
+  celcoinTransactionId: varchar("celcoin_transaction_id", { length: 100 }),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Withdrawals table
+export const withdrawals = pgTable("withdrawals", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  fee: decimal("fee", { precision: 15, scale: 2 }).default("0").notNull(),
+  netAmount: decimal("net_amount", { precision: 15, scale: 2 }).notNull(),
+  bankAccount: jsonb("bank_account").notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  celcoinTransactionId: varchar("celcoin_transaction_id", { length: 100 }),
+  processedAt: timestamp("processed_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
