@@ -4640,20 +4640,34 @@ export default function AdminDashboard() {
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-medium">CPU</span>
-                            <span className="text-sm text-muted-foreground">23%</span>
+                            <span className="text-sm text-muted-foreground">
+                              {systemMetrics?.find((m: any) => m.name === 'CPU Usage')?.value || '---'}
+                            </span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-2">
-                            <div className="bg-blue-500 h-2 rounded-full" style={{ width: '23%' }} />
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full" 
+                              style={{ 
+                                width: systemMetrics?.find((m: any) => m.name === 'CPU Usage')?.value || '0%'
+                              }} 
+                            />
                           </div>
                         </div>
                         
                         <div className="space-y-2">
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-medium">Memória</span>
-                            <span className="text-sm text-muted-foreground">67%</span>
+                            <span className="text-sm text-muted-foreground">
+                              {systemMetrics?.find((m: any) => m.name === 'Memory Usage')?.value || '---'}
+                            </span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-2">
-                            <div className="bg-green-500 h-2 rounded-full" style={{ width: '67%' }} />
+                            <div 
+                              className="bg-green-500 h-2 rounded-full" 
+                              style={{ 
+                                width: systemMetrics?.find((m: any) => m.name === 'Memory Usage')?.value || '0%'
+                              }} 
+                            />
                           </div>
                         </div>
 
@@ -4766,31 +4780,67 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   
-                  <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">Conexões Ativas</span>
-                        <span className="text-2xl font-bold">24</span>
+                  {databasePerformance && (
+                    <div className="mt-6 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium">Conexões Ativas</span>
+                            <span className="text-2xl font-bold">
+                              {databasePerformance.connectionStats?.reduce((sum: number, stat: any) => sum + stat.connection_count, 0) || 0}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">Estado das conexões</div>
+                        </div>
+                        
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium">Queries Lentas</span>
+                            <span className="text-2xl font-bold">
+                              {databasePerformance.queryPerformance?.length || 0}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">Últimas 24h</div>
+                        </div>
+                        
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium">Tamanho DB</span>
+                            <span className="text-2xl font-bold">
+                              {databasePerformance.totalSize || '---'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">Espaço utilizado</div>
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">Max: 100</div>
+
+                      {databasePerformance.queryPerformance?.length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="font-medium mb-3">Top Queries (Tempo de Execução)</h4>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {databasePerformance.queryPerformance.slice(0, 5).map((query: any, index: number) => (
+                              <div key={index} className="p-3 border rounded-lg">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-sm font-medium">
+                                    Query #{index + 1}
+                                  </span>
+                                  <Badge variant="outline">
+                                    {Math.round(query.mean_exec_time)}ms avg
+                                  </Badge>
+                                </div>
+                                <div className="text-xs text-muted-foreground font-mono truncate">
+                                  {query.query?.substring(0, 80)}...
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Calls: {query.calls} | Total: {Math.round(query.total_exec_time)}ms
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">Queries/seg</span>
-                        <span className="text-2xl font-bold">67</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">Média últimos 5min</div>
-                    </div>
-                    
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">Cache Hit Rate</span>
-                        <span className="text-2xl font-bold">94%</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">Redis Cache</div>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -4807,37 +4857,35 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {[
-                      { time: new Date().toLocaleTimeString(), level: 'info', message: `Usuário ${adminStats.activeUsers} conectado via WebSocket`, source: 'websocket' },
-                      { time: new Date(Date.now() - 30000).toLocaleTimeString(), level: 'success', message: `${adminStats.totalOrders} pedidos processados com sucesso`, source: 'orders' },
-                      { time: new Date(Date.now() - 60000).toLocaleTimeString(), level: 'info', message: 'Backup automático do banco de dados iniciado', source: 'database' },
-                      { time: new Date(Date.now() - 90000).toLocaleTimeString(), level: 'warning', message: 'Cache Redis com 85% de utilização', source: 'cache' },
-                      { time: new Date(Date.now() - 120000).toLocaleTimeString(), level: 'info', message: `${adminStats.totalTenants} lojas ativas na plataforma`, source: 'tenants' },
-                      { time: new Date(Date.now() - 150000).toLocaleTimeString(), level: 'success', message: 'Email service funcionando normalmente', source: 'email' },
-                      { time: new Date(Date.now() - 180000).toLocaleTimeString(), level: 'info', message: 'Sistema de monitoramento iniciado', source: 'system' },
-                      { time: new Date(Date.now() - 210000).toLocaleTimeString(), level: 'info', message: 'API Gateway respondendo em 89ms média', source: 'api' }
-                    ].map((log, index) => (
+                    {securityLogs?.map((log: any, index: number) => (
                       <div key={index} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                         <div className={`w-2 h-2 rounded-full mt-2 ${
-                          log.level === 'success' ? 'bg-green-500' :
-                          log.level === 'warning' ? 'bg-yellow-500' :
-                          log.level === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                          log.event_type === 'login_success' ? 'bg-green-500' :
+                          log.event_type === 'login_failed' ? 'bg-red-500' :
+                          log.event_type === 'suspicious_activity' ? 'bg-yellow-500' : 'bg-blue-500'
                         }`} />
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-mono text-muted-foreground">{log.time}</span>
+                            <span className="text-sm font-mono text-muted-foreground">
+                              {new Date(log.created_at).toLocaleTimeString('pt-BR')}
+                            </span>
                             <Badge variant={
-                              log.level === 'success' ? 'default' :
-                              log.level === 'warning' ? 'secondary' :
-                              log.level === 'error' ? 'destructive' : 'outline'
+                              log.event_type === 'login_success' ? 'default' :
+                              log.event_type === 'login_failed' ? 'destructive' :
+                              log.event_type === 'suspicious_activity' ? 'secondary' : 'outline'
                             }>
-                              {log.level.toUpperCase()}
+                              {log.event_type?.toUpperCase().replace('_', ' ') || 'INFO'}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
-                              {log.source}
+                              {log.ip_address || 'Sistema'}
                             </Badge>
                           </div>
-                          <p className="text-sm mt-1">{log.message}</p>
+                          <p className="text-sm mt-1">{log.description || 'Evento de segurança detectado'}</p>
+                          {log.user_id && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Usuário ID: {log.user_id}
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))}
