@@ -119,22 +119,25 @@ model Product {
 model Order {
   id                    Int       @id @default(autoincrement())
   tenantId              Int       @map("tenant_id")
-  customerName          String?   @map("customer_name") @db.Text
-  customerEmail         String?   @map("customer_email") @db.Text
-  total                 Decimal?  @db.Decimal(10, 2)
-  status                String?   @db.Text
-  paymentMethod         String?   @map("payment_method") @db.Text
-  paymentStatus         String?   @map("payment_status") @db.Text
-  celcoinTransactionId  String?   @map("celcoin_transaction_id") @db.Text
-  customerDocument      String?   @map("customer_document") @db.VarChar(255)
+  customerName          String    @map("customer_name") @db.VarChar(255)
+  customerEmail         String    @map("customer_email") @db.VarChar(255)
   customerPhone         String?   @map("customer_phone") @db.VarChar(255)
-  shippingAddress       Json?     @map("shipping_address")
-  items                 Json?
-  customerAddress       String?   @map("customer_address") @db.Text
-  customerCity          String?   @map("customer_city") @db.Text
-  customerState         String?   @map("customer_state") @db.Text
-  customerZipCode       String?   @map("customer_zip_code") @db.Text
-  taxTotal              Decimal?  @map("tax_total") @db.Decimal(10, 2)
+  customerAddress       String    @map("customer_address") @db.Text
+  customerCity          String    @map("customer_city") @db.VarChar(255)
+  customerState         String    @map("customer_state") @db.VarChar(255)
+  customerZipCode       String    @map("customer_zip_code") @db.VarChar(20)
+  customerCountry       String?   @map("customer_country") @db.VarChar(255)
+  customerDocument      String?   @map("customer_document") @db.VarChar(255)
+  status                String    @default("pending") @db.VarChar(50)
+  paymentStatus         String    @default("pending") @map("payment_status") @db.VarChar(50)
+  paymentMethod         String?   @map("payment_method") @db.VarChar(100)
+  subtotal              Decimal   @db.Decimal(10, 2)
+  taxAmount             Decimal?  @map("tax_amount") @db.Decimal(10, 2)
+  shippingAmount        Decimal?  @map("shipping_amount") @db.Decimal(10, 2)
+  discountAmount        Decimal?  @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount           Decimal   @map("total_amount") @db.Decimal(10, 2)
+  notes                 String?   @db.Text
+  celcoinTransactionId  String?   @map("celcoin_transaction_id") @db.Text
   nfeKey                String?   @map("nfe_key") @db.Text
   nfeNumber             String?   @map("nfe_number") @db.Text
   nfeStatus             String?   @map("nfe_status") @db.Text
@@ -142,14 +145,31 @@ model Order {
   nfeProtocol           String?   @map("nfe_protocol") @db.Text
   nfeErrorMessage       String?   @map("nfe_error_message") @db.Text
   trackingCode          String?   @map("tracking_code") @db.Text
-  notes                 String?   @db.Text
-  createdAt             DateTime? @map("created_at")
-  updatedAt             DateTime? @map("updated_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  tenant                Tenant    @relation(fields: [tenantId], references: [id])
+  tenant                Tenant      @relation(fields: [tenantId], references: [id])
+  orderItems            OrderItem[]
   
   @@map("orders")
+}
+
+model OrderItem {
+  id         Int     @id @default(autoincrement())
+  orderId    Int     @map("order_id")
+  productId  Int     @map("product_id")
+  quantity   Int
+  unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
+  totalPrice Decimal @map("total_price") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product @relation(fields: [productId], references: [id])
+  
+  @@map("order_items")
 }
 
 model Customer {
