@@ -944,9 +944,3 @@ export class NfeService {
     return cidades[cidade] || '9999999';
   }
 }
-      'Salvador': '2927408',
-    };
-    
-    return municipios[nomeMunicipio] || '3550308'; // Default São Paulo
-  }
-}

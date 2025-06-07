@@ -154,12 +154,77 @@ export class NfeController {
     @GetUser() user: any,
   ): Promise<{ pdf: string }> {
     try {
-      const pdf = await this.nfeService.gerarDanfe(nfeId, user.tenantId);
-      return { pdf };
+      const pdfBuffer = await this.nfeService.gerarDanfe(nfeId, user.tenantId);
+      const pdfBase64 = pdfBuffer.toString('base64');
+      return { pdf: `data:application/pdf;base64,${pdfBase64}` };
     } catch (error) {
       throw new HttpException(
         error.message || 'Erro ao gerar DANFE',
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get(':nfeId/download/xml')
+  @Header('Content-Type', 'application/xml')
+  async downloadXml(
+    @Param('nfeId', ParseIntPipe) nfeId: number,
+    @GetUser() user: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      const { filename, content } = await this.nfeService.downloadXmlNfe(nfeId, user.tenantId);
+      
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/xml');
+      res.send(content);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao baixar XML da NFe',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+  }
+
+  @Get(':nfeId/download/pdf')
+  @Header('Content-Type', 'application/pdf')
+  async downloadPdf(
+    @Param('nfeId', ParseIntPipe) nfeId: number,
+    @GetUser() user: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      const { filename, content } = await this.nfeService.downloadPdfNfe(nfeId, user.tenantId);
+      
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.send(content);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao baixar PDF da NFe',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Put('configuracao/ambiente')
+  async alternarAmbiente(
+    @Body('ambiente') ambiente: 'homologacao' | 'producao',
+    @GetUser() user: any,
+  ): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      if (!ambiente || !['homologacao', 'producao'].includes(ambiente)) {
+        throw new HttpException(
+          'Ambiente deve ser "homologacao" ou "producao"',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      return await this.nfeService.alternarAmbiente(user.tenantId, ambiente);
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Erro ao alterar ambiente',
+        HttpStatus.BAD_REQUEST,
       );
     }
   }

@@ -336,9 +336,12 @@ model Nfe {
   serie                   String    @default("001") @db.VarChar(3)
   dataEmissao             DateTime  @map("data_emissao")
   status                  String    @db.VarChar(20) // autorizada, rejeitada, cancelada, pendente
+  ambiente                String    @default("homologacao") @db.VarChar(20) // homologacao, producao
   protocoloAutorizacao    String?   @map("protocolo_autorizacao") @db.VarChar(50)
   protocoloCancelamento   String?   @map("protocolo_cancelamento") @db.VarChar(50)
   xmlAssinado             String?   @map("xml_assinado") @db.Text
+  pdfDanfe                Bytes?    @map("pdf_danfe")
+  pdfGeradoEm             DateTime? @map("pdf_gerado_em")
   motivoRejeicao          String?   @map("motivo_rejeicao") @db.Text
   motivoCancelamento      String?   @map("motivo_cancelamento") @db.Text
   dataCancelamento        DateTime? @map("data_cancelamento")
@@ -346,6 +349,7 @@ model Nfe {
   destinatarioDocumento   String?   @map("destinatario_documento") @db.VarChar(20)
   valorTotal              Decimal?  @map("valor_total") @db.Decimal(10, 2)
   observacoes             String?   @db.Text
+  dadosCompletos          Json?     @map("dados_completos") // Store complete NFe data for audit
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
