@@ -151,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenantId = req.body.tenantId || 1;
 
       // Validate products and calculate totals
-      const productIds = items.map(item => item.productId);
+      const productIds = items.map((item: any) => item.productId);
       const dbProducts = await db.select().from(products).where(eq(products.tenantId, tenantId));
       const availableProducts = dbProducts.filter(p => productIds.includes(p.id));
 
@@ -175,21 +175,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        if (product.stock < item.quantity) {
+        const productStock = product.stock || 0;
+        if (productStock < item.quantity) {
           return res.status(400).json({ 
             success: false, 
-            message: `Estoque insuficiente para ${product.name}` 
+            message: `Estoque insuficiente para ${product.name || 'produto'}` 
           });
         }
 
-        const itemTotal = item.quantity * parseFloat(product.price);
+        const productPrice = parseFloat(product.price || '0');
+        const itemTotal = item.quantity * productPrice;
         subtotal += itemTotal;
 
         orderItems.push({
           productId: item.productId,
-          name: product.name,
+          name: product.name || 'Produto',
           quantity: item.quantity,
-          unitPrice: parseFloat(product.price),
+          unitPrice: productPrice,
           totalPrice: itemTotal
         });
       }
@@ -202,27 +204,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantId,
         customerName: customerData.name,
         customerEmail: customerData.email,
-        customerDocument: customerData.cpf,
-        customerPhone: customerData.phone,
+        customerDocument: customerData.cpf || '',
+        customerPhone: customerData.phone || '',
         total: total.toString(),
         status: 'pending',
         paymentMethod,
         paymentStatus: 'pending',
-        shippingAddress: JSON.stringify(customerData.address),
+        shippingAddress: JSON.stringify(customerData.address || {}),
         items: JSON.stringify(orderItems),
-        notes,
-        customerAddress: customerData.address?.street,
-        customerCity: customerData.address?.city,
-        customerState: customerData.address?.state,
-        customerZipCode: customerData.address?.postalCode,
+        notes: notes || '',
+        customerAddress: customerData.address?.street || '',
+        customerCity: customerData.address?.city || '',
+        customerState: customerData.address?.state || '',
+        customerZipCode: customerData.address?.postalCode || '',
         taxTotal: '0.00'
       }).returning();
 
       // Reserve stock
       for (const item of items) {
-        await db.update(products)
-          .set({ stock: db.sql`${products.stock} - ${item.quantity}` })
-          .where(eq(products.id, item.productId));
+        const product = availableProducts.find(p => p.id === item.productId);
+        if (product && product.stock !== null) {
+          const newStock = product.stock - item.quantity;
+          await db.update(products)
+            .set({ stock: newStock })
+            .where(eq(products.id, item.productId));
+        }
       }
 
       console.log(`Order created: ${orderNumber} for tenant ${tenantId}`);
@@ -272,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const correlationId = `PAY_${orderId}_${Date.now()}`;
-      let paymentResult;
+      let paymentResult: any = null;
 
       // Simulate Celcoin payment processing
       if (paymentMethod === 'pix') {
@@ -294,6 +300,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: 'pending',
           paymentMethod: 'boleto'
         };
+      } else {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Método de pagamento não suportado' 
+        });
       }
 
       // Update order with payment info
@@ -365,11 +376,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Restore stock if payment failed
       if (newPaymentStatus === 'failed') {
-        const orderItems = JSON.parse(order.items || '[]');
+        const orderItemsStr = order.items || '[]';
+        const orderItems = JSON.parse(orderItemsStr);
         for (const item of orderItems) {
-          await db.update(products)
-            .set({ stock: db.sql`${products.stock} + ${item.quantity}` })
-            .where(eq(products.id, item.productId));
+          const currentProduct = await db.select().from(products).where(eq(products.id, item.productId));
+          if (currentProduct.length > 0) {
+            const newStock = (currentProduct[0].stock || 0) + item.quantity;
+            await db.update(products)
+              .set({ stock: newStock })
+              .where(eq(products.id, item.productId));
+          }
         }
         console.log(`Payment failed for order ${order.id}, stock restored`);
       } else if (newPaymentStatus === 'succeeded') {
@@ -400,12 +416,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const orderItemsStr = order.items || '[]';
+      const shippingAddressStr = order.shippingAddress || '{}';
+      
       res.json({
         success: true,
         order: {
           ...order,
-          items: JSON.parse(order.items || '[]'),
-          shippingAddress: JSON.parse(order.shippingAddress || '{}')
+          items: JSON.parse(orderItemsStr),
+          shippingAddress: JSON.parse(shippingAddressStr)
         }
       });
 
