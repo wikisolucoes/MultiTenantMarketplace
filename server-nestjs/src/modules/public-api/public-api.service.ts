@@ -7,7 +7,7 @@ export class PublicApiService {
 
   async validateApiKey(apiKey: string) {
     const credential = await this.prisma.apiCredential.findUnique({
-      where: { key: apiKey, isActive: true }
+      where: { apiKey: apiKey, isActive: true }
     });
 
     if (!credential) {
@@ -20,7 +20,8 @@ export class PublicApiService {
   async checkPermission(apiKey: string, permission: string) {
     const credential = await this.validateApiKey(apiKey);
     
-    if (!credential.permissions.includes(permission)) {
+    const permissions = Array.isArray(credential.permissions) ? credential.permissions : [];
+    if (!permissions.includes(permission)) {
       throw new ForbiddenException(`Permissão '${permission}' não concedida`);
     }
 
@@ -296,7 +297,7 @@ export class PublicApiService {
   async getCategories(apiKey: string) {
     const credential = await this.checkPermission(apiKey, 'products:read');
     
-    return this.prisma.categories.findMany({
+    return this.prisma.category.findMany({
       where: { tenantId: credential.tenantId, isActive: true },
       orderBy: { name: 'asc' }
     });
@@ -305,7 +306,7 @@ export class PublicApiService {
   async getBrands(apiKey: string) {
     const credential = await this.checkPermission(apiKey, 'products:read');
     
-    return this.prisma.brands.findMany({
+    return this.prisma.brand.findMany({
       where: { tenantId: credential.tenantId, isActive: true },
       orderBy: { name: 'asc' }
     });

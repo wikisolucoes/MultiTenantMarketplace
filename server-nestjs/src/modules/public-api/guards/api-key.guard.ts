@@ -50,7 +50,7 @@ export class ApiKeyGuard implements CanActivate {
         id: credential.id,
         tenantId: credential.tenantId,
         userId: credential.userId,
-        permissions: credential.permissions || [],
+        permissions: Array.isArray(credential.permissions) ? credential.permissions as string[] : [],
         rateLimit: credential.rateLimit
       };
 
