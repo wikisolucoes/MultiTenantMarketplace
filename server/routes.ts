@@ -846,6 +846,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Storefront API endpoints
+  app.get('/api/storefront/tenant/:subdomain', async (req, res) => {
+    try {
+      const { subdomain } = req.params;
+      
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.subdomain, subdomain));
+      
+      if (!tenant) {
+        return res.status(404).json({ message: 'Store not found' });
+      }
+
+      res.json({
+        ...tenant,
+        activeTheme: tenant.theme?.activeTheme || 'modern',
+        primaryColor: tenant.theme?.primaryColor || '#0891b2',
+        secondaryColor: tenant.theme?.secondaryColor || '#0e7490',
+        accentColor: tenant.theme?.accentColor || '#06b6d4'
+      });
+    } catch (error) {
+      console.error('Error fetching tenant:', error);
+      res.status(500).json({ message: 'Failed to fetch store data' });
+    }
+  });
+
+  app.get('/api/storefront/products/:tenantId', async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 12;
+      const offset = (page - 1) * limit;
+      
+      const storeProducts = await db.select({
+        id: products.id,
+        tenantId: products.tenantId,
+        name: products.name,
+        description: products.description,
+        price: products.price,
+        compareAtPrice: products.compareAtPrice,
+        sku: products.sku,
+        mainImage: products.mainImage,
+        images: products.images,
+        isActive: products.isActive,
+        categoryId: products.categoryId,
+        brandId: products.brandId,
+        stock: products.stock,
+        weight: products.weight,
+        dimensions: products.dimensions,
+        tags: products.tags,
+        seoTitle: products.seoTitle,
+        seoDescription: products.seoDescription,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt
+      })
+      .from(products)
+      .where(and(eq(products.tenantId, tenantId), eq(products.isActive, true)))
+      .limit(limit)
+      .offset(offset)
+      .orderBy(products.createdAt);
+
+      const totalCount = await db.select({ count: sql`count(*)` })
+        .from(products)
+        .where(and(eq(products.tenantId, tenantId), eq(products.isActive, true)));
+
+      res.json({
+        products: storeProducts,
+        pagination: {
+          page,
+          limit,
+          total: Number(totalCount[0]?.count || 0),
+          pages: Math.ceil(Number(totalCount[0]?.count || 0) / limit)
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      res.status(500).json({ message: 'Failed to fetch products' });
+    }
+  });
+
+  app.get('/api/storefront/banners/:tenantId', async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      
+      const banners = await db.select().from(bannerSlides)
+        .where(and(eq(bannerSlides.tenantId, tenantId), eq(bannerSlides.isActive, true)))
+        .orderBy(bannerSlides.position);
+
+      res.json(banners);
+    } catch (error) {
+      console.error('Error fetching banners:', error);
+      res.status(500).json({ message: 'Failed to fetch banners' });
+    }
+  });
+
+  app.get('/api/storefront/categories/:tenantId', async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      
+      const storeCategories = await db.select().from(categories)
+        .where(and(eq(categories.tenantId, tenantId), eq(categories.isActive, true)))
+        .orderBy(categories.name);
+
+      res.json(storeCategories);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      res.status(500).json({ message: 'Failed to fetch categories' });
+    }
+  });
+
+  app.get('/api/storefront/brands/:tenantId', async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.tenantId);
+      
+      const storeBrands = await db.select().from(brands)
+        .where(and(eq(brands.tenantId, tenantId), eq(brands.isActive, true)))
+        .orderBy(brands.name);
+
+      res.json(storeBrands);
+    } catch (error) {
+      console.error('Error fetching brands:', error);
+      res.status(500).json({ message: 'Failed to fetch brands' });
+    }
+  });
+
+  app.get('/api/storefront/product/:id', async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      
+      const [product] = await db.select({
+        id: products.id,
+        tenantId: products.tenantId,
+        name: products.name,
+        description: products.description,
+        price: products.price,
+        compareAtPrice: products.compareAtPrice,
+        sku: products.sku,
+        mainImage: products.mainImage,
+        images: products.images,
+        isActive: products.isActive,
+        categoryId: products.categoryId,
+        brandId: products.brandId,
+        stock: products.stock,
+        weight: products.weight,
+        dimensions: products.dimensions,
+        tags: products.tags,
+        seoTitle: products.seoTitle,
+        seoDescription: products.seoDescription,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt
+      })
+      .from(products)
+      .where(and(eq(products.id, productId), eq(products.isActive, true)));
+
+      if (!product) {
+        return res.status(404).json({ message: 'Product not found' });
+      }
+
+      res.json(product);
+    } catch (error) {
+      console.error('Error fetching product:', error);
+      res.status(500).json({ message: 'Failed to fetch product' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

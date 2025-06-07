@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ShoppingCart, User, Heart, Settings } from "lucide-react";
+import { ShoppingCart, User, Heart, Settings, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ModernTheme from "@/components/storefront/themes/ModernTheme";
@@ -80,130 +80,78 @@ export default function StorefrontThemed() {
   const [cartItems, setCartItems] = useState<Array<{ id: number; quantity: number }>>([]);
   const [showAuth, setShowAuth] = useState(false);
   const [currentCustomer, setCurrentCustomer] = useState<any>(null);
+  const [subdomain] = useState("demo"); // Default store for demo
 
-  // Demo tenant data
-  const demoTenant = {
-    id: 1,
-    name: "Loja Demo",
-    subdomain: "demo",
-    isActive: true,
-    activeTheme: currentTheme,
-    logo: null,
-    favicon: null,
-    primaryColor: "#0891b2",
-    secondaryColor: "#0e7490",
-    accentColor: "#06b6d4",
-    storeDescription: "A melhor loja online com produtos de qualidade",
-    contactEmail: "contato@demo.com.br",
-    contactPhone: "(11) 99999-9999",
-    whatsappNumber: "(11) 99999-9999",
-    address: {
-      street: "Rua das Flores, 123",
-      city: "São Paulo",
-      state: "SP",
-      zipCode: "01234-567"
-    },
-    socialLinks: {
-      instagram: "@lojademo",
-      facebook: "lojademo"
-    },
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  // Demo products
-  const demoProducts = [
-    {
-      id: 1,
-      tenantId: 1,
-      name: "Tênis Esportivo Premium",
-      description: "Tênis de alta performance para corrida e atividades esportivas",
-      price: "299.99",
-      compareAtPrice: "399.99",
-      sku: "TNS-001",
-      mainImage: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop",
-      isActive: true,
-      categoryId: 1,
-      brandId: 1,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: 2,
-      tenantId: 1,
-      name: "Camiseta Básica Premium",
-      description: "Camiseta 100% algodão com corte moderno e confortável",
-      price: "79.99",
-      compareAtPrice: "99.99",
-      sku: "CAM-001",
-      mainImage: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop",
-      isActive: true,
-      categoryId: 2,
-      brandId: 1,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: 3,
-      tenantId: 1,
-      name: "Jaqueta Jeans Vintage",
-      description: "Jaqueta jeans com lavagem especial e design vintage autêntico",
-      price: "189.99",
-      compareAtPrice: "249.99",
-      sku: "JAQ-001",
-      mainImage: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&h=400&fit=crop",
-      isActive: true,
-      categoryId: 2,
-      brandId: 2,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: 4,
-      tenantId: 1,
-      name: "Relógio Smart Fitness",
-      description: "Relógio inteligente com monitoramento de atividades e saúde",
-      price: "399.99",
-      compareAtPrice: "599.99",
-      sku: "REL-001",
-      mainImage: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop",
-      isActive: true,
-      categoryId: 1,
-      brandId: 3,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: 5,
-      tenantId: 1,
-      name: "Mochila Urbana Impermeável",
-      description: "Mochila resistente à água com compartimentos organizadores",
-      price: "149.99",
-      compareAtPrice: "199.99",
-      sku: "MOC-001",
-      mainImage: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&h=400&fit=crop",
-      isActive: true,
-      categoryId: 3,
-      brandId: 2,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    },
-    {
-      id: 6,
-      tenantId: 1,
-      name: "Fone Bluetooth Premium",
-      description: "Fone de ouvido sem fio com cancelamento de ruído ativo",
-      price: "249.99",
-      compareAtPrice: "349.99",
-      sku: "FON-001",
-      mainImage: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop",
-      isActive: true,
-      categoryId: 1,
-      brandId: 3,
-      createdAt: new Date(),
-      updatedAt: new Date()
+  // Fetch real tenant data from backend
+  const { data: tenant, isLoading: tenantLoading } = useQuery({
+    queryKey: ['/api/storefront/tenant', subdomain],
+    queryFn: async () => {
+      const response = await fetch(`/api/storefront/tenant/${subdomain}`);
+      if (!response.ok) throw new Error('Failed to fetch store data');
+      return response.json();
     }
-  ];
+  });
+
+  // Fetch real products from backend
+  const { data: productsData, isLoading: productsLoading } = useQuery({
+    queryKey: ['/api/storefront/products', tenant?.id],
+    queryFn: async () => {
+      if (!tenant?.id) return { products: [], pagination: {} };
+      const response = await fetch(`/api/storefront/products/${tenant.id}?limit=12`);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
+    enabled: !!tenant?.id
+  });
+
+  // Fetch real banners from backend
+  const { data: banners = [], isLoading: bannersLoading } = useQuery({
+    queryKey: ['/api/storefront/banners', tenant?.id],
+    queryFn: async () => {
+      if (!tenant?.id) return [];
+      const response = await fetch(`/api/storefront/banners/${tenant.id}`);
+      if (!response.ok) throw new Error('Failed to fetch banners');
+      return response.json();
+    },
+    enabled: !!tenant?.id
+  });
+
+  // Update theme when tenant data loads
+  useEffect(() => {
+    if (tenant?.activeTheme) {
+      setCurrentTheme(tenant.activeTheme);
+    }
+  }, [tenant]);
+
+  // Loading states
+  const isLoading = tenantLoading || productsLoading || bannersLoading;
+  
+  // Real products from backend
+  const products = productsData?.products || [];
+  
+  // Loading component
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-cyan-600" />
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Carregando Loja</h2>
+          <p className="text-gray-500">Buscando informações da loja...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!tenant) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Loja não encontrada</h2>
+          <p className="text-gray-500">A loja "{subdomain}" não existe ou está inativa.</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleThemeChange = (theme: string) => {
     setCurrentTheme(theme);
@@ -240,9 +188,9 @@ export default function StorefrontThemed() {
   if (isManagementMode) {
     return (
       <ThemeManager
-        tenant={demoTenant}
-        products={demoProducts}
-        banners={demoBanners}
+        tenant={tenant}
+        products={products}
+        banners={banners}
         onThemeChange={handleThemeChange}
         currentTheme={currentTheme}
         wishlist={wishlist}
@@ -286,7 +234,7 @@ export default function StorefrontThemed() {
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-bold text-gray-900">{demoTenant.name}</h1>
+            <h1 className="text-xl font-bold text-gray-900">{tenant.name}</h1>
             <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">
               Tema: {currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1)}
             </Badge>
@@ -337,9 +285,9 @@ export default function StorefrontThemed() {
       {/* Theme Content */}
       <div key={currentTheme} className="animate-in fade-in duration-500">
         <CurrentThemeComponent
-          tenant={demoTenant}
-          products={demoProducts}
-          banners={demoBanners}
+          tenant={tenant}
+          products={products}
+          banners={banners}
           onProductClick={handleProductClick}
           onAddToCart={handleAddToCart}
           onToggleWishlist={handleToggleWishlist}
@@ -357,8 +305,8 @@ export default function StorefrontThemed() {
                 setShowAuth(false);
               }}
               onClose={() => setShowAuth(false)}
-              storeName={demoTenant.name}
-              subdomain={demoTenant.subdomain}
+              storeName={tenant.name}
+              subdomain={tenant.subdomain}
             />
           </div>
         </div>
