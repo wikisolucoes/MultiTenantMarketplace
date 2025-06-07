@@ -6,7 +6,7 @@ export class PublicApiService {
   constructor(private prisma: PrismaService) {}
 
   async validateApiKey(apiKey: string) {
-    const credential = await this.prisma.apiCredentials.findUnique({
+    const credential = await this.prisma.apiCredential.findUnique({
       where: { key: apiKey, isActive: true }
     });
 
@@ -112,7 +112,7 @@ export class PublicApiService {
   async getProduct(apiKey: string, id: number) {
     const credential = await this.checkPermission(apiKey, 'products:read');
     
-    const product = await this.prisma.products.findFirst({
+    const product = await this.prisma.product.findFirst({
       where: { id, tenantId: credential.tenantId }
     });
 
@@ -137,7 +137,7 @@ export class PublicApiService {
   async updateProduct(apiKey: string, id: number, productData: any) {
     const credential = await this.checkPermission(apiKey, 'products:write');
     
-    const product = await this.prisma.products.findFirst({
+    const product = await this.prisma.product.findFirst({
       where: { id, tenantId: credential.tenantId }
     });
 
@@ -145,7 +145,7 @@ export class PublicApiService {
       throw new NotFoundException('Produto não encontrado');
     }
 
-    return this.prisma.products.update({
+    return this.prisma.product.update({
       where: { id },
       data: {
         ...productData,
@@ -167,7 +167,7 @@ export class PublicApiService {
       newQuantity = product.stockQuantity - stockData.quantity;
     }
 
-    return this.prisma.products.update({
+    return this.prisma.product.update({
       where: { id },
       data: {
         stockQuantity: Math.max(0, newQuantity),
