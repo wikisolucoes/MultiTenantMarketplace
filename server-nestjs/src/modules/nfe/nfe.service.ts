@@ -594,6 +594,36 @@ export class NfeService {
     };
   }
 
+  async reenviarParaSefaz(nfeId: number, tenantId: number): Promise<NfeProcessingResult> {
+    try {
+      const nfe = await this.prisma.nfe.findFirst({
+        where: { id: nfeId, tenantId },
+      });
+
+      if (!nfe) {
+        throw new BadRequestException('NFe não encontrada');
+      }
+
+      if (nfe.status === 'autorizada') {
+        throw new BadRequestException('NFe já está autorizada');
+      }
+
+      // Reenviar para SEFAZ (implementar lógica de reenvio)
+      this.logger.log(`Reenviando NFe ${nfe.chaveAcesso} para SEFAZ`);
+
+      return {
+        nfeId: nfe.id,
+        chaveAcesso: nfe.chaveAcesso,
+        numeroNfe: nfe.numeroNfe,
+        status: 'pendente',
+        xmlAssinado: nfe.xmlAssinado,
+      };
+    } catch (error) {
+      this.logger.error(`Erro ao reenviar NFe ${nfeId}:`, error);
+      throw error;
+    }
+  }
+
   private async gerarHtmlDanfe(nfe: any, xmlData: any): Promise<string> {
     const ambiente = process.env.NFE_AMBIENTE === 'producao' ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
     
@@ -913,70 +943,7 @@ export class NfeService {
     
     return cidades[cidade] || '9999999';
   }
-        status: item.status,
-        quantidade: item._count.id,
-      })),
-      nfes,
-    };
-  }
-
-  async reenviarParaSefaz(nfeId: number, tenantId: number): Promise<NfeProcessingResult> {
-    try {
-      const nfe = await this.prisma.nfe.findFirst({
-        where: { id: nfeId, tenantId },
-      });
-
-      if (!nfe) {
-        throw new BadRequestException('NFe não encontrada');
-      }
-
-      if (nfe.status === 'autorizada') {
-        throw new BadRequestException('NFe já está autorizada');
-      }
-
-      // Simular reenvio para SEFAZ
-      const novoStatus = 'autorizada';
-      const protocoloAutorizacao = '123456789012345';
-
-      await this.prisma.nfe.update({
-        where: { id: nfeId },
-        data: {
-          status: novoStatus,
-          protocoloAutorizacao,
-        },
-      });
-
-      // Atualizar pedido se houver
-      if (nfe.orderId) {
-        await this.prisma.order.update({
-          where: { id: nfe.orderId },
-          data: {
-            nfeStatus: novoStatus,
-            nfeProtocol: protocoloAutorizacao,
-          },
-        });
-      }
-
-      return {
-        nfeId: nfe.id,
-        chaveAcesso: nfe.chaveAcesso,
-        numeroNfe: nfe.numeroNfe,
-        status: novoStatus,
-        protocoloAutorizacao,
-      };
-    } catch (error) {
-      this.logger.error(`Erro ao reenviar NFe ${nfeId} para SEFAZ:`, error);
-      throw error;
-    }
-  }
-
-  private obterCodigoMunicipio(nomeMunicipio: string): string {
-    // Em produção, usar tabela de municípios do IBGE
-    const municipios: { [key: string]: string } = {
-      'São Paulo': '3550308',
-      'Rio de Janeiro': '3304557',
-      'Belo Horizonte': '3106200',
-      'Brasília': '5300108',
+}
       'Salvador': '2927408',
     };
     

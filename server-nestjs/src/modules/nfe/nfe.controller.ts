@@ -9,8 +9,11 @@ import {
   UseGuards, 
   ParseIntPipe,
   HttpStatus,
-  HttpException
+  HttpException,
+  Res,
+  Header
 } from '@nestjs/common';
+import { Response } from 'express';
 import { NfeService, NfeProcessingResult } from './nfe.service';
 import { EmitirNfeDto } from './dto/emitir-nfe.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
