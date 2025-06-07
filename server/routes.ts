@@ -733,30 +733,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const [totalRevenue, orderCount, customerCount] = await Promise.all([
         db.select({ 
-          total: sql`COALESCE(SUM(CAST(total AS DECIMAL)), 0)` 
+          total: sql`COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0)` 
         }).from(orders).where(eq(orders.status, 'confirmed')),
         db.select({ count: sql`count(*)` }).from(orders),
         db.select({ count: sql`count(*)` }).from(customers)
       ]);
 
       const revenue = Number(totalRevenue[0]?.total || 0);
-      const orders = Number(orderCount[0]?.count || 0);
-      const customers = Number(customerCount[0]?.count || 0);
+      const orderCountValue = Number(orderCount[0]?.count || 0);
+      const customerCountValue = Number(customerCount[0]?.count || 0);
 
       res.json({
         salesReport: {
           totalSales: revenue,
           salesGrowth: 12.5,
-          orderCount: orders,
-          averageOrder: orders > 0 ? revenue / orders : 0,
+          orderCount: orderCountValue,
+          averageOrder: orderCountValue > 0 ? revenue / orderCountValue : 0,
           topProducts: [
             { name: 'Smartphone Galaxy', sales: 45, revenue: 58499.55 },
             { name: 'Notebook Lenovo', sales: 23, revenue: 57497.70 }
           ]
         },
         customerReport: {
-          totalCustomers: customers,
-          newCustomers: Math.floor(customers * 0.1),
+          totalCustomers: customerCountValue,
+          newCustomers: Math.floor(customerCountValue * 0.1),
           customerGrowth: 8.7,
           retention: 78.5,
           topCustomers: [
