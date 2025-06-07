@@ -34,6 +34,7 @@ import { NfeModule } from './modules/nfe/nfe.module';
     SecurityModule,
     PublicApiModule,
     CelcoinModule,
+    NfeModule,
   ],
 })
 export class AppModule {}
