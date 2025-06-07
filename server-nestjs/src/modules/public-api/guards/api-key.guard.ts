@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../../shared/prisma/prisma.service';
 
 export interface AuthenticatedApiRequest extends Request {
   apiCredential?: {
