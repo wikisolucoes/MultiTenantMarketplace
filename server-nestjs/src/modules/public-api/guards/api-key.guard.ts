@@ -31,8 +31,7 @@ export class ApiKeyGuard implements CanActivate {
           isActive: true
         },
         include: {
-          tenant: true,
-          user: true
+          tenant: true
         }
       });
 

@@ -43,8 +43,12 @@ export class SupportService {
   async createSupportTicket(createTicketDto: CreateSupportTicketDto) {
     return this.prisma.supportTicket.create({
       data: {
-        ...createTicketDto,
-        status: TicketStatus.OPEN
+        title: createTicketDto.subject,
+        description: createTicketDto.description,
+        priority: createTicketDto.priority,
+        userId: createTicketDto.userId,
+        status: TicketStatus.OPEN,
+        tenantId: createTicketDto.tenantId
       }
     });
   }
