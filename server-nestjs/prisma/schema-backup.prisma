@@ -11,16 +11,22 @@ datasource db {
 }
 
 model Tenant {
-  id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(255)
-  slug      String   @unique @db.VarChar(100)
-  domain    String?  @db.VarChar(255)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id               Int       @id @default(autoincrement())
+  name             String    @db.VarChar(255)
+  slug             String    @unique @db.VarChar(100)
+  domain           String?   @db.VarChar(255)
+  subdomain        String?   @db.VarChar(100)
+  description      String?   @db.Text
+  logo             String?   @db.Text
+  theme            Json?
+  isActive         Boolean   @default(true) @map("is_active")
+  settings         Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @map("updated_at")
 
   // Relations
   users                     User[]
+  products                  Product[]
   orders                    Order[]
   nfes                      Nfe[]
   apiCredentials            ApiCredential[]
@@ -37,7 +43,6 @@ model Tenant {
   pluginUsage               PluginUsage[]
   productBrands             ProductBrand[]
   productCategories         ProductCategory[]
-  products                  Product[]
   reconciliationRecords     ReconciliationRecord[]
   securityAuditLogs         SecurityAuditLog[]
   supportTickets            SupportTicket[]
@@ -45,7 +50,7 @@ model Tenant {
   tenantSubscriptions       TenantSubscription[]
   transactions              Transaction[]
   withdrawals               Withdrawal[]
-
+  
   @@map("tenants")
 }
 
@@ -73,61 +78,237 @@ model User {
   @@map("users")
 }
 
-model Order {
-  id                Int       @id @default(autoincrement())
-  tenantId          Int       @map("tenant_id")
-  customerName      String    @map("customer_name")
-  customerEmail     String    @map("customer_email")
-  total             Decimal   @db.Decimal(10, 2)
-  status            String    @default("pending")
-  paymentMethod     String    @map("payment_method")
-  paymentStatus     String    @default("pending") @map("payment_status")
-  celcoinTransactionId String? @map("celcoin_transaction_id")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
-  customerDocument  String?   @map("customer_document") @db.VarChar(20)
-  customerPhone     String?   @map("customer_phone") @db.VarChar(20)
-  shippingAddress   Json?     @map("shipping_address")
-  items             Json?
-  customerAddress   String?   @map("customer_address")
-  customerCity      String?   @map("customer_city")
-  customerState     String?   @map("customer_state")
-  customerZipCode   String?   @map("customer_zip_code")
-  taxTotal          Decimal?  @default(0.00) @map("tax_total") @db.Decimal(10, 2)
-  nfeKey            String?   @map("nfe_key")
-  nfeNumber         String?   @map("nfe_number")
-  nfeStatus         String?   @default("not_issued") @map("nfe_status")
-  nfeXml            String?   @map("nfe_xml")
-  nfeProtocol       String?   @map("nfe_protocol")
-  nfeErrorMessage   String?   @map("nfe_error_message")
-  trackingCode      String?   @map("tracking_code")
-  notes             String?
+model Product {
+  id                    Int       @id @default(autoincrement())
+  tenantId              Int       @map("tenant_id")
+  name                  String    @db.VarChar(255)
+  description           String?   @db.Text
+  price                 Decimal   @db.Decimal(10, 2)
+  stock                 Int       @default(0)
+  isActive              Boolean   @default(true) @map("is_active")
+  categoryId            Int?      @map("category_id")
+  brandId               Int?      @map("brand_id")
+  ncm                   String?   @db.VarChar(20)
+  cest                  String?   @db.VarChar(20)
+  cfop                  String?   @db.VarChar(10)
+  icmsOrigin            String?   @map("icms_origin") @db.VarChar(2)
+  icmsCst               String?   @map("icms_cst") @db.VarChar(5)
+  icmsRate              Decimal?  @map("icms_rate") @db.Decimal(5, 2)
+  ipiCst                String?   @map("ipi_cst") @db.VarChar(5)
+  ipiRate               Decimal?  @map("ipi_rate") @db.Decimal(5, 2)
+  pisCst                String?   @map("pis_cst") @db.VarChar(5)
+  pisRate               Decimal?  @map("pis_rate") @db.Decimal(5, 2)
+  cofinsCst             String?   @map("cofins_cst") @db.VarChar(5)
+  cofinsRate            Decimal?  @map("cofins_rate") @db.Decimal(5, 2)
+  productUnit           String    @default("UN") @map("product_unit") @db.VarChar(10)
+  grossWeight           Decimal?  @map("gross_weight") @db.Decimal(8, 3)
+  netWeight             Decimal?  @map("net_weight") @db.Decimal(8, 3)
+  slug                  String?   @db.VarChar(255)
+  metaTitle             String?   @map("meta_title") @db.VarChar(255)
+  metaDescription       String?   @map("meta_description") @db.Text
+  metaKeywords          String?   @map("meta_keywords") @db.Text
+  promotionalPrice      Decimal?  @map("promotional_price") @db.Decimal(10, 2)
+  promotionalStartDate  DateTime? @map("promotional_start_date")
+  promotionalEndDate    DateTime? @map("promotional_end_date")
+  priceB2b              Decimal?  @map("price_b2b") @db.Decimal(10, 2)
+  priceB2c              Decimal?  @map("price_b2c") @db.Decimal(10, 2)
+  rewardPointsB2b       Int       @default(0) @map("reward_points_b2b")
+  rewardPointsB2c       Int       @default(0) @map("reward_points_b2c")
+  availabilityDate      DateTime? @map("availability_date")
+  requiresShipping      Boolean   @default(true) @map("requires_shipping")
+  isDigital             Boolean   @default(false) @map("is_digital")
+  hasUnlimitedStock     Boolean   @default(false) @map("has_unlimited_stock")
+  sku                   String?   @db.VarChar(100)
+  compareAtPrice        Decimal?  @map("compare_at_price") @db.Decimal(10, 2)
+  costPrice             Decimal?  @map("cost_price") @db.Decimal(10, 2)
+  minStock              Int       @default(0) @map("min_stock")
+  maxStock              Int       @default(100) @map("max_stock")
+  isFeatured            Boolean   @default(false) @map("is_featured")
+  tags                  String?   @db.Text
+  weight                Decimal?  @db.Decimal(8, 3)
+  dimensionsLength      Decimal?  @map("dimensions_length") @db.Decimal(8, 2)
+  dimensionsWidth       Decimal?  @map("dimensions_width") @db.Decimal(8, 2)
+  dimensionsHeight      Decimal?  @map("dimensions_height") @db.Decimal(8, 2)
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @map("updated_at")
 
   // Relations
-  tenant        Tenant        @relation(fields: [tenantId], references: [id])
-  nfes          Nfe[]
-  ledgerEntries LedgerEntry[]
-  transactions  Transaction[]
+  tenant                Tenant      @relation(fields: [tenantId], references: [id])
+  brand                 Brand?      @relation("ProductBrand", fields: [brandId], references: [id])
+  category              Category?   @relation("ProductCategory", fields: [categoryId], references: [id])
+  orderItems            OrderItem[]
+  
+  @@map("products")
+}
 
+model Order {
+  id                    Int       @id @default(autoincrement())
+  tenantId              Int       @map("tenant_id")
+  customerName          String    @map("customer_name") @db.VarChar(255)
+  customerEmail         String    @map("customer_email") @db.VarChar(255)
+  customerPhone         String?   @map("customer_phone") @db.VarChar(255)
+  customerAddress       String    @map("customer_address") @db.Text
+  customerCity          String    @map("customer_city") @db.VarChar(255)
+  customerState         String    @map("customer_state") @db.VarChar(255)
+  customerZipCode       String    @map("customer_zip_code") @db.VarChar(20)
+  customerCountry       String?   @map("customer_country") @db.VarChar(255)
+  customerDocument      String?   @map("customer_document") @db.VarChar(255)
+  status                String    @default("pending") @db.VarChar(50)
+  paymentStatus         String    @default("pending") @map("payment_status") @db.VarChar(50)
+  paymentMethod         String?   @map("payment_method") @db.VarChar(100)
+  subtotal              Decimal   @db.Decimal(10, 2)
+  taxAmount             Decimal?  @map("tax_amount") @db.Decimal(10, 2)
+  shippingAmount        Decimal?  @map("shipping_amount") @db.Decimal(10, 2)
+  discountAmount        Decimal?  @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount           Decimal   @map("total_amount") @db.Decimal(10, 2)
+  notes                 String?   @db.Text
+  celcoinTransactionId  String?   @map("celcoin_transaction_id") @db.Text
+  nfeKey                String?   @map("nfe_key") @db.Text
+  nfeNumber             String?   @map("nfe_number") @db.Text
+  nfeStatus             String?   @map("nfe_status") @db.Text
+  nfeXml                String?   @map("nfe_xml") @db.Text
+  nfeProtocol           String?   @map("nfe_protocol") @db.Text
+  nfeErrorMessage       String?   @map("nfe_error_message") @db.Text
+  trackingCode          String?   @map("tracking_code") @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant                Tenant      @relation(fields: [tenantId], references: [id])
+  orderItems            OrderItem[]
+  nfes                  Nfe[]
+  
   @@map("orders")
+}
+
+model OrderItem {
+  id         Int     @id @default(autoincrement())
+  orderId    Int     @map("order_id")
+  productId  Int     @map("product_id")
+  quantity   Int
+  unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
+  totalPrice Decimal @map("total_price") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product @relation(fields: [productId], references: [id])
+  
+  @@map("order_items")
+}
+
+
+
+
+
+model CelcoinAccount {
+  id               Int      @id @default(autoincrement())
+  tenantId         Int      @map("tenant_id")
+  celcoinAccountId String   @map("celcoin_account_id") @db.VarChar(255)
+  status           String   @default("active") @map("status") @db.VarChar(20)
+  balance          Decimal  @default(0) @db.Decimal(15, 2)
+  blockedBalance   Decimal  @default(0) @map("blocked_balance") @db.Decimal(15, 2)
+  accountType      String   @map("account_type") @db.VarChar(50)
+  lastSyncAt       DateTime? @map("last_sync_at")
+  syncFrequency    Int      @default(300) @map("sync_frequency")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @map("updated_at")
+
+  // Relations
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@map("celcoin_accounts")
+}
+
+model Brand {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  name      String   @db.VarChar(255)
+  slug      String?  @db.VarChar(255)
+  logo      String?  @db.Text
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  // Relations
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  products  Product[] @relation("ProductBrand")
+  
+  @@map("brands")
+}
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  tenantId    Int        @map("tenant_id")
+  name        String     @db.VarChar(255)
+  slug        String?    @db.VarChar(255)
+  description String?    @db.Text
+  parentId    Int?       @map("parent_id")
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @default(now()) @map("updated_at")
+
+  // Relations
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  parent      Category?  @relation("CategoryParent", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryParent")
+  products    Product[]  @relation("ProductCategory")
+  
+  @@map("categories")
+}
+
+model SupportTicket {
+  id          Int       @id @default(autoincrement())
+  tenantId    Int       @map("tenant_id")
+  title       String    @db.VarChar(255)
+  description String    @db.Text
+  status      String    @default("open") @db.VarChar(50)
+  priority    String    @default("medium") @db.VarChar(50)
+  userId      Int?      @map("user_id")
+  customerEmail String? @map("customer_email") @db.VarChar(255)
+  assigneeId  Int?      @map("assignee_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @map("updated_at")
+
+  // Relations
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  messages    SupportTicketMessage[]
+  
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id        Int           @id @default(autoincrement())
+  ticketId  Int           @map("ticket_id")
+  message   String        @db.Text
+  isInternal Boolean      @default(false) @map("is_internal")
+  authorId  Int?          @map("author_id")
+  authorType String       @default("user") @map("author_type") @db.VarChar(50)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  
+  @@map("support_ticket_messages")
 }
 
 model ApiCredential {
   id          Int      @id @default(autoincrement())
   tenantId    Int      @map("tenant_id")
+  userId      Int?     @map("user_id")
   name        String   @db.VarChar(255)
-  clientId    String   @unique @map("client_id") @db.VarChar(100)
-  clientSecret String  @map("client_secret") @db.VarChar(255)
-  permissions String[] @default([])
-  rateLimit   Int      @default(100) @map("rate_limit")
+  apiKey      String   @unique @map("api_key") @db.VarChar(255)
+  permissions Json     @default("[]")
+  rateLimit   Int      @default(1000) @map("rate_limit")
   isActive    Boolean  @default(true) @map("is_active")
   lastUsedAt  DateTime? @map("last_used_at")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
 
   // Relations
-  tenant     Tenant        @relation(fields: [tenantId], references: [id])
-  usageLogs  ApiUsageLog[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
   
   @@map("api_credentials")
 }
@@ -140,8 +321,8 @@ model Nfe {
   numeroNfe               String    @map("numero_nfe") @db.VarChar(20)
   serie                   String    @default("001") @db.VarChar(3)
   dataEmissao             DateTime  @map("data_emissao")
-  status                  String    @db.VarChar(20)
-  ambiente                String    @default("homologacao") @db.VarChar(20)
+  status                  String    @db.VarChar(20) // autorizada, rejeitada, cancelada, pendente
+  ambiente                String    @default("homologacao") @db.VarChar(20) // homologacao, producao
   protocoloAutorizacao    String?   @map("protocolo_autorizacao") @db.VarChar(50)
   protocoloCancelamento   String?   @map("protocolo_cancelamento") @db.VarChar(50)
   xmlAssinado             String?   @map("xml_assinado") @db.Text
@@ -154,7 +335,7 @@ model Nfe {
   destinatarioDocumento   String?   @map("destinatario_documento") @db.VarChar(20)
   valorTotal              Decimal?  @map("valor_total") @db.Decimal(10, 2)
   observacoes             String?   @db.Text
-  dadosCompletos          Json?     @map("dados_completos")
+  dadosCompletos          Json?     @map("dados_completos") // Store complete NFe data for audit
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
