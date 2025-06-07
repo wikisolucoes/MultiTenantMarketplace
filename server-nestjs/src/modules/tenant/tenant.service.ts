@@ -19,7 +19,7 @@ export class TenantService {
           status: 'completed'
         },
         _sum: {
-          total: true
+          totalAmount: true
         }
       })
     ]);
@@ -31,7 +31,7 @@ export class TenantService {
       select: {
         id: true,
         customerName: true,
-        total: true,
+        totalAmount: true,
         status: true,
         createdAt: true
       }
@@ -40,7 +40,7 @@ export class TenantService {
     return {
       totalOrders: orders,
       totalProducts: products,
-      totalRevenue: totalRevenue._sum.total || 0,
+      totalRevenue: totalRevenue._sum.totalAmount || 0,
       recentOrders
     };
   }
