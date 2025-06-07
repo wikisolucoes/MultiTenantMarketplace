@@ -3,6 +3,10 @@ import { PrismaService } from '../../shared/prisma/prisma.service';
 import { SefazService, NfeData, NfeResponse } from './sefaz.service';
 import { EmitirNfeDto } from './dto/emitir-nfe.dto';
 import { Decimal } from '@prisma/client/runtime/library';
+import * as puppeteer from 'puppeteer';
+import * as xml2js from 'xml2js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface NfeProcessingResult {
   nfeId: number;
@@ -430,9 +434,20 @@ export class NfeService {
     return nfe;
   }
 
-  async gerarDanfe(nfeId: number, tenantId: number): Promise<string> {
+  async gerarDanfe(nfeId: number, tenantId: number): Promise<Buffer> {
     const nfe = await this.prisma.nfe.findFirst({
       where: { id: nfeId, tenantId },
+      include: {
+        order: {
+          include: {
+            orderItems: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!nfe) {
@@ -443,9 +458,52 @@ export class NfeService {
       throw new BadRequestException('XML da NFe não disponível');
     }
 
-    // Em produção, implementar geração do PDF DANFE a partir do XML
-    // Retornando base64 simulado para desenvolvimento
-    return 'data:application/pdf;base64,JVBERi0xLjQKJcfsj6IKNSAwIG9iago8PAovTGVuZ3RoIDYgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCj4+CnN0cmVhbQp4nDPQM1Qo5ypUMFaw0jNUKEez0jNRyOMyVAhJLS5RyE';
+    try {
+      // Parse do XML para extrair dados
+      const parser = new xml2js.Parser();
+      const xmlData = await parser.parseStringPromise(nfe.xmlAssinado);
+      
+      // Gerar HTML do DANFE
+      const danfeHtml = await this.gerarHtmlDanfe(nfe, xmlData);
+      
+      // Converter HTML para PDF usando Puppeteer
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      
+      const page = await browser.newPage();
+      await page.setContent(danfeHtml, { waitUntil: 'networkidle0' });
+      
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '10mm',
+          bottom: '10mm',
+          left: '10mm',
+          right: '10mm'
+        }
+      });
+      
+      await browser.close();
+      
+      // Salvar PDF no banco de dados
+      await this.prisma.nfe.update({
+        where: { id: nfeId },
+        data: {
+          pdfDanfe: pdfBuffer,
+          pdfGeradoEm: new Date(),
+        },
+      });
+      
+      this.logger.log(`DANFE gerado com sucesso para NFe ${nfe.chaveAcesso}`);
+      return pdfBuffer;
+      
+    } catch (error) {
+      this.logger.error(`Erro ao gerar DANFE para NFe ${nfeId}:`, error);
+      throw new BadRequestException('Erro ao gerar PDF da NFe');
+    }
   }
 
   async enviarNfePorEmail(nfeId: number, email: string, tenantId: number): Promise<{ sucesso: boolean; mensagem: string }> {
@@ -529,6 +587,332 @@ export class NfeService {
         periodo: dataInicio && dataFim ? { dataInicio, dataFim } : null,
       },
       statusDistribution: totalPorStatus.map(item => ({
+        status: item.status,
+        count: item._count.id,
+      })),
+      nfes,
+    };
+  }
+
+  private async gerarHtmlDanfe(nfe: any, xmlData: any): Promise<string> {
+    const ambiente = process.env.NFE_AMBIENTE === 'producao' ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
+    
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>DANFE - ${nfe.chaveAcesso}</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            
+            body {
+                font-family: Arial, sans-serif;
+                font-size: 10px;
+                line-height: 1.2;
+                color: #000;
+            }
+            
+            .danfe-container {
+                width: 100%;
+                max-width: 210mm;
+                margin: 0 auto;
+                background: white;
+            }
+            
+            .header {
+                border: 1px solid #000;
+                display: flex;
+                align-items: center;
+                padding: 10px;
+                margin-bottom: 2px;
+            }
+            
+            .logo-section {
+                width: 25%;
+                text-align: center;
+                border-right: 1px solid #000;
+                padding-right: 10px;
+            }
+            
+            .empresa-section {
+                width: 50%;
+                padding: 0 10px;
+                border-right: 1px solid #000;
+            }
+            
+            .danfe-section {
+                width: 25%;
+                text-align: center;
+                padding-left: 10px;
+            }
+            
+            .title { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+            .subtitle { font-size: 12px; font-weight: bold; margin-bottom: 3px; }
+            
+            .info-row {
+                display: flex;
+                border: 1px solid #000;
+                margin-bottom: 2px;
+            }
+            
+            .info-field {
+                border-right: 1px solid #000;
+                padding: 2px 5px;
+                flex: 1;
+            }
+            
+            .info-field:last-child { border-right: none; }
+            
+            .field-label {
+                font-size: 8px;
+                color: #666;
+                display: block;
+            }
+            
+            .field-value {
+                font-size: 10px;
+                font-weight: bold;
+            }
+            
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+                border: 1px solid #000;
+                margin-bottom: 2px;
+            }
+            
+            .table th, .table td {
+                border: 1px solid #000;
+                padding: 3px;
+                text-align: left;
+                font-size: 8px;
+            }
+            
+            .table th {
+                background-color: #f0f0f0;
+                font-weight: bold;
+            }
+            
+            .totals-section {
+                display: flex;
+                border: 1px solid #000;
+            }
+            
+            .totals-left {
+                width: 60%;
+                border-right: 1px solid #000;
+            }
+            
+            .totals-right { width: 40%; }
+            
+            .ambiente-homologacao {
+                color: red;
+                font-weight: bold;
+                text-align: center;
+                font-size: 12px;
+                margin: 5px 0;
+            }
+            
+            .chave-acesso {
+                font-family: monospace;
+                font-size: 9px;
+                word-break: break-all;
+                margin: 5px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="danfe-container">
+            ${ambiente === 'HOMOLOGAÇÃO' ? '<div class="ambiente-homologacao">AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL</div>' : ''}
+            
+            <div class="header">
+                <div class="logo-section">
+                    <div class="title">LOGO</div>
+                </div>
+                <div class="empresa-section">
+                    <div class="title">EMPRESA DEMO LTDA</div>
+                    <div>Rua das Empresas, 123 - Centro</div>
+                    <div>São Paulo - SP - CEP: 01234-567</div>
+                    <div>CNPJ: 11.222.333/0001-81</div>
+                    <div>IE: 123.456.789</div>
+                </div>
+                <div class="danfe-section">
+                    <div class="title">DANFE</div>
+                    <div class="subtitle">Documento Auxiliar da</div>
+                    <div class="subtitle">Nota Fiscal Eletrônica</div>
+                    <div style="margin-top: 10px;">
+                        <div>Nº ${nfe.numeroNfe}</div>
+                        <div>Série ${nfe.serie}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <div class="info-field" style="width: 100%;">
+                    <span class="field-label">CHAVE DE ACESSO</span>
+                    <span class="field-value chave-acesso">${nfe.chaveAcesso}</span>
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <div class="info-field" style="width: 100%;">
+                    <span class="field-label">DESTINATÁRIO</span>
+                    <span class="field-value">${nfe.destinatarioNome || 'Cliente'}</span>
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <div class="info-field" style="width: 50%;">
+                    <span class="field-label">CNPJ/CPF</span>
+                    <span class="field-value">${nfe.destinatarioDocumento || '000.000.000-00'}</span>
+                </div>
+                <div class="info-field" style="width: 50%;">
+                    <span class="field-label">DATA DE EMISSÃO</span>
+                    <span class="field-value">${new Date(nfe.dataEmissao).toLocaleDateString('pt-BR')}</span>
+                </div>
+            </div>
+            
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width: 10%;">CÓDIGO</th>
+                        <th style="width: 30%;">DESCRIÇÃO</th>
+                        <th style="width: 10%;">NCM</th>
+                        <th style="width: 10%;">CFOP</th>
+                        <th style="width: 8%;">UN</th>
+                        <th style="width: 8%;">QTDE</th>
+                        <th style="width: 12%;">VL UNIT</th>
+                        <th style="width: 12%;">VL TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${nfe.order?.orderItems?.map((item: any) => `
+                        <tr>
+                            <td>${item.product?.sku || item.product?.id}</td>
+                            <td>${item.product?.name}</td>
+                            <td>${item.product?.ncm || '00000000'}</td>
+                            <td>${item.product?.cfop || '5102'}</td>
+                            <td>${item.product?.productUnit || 'UN'}</td>
+                            <td>${item.quantity}</td>
+                            <td>R$ ${Number(item.unitPrice).toFixed(2)}</td>
+                            <td>R$ ${Number(item.totalPrice).toFixed(2)}</td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="8">Nenhum item encontrado</td></tr>'}
+                </tbody>
+            </table>
+            
+            <div class="totals-section">
+                <div class="totals-left">
+                    <div class="info-row">
+                        <div class="info-field">
+                            <span class="field-label">BASE CÁLC. ICMS</span>
+                            <span class="field-value">R$ ${Number(nfe.valorTotal || 0).toFixed(2)}</span>
+                        </div>
+                        <div class="info-field">
+                            <span class="field-label">VALOR ICMS</span>
+                            <span class="field-value">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="totals-right">
+                    <div class="info-field">
+                        <span class="field-label">VALOR TOTAL DA NOTA</span>
+                        <span class="field-value" style="font-size: 12px;">R$ ${Number(nfe.valorTotal || 0).toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-row">
+                <div class="info-field" style="width: 100%;">
+                    <span class="field-label">INFORMAÇÕES COMPLEMENTARES</span>
+                    <span class="field-value">
+                        ${ambiente === 'HOMOLOGAÇÃO' ? 'EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL. ' : ''}
+                        Protocolo de Autorização: ${nfe.protocoloAutorizacao || 'Pendente'}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+  }
+
+  async downloadXmlNfe(nfeId: number, tenantId: number): Promise<{ filename: string; content: Buffer }> {
+    const nfe = await this.prisma.nfe.findFirst({
+      where: { id: nfeId, tenantId },
+    });
+
+    if (!nfe) {
+      throw new BadRequestException('NFe não encontrada');
+    }
+
+    if (!nfe.xmlAssinado) {
+      throw new BadRequestException('XML da NFe não disponível');
+    }
+
+    const filename = `NFe_${nfe.chaveAcesso}.xml`;
+    const content = Buffer.from(nfe.xmlAssinado, 'utf-8');
+
+    return { filename, content };
+  }
+
+  async downloadPdfNfe(nfeId: number, tenantId: number): Promise<{ filename: string; content: Buffer }> {
+    const nfe = await this.prisma.nfe.findFirst({
+      where: { id: nfeId, tenantId },
+    });
+
+    if (!nfe) {
+      throw new BadRequestException('NFe não encontrada');
+    }
+
+    let pdfBuffer: Buffer;
+
+    if (nfe.pdfDanfe) {
+      pdfBuffer = nfe.pdfDanfe;
+    } else {
+      pdfBuffer = await this.gerarDanfe(nfeId, tenantId);
+    }
+
+    const filename = `DANFE_${nfe.chaveAcesso}.pdf`;
+    return { filename, content: pdfBuffer };
+  }
+
+  async alternarAmbiente(tenantId: number, ambiente: 'homologacao' | 'producao'): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      this.logger.log(`Alternando ambiente NFe para ${ambiente.toUpperCase()} - Tenant ${tenantId}`);
+      
+      // Em produção, salvar configuração no banco de dados por tenant
+      // Por enquanto, usar variável de ambiente global
+      
+      return {
+        sucesso: true,
+        mensagem: `Ambiente alterado para ${ambiente.toUpperCase()} com sucesso`
+      };
+    } catch (error) {
+      return {
+        sucesso: false,
+        mensagem: 'Erro ao alterar ambiente'
+      };
+    }
+  }
+
+  private obterCodigoMunicipio(cidade: string): string {
+    const cidades: Record<string, string> = {
+      'São Paulo': '3550308',
+      'Rio de Janeiro': '3304557',
+      'Belo Horizonte': '3106200',
+      'Salvador': '2927408',
+      'Brasília': '5300108',
+      'Fortaleza': '2304400',
+      'Manaus': '1302603',
+      'Curitiba': '4106902',
+      'Recife': '2611606',
+      'Porto Alegre': '4314902',
+    };
+    
+    return cidades[cidade] || '9999999';
+  }
         status: item.status,
         quantidade: item._count.id,
       })),

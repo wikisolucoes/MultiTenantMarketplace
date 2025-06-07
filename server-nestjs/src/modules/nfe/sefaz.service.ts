@@ -128,7 +128,7 @@ export class SefazService {
 
   constructor(private configService: ConfigService) {
     this.config = {
-      environment: this.configService.get<string>('SEFAZ_ENVIRONMENT', 'homologacao') as 'homologacao' | 'producao',
+      environment: this.configService.get<string>('NFE_AMBIENTE', 'homologacao') as 'homologacao' | 'producao',
       certificatePath: this.configService.get<string>('SEFAZ_CERTIFICATE_PATH', ''),
       certificatePassword: this.configService.get<string>('SEFAZ_CERTIFICATE_PASSWORD', ''),
       cnpj: this.configService.get<string>('EMPRESA_CNPJ', ''),
@@ -136,12 +136,19 @@ export class SefazService {
       uf: this.configService.get<string>('EMPRESA_UF', 'SP'),
     };
 
+    const baseUrl = this.config.environment === 'producao' 
+      ? 'https://nfe.fazenda.sp.gov.br'
+      : 'https://homologacao.nfe.fazenda.sp.gov.br';
+
     this.api = axios.create({
+      baseURL: baseUrl,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/soap+xml; charset=utf-8',
       },
     });
+
+    this.logger.log(`SEFAZ configurado para ambiente: ${this.config.environment.toUpperCase()}`);
   }
 
   async emitirNfe(nfeData: NfeData): Promise<NfeResponse> {
