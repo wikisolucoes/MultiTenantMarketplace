@@ -25,16 +25,31 @@ model Tenant {
   updatedAt        DateTime  @default(now()) @map("updated_at")
 
   // Relations
-  users            User[]
-  products         Product[]
-  orders           Order[]
-  nfes             Nfe[]
-  bankAccounts     BankAccount[]
-  celcoinAccounts  CelcoinAccount[]
-  brands           Brand[]
-  categories       Category[]
-  supportTickets   SupportTicket[]
-  apiCredentials   ApiCredential[]
+  users                     User[]
+  products                  Product[]
+  orders                    Order[]
+  nfes                      Nfe[]
+  apiCredentials            ApiCredential[]
+  apiRateLimits             ApiRateLimit[]
+  apiUsageLogs              ApiUsageLog[]
+  balanceSnapshots          BalanceSnapshot[]
+  celcoinAccounts           CelcoinAccount[]
+  celcoinTransactionLogs    CelcoinTransactionLog[]
+  customerOrders            CustomerOrder[]
+  customers                 Customer[]
+  ledgerEntries             LedgerEntry[]
+  nfeConfigurations         NfeConfiguration[]
+  pluginSubscriptions       PluginSubscription[]
+  pluginUsage               PluginUsage[]
+  productBrands             ProductBrand[]
+  productCategories         ProductCategory[]
+  reconciliationRecords     ReconciliationRecord[]
+  securityAuditLogs         SecurityAuditLog[]
+  supportTickets            SupportTicket[]
+  tenantPluginSubscriptions TenantPluginSubscription[]
+  tenantSubscriptions       TenantSubscription[]
+  transactions              Transaction[]
+  withdrawals               Withdrawal[]
   
   @@map("tenants")
 }
@@ -368,4 +383,869 @@ model Session {
 
   @@index([expire], name: "IDX_session_expire")
   @@map("sessions")
+}
+
+// API Rate Limits
+model ApiRateLimit {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  endpoint     String   @db.VarChar(100)
+  ipAddress    String   @map("ip_address") @db.VarChar(45)
+  requestCount Int?     @default(0) @map("request_count")
+  windowStart  DateTime @default(now()) @map("window_start")
+  isBlocked    Boolean? @default(false) @map("is_blocked")
+  blockedUntil DateTime? @map("blocked_until")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("api_rate_limits")
+}
+
+// API Usage Logs
+model ApiUsageLog {
+  id             Int      @id @default(autoincrement())
+  credentialId   Int      @map("credential_id")
+  tenantId       Int      @map("tenant_id")
+  endpoint       String   @db.VarChar(255)
+  method         String   @db.VarChar(10)
+  statusCode     Int      @map("status_code")
+  responseTime   Int?     @map("response_time")
+  userAgent      String?  @db.Text @map("user_agent")
+  ipAddress      String?  @db.VarChar(45) @map("ip_address")
+  requestSize    Int?     @map("request_size")
+  responseSize   Int?     @map("response_size")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  credential ApiCredential @relation(fields: [credentialId], references: [id])
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@map("api_usage_logs")
+}
+
+// Balance Snapshots
+model BalanceSnapshot {
+  id                  Int      @id @default(autoincrement())
+  tenantId            Int      @map("tenant_id")
+  balance             Decimal  @db.Decimal(15, 2)
+  pendingBalance      Decimal  @map("pending_balance") @db.Decimal(15, 2)
+  lastLedgerEntryId   Int?     @map("last_ledger_entry_id")
+  snapshotType        String   @map("snapshot_type")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("balance_snapshots")
+}
+
+// Bank Accounts
+model BankAccount {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  bank        String
+  agency      String
+  account     String
+  accountType String   @default("checking") @map("account_type")
+  isDefault   Boolean  @default(true) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User         @relation(fields: [userId], references: [id])
+  withdrawals Withdrawal[]
+
+  @@map("bank_accounts")
+}
+
+// Celcoin Accounts
+model CelcoinAccount {
+  id                Int      @id @default(autoincrement())
+  tenantId          Int      @map("tenant_id")
+  celcoinAccountId  String   @map("celcoin_account_id")
+  status            String   @default("pending")
+  balance           Decimal  @default(0.00) @db.Decimal(15, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("celcoin_accounts")
+}
+
+// Celcoin Transaction Log
+model CelcoinTransactionLog {
+  id                     Int       @id @default(autoincrement())
+  tenantId               Int       @map("tenant_id")
+  externalTransactionId  String    @map("external_transaction_id") @db.VarChar(100)
+  operationType          String    @map("operation_type")
+  requestPayload         Json      @map("request_payload")
+  responsePayload        Json?     @map("response_payload")
+  httpStatus             Int?      @map("http_status")
+  celcoinStatus          String?   @map("celcoin_status") @db.VarChar(50)
+  amount                 Decimal?  @db.Decimal(15, 2)
+  fee                    Decimal?  @db.Decimal(15, 2)
+  netAmount              Decimal?  @map("net_amount") @db.Decimal(15, 2)
+  errorCode              String?   @map("error_code") @db.VarChar(50)
+  errorMessage           String?   @map("error_message")
+  retryCount             Int       @default(0) @map("retry_count")
+  isSuccessful           Boolean   @default(false) @map("is_successful")
+  webhookReceived        Boolean   @default(false) @map("webhook_received")
+  webhookTimestamp       DateTime? @map("webhook_timestamp")
+  ipAddress              String?   @map("ip_address") @db.VarChar(45)
+  userAgent              String?   @map("user_agent")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("celcoin_transaction_log")
+}
+
+// Customer Addresses
+model CustomerAddress {
+  id           Int      @id @default(autoincrement())
+  customerId   Int      @map("customer_id")
+  type         String   @db.VarChar(20)
+  name         String   @db.VarChar(100)
+  zipCode      String   @map("zip_code") @db.VarChar(10)
+  street       String   @db.VarChar(255)
+  number       String   @db.VarChar(20)
+  complement   String?  @db.VarChar(255)
+  neighborhood String   @db.VarChar(100)
+  city         String   @db.VarChar(100)
+  state        String   @db.VarChar(2)
+  isDefault    Boolean  @default(false) @map("is_default")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("customer_addresses")
+}
+
+// Customer Order Items
+model CustomerOrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @map("order_id")
+  productId Int      @map("product_id")
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2)
+  total     Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order   CustomerOrder @relation(fields: [orderId], references: [id])
+  product Product       @relation(fields: [productId], references: [id])
+
+  @@map("customer_order_items")
+}
+
+// Customer Orders
+model CustomerOrder {
+  id              Int      @id @default(autoincrement())
+  customerId      Int      @map("customer_id")
+  tenantId        Int      @map("tenant_id")
+  orderNumber     String   @map("order_number") @db.VarChar(50)
+  status          String   @db.VarChar(50)
+  paymentStatus   String   @map("payment_status") @db.VarChar(50)
+  paymentMethod   String   @map("payment_method") @db.VarChar(50)
+  subtotal        Decimal  @db.Decimal(10, 2)
+  shippingCost    Decimal  @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  discount        Decimal  @default(0) @db.Decimal(10, 2)
+  total           Decimal  @db.Decimal(10, 2)
+  shippingAddress String   @map("shipping_address")
+  trackingCode    String?  @map("tracking_code") @db.VarChar(100)
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  customer Customer           @relation(fields: [customerId], references: [id])
+  tenant   Tenant             @relation(fields: [tenantId], references: [id])
+  items    CustomerOrderItem[]
+
+  @@map("customer_orders")
+}
+
+// Customers
+model Customer {
+  id        Int       @id @default(autoincrement())
+  tenantId  Int       @map("tenant_id")
+  email     String    @db.VarChar(255)
+  password  String    @db.VarChar(255)
+  firstName String    @map("first_name") @db.VarChar(100)
+  lastName  String    @map("last_name") @db.VarChar(100)
+  phone     String?   @db.VarChar(20)
+  cpf       String?   @db.VarChar(14)
+  birthDate DateTime? @map("birth_date")
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  addresses CustomerAddress[]
+  orders    CustomerOrder[]
+  reviews   ProductReview[]
+  wishlist  Wishlist[]
+
+  @@unique([tenantId, email])
+  @@map("customers")
+}
+
+// Email Notifications
+model EmailNotification {
+  id            Int       @id @default(autoincrement())
+  title         String    @db.VarChar(255)
+  message       String
+  recipientType String    @map("recipient_type") @db.VarChar(50)
+  recipientIds  Json?     @map("recipient_ids")
+  sentCount     Int       @default(0) @map("sent_count")
+  failedCount   Int       @default(0) @map("failed_count")
+  status        String    @default("pending") @db.VarChar(20)
+  createdBy     Int?      @map("created_by")
+  createdAt     DateTime? @default(now()) @map("created_at")
+  sentAt        DateTime? @map("sent_at")
+
+  @@map("email_notifications")
+}
+
+// Ledger Entries
+model LedgerEntry {
+  id                     Int       @id @default(autoincrement())
+  tenantId               Int       @map("tenant_id")
+  entryType              String    @map("entry_type")
+  transactionType        String    @map("transaction_type")
+  amount                 Decimal   @db.Decimal(15, 2)
+  runningBalance         Decimal   @map("running_balance") @db.Decimal(15, 2)
+  referenceId            String?   @map("reference_id") @db.VarChar(100)
+  orderId                Int?      @map("order_id")
+  withdrawalId           Int?      @map("withdrawal_id")
+  celcoinTransactionId   String?   @map("celcoin_transaction_id") @db.VarChar(100)
+  description            String
+  status                 String    @default("pending")
+  metadata               Json?
+  ipAddress              String?   @map("ip_address") @db.VarChar(45)
+  userAgent              String?   @map("user_agent")
+  sessionId              String?   @map("session_id") @db.VarChar(100)
+  createdAt              DateTime  @default(now()) @map("created_at")
+  confirmedAt            DateTime? @map("confirmed_at")
+  reversedAt             DateTime? @map("reversed_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  order      Order?      @relation(fields: [orderId], references: [id])
+  withdrawal Withdrawal? @relation(fields: [withdrawalId], references: [id])
+
+  @@map("ledger_entries")
+}
+
+// NFe Configurations
+model NfeConfiguration {
+  id                  Int      @id @default(autoincrement())
+  tenantId            Int      @map("tenant_id")
+  certificateFile     String?  @map("certificate_file")
+  certificatePassword String?  @map("certificate_password") @db.VarChar(255)
+  environment         String   @default("homologacao") @db.VarChar(20)
+  serie               Int      @default(1)
+  nextNumber          Int      @default(1) @map("next_number")
+  isActive            Boolean  @default(false) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("nfe_configurations")
+}
+
+// Plan Plugins
+model PlanPlugin {
+  id         Int      @id @default(autoincrement())
+  planId     Int      @map("plan_id")
+  pluginId   Int      @map("plugin_id")
+  isRequired Boolean  @default(true) @map("is_required")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+  plugin Plugin           @relation(fields: [pluginId], references: [id])
+
+  @@map("plan_plugins")
+}
+
+// Platform Features
+model PlatformFeature {
+  id                 Int       @id @default(autoincrement())
+  name               String    @db.VarChar(100)
+  description        String?
+  isEnabled          Boolean   @default(false) @map("is_enabled")
+  rolloutPercentage  Int       @default(0) @map("rollout_percentage")
+  targetTenants      Json?     @map("target_tenants")
+  metadata           Json?
+  createdBy          Int?      @map("created_by")
+  enabledBy          Int?      @map("enabled_by")
+  enabledAt          DateTime? @map("enabled_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("platform_features")
+}
+
+// Platform Maintenance
+model PlatformMaintenance {
+  id               Int       @id @default(autoincrement())
+  title            String    @db.VarChar(255)
+  description      String
+  maintenanceType  String    @map("maintenance_type") @db.VarChar(50)
+  severity         String    @default("low") @db.VarChar(20)
+  affectedServices Json?     @map("affected_services")
+  scheduledStart   DateTime? @map("scheduled_start")
+  scheduledEnd     DateTime? @map("scheduled_end")
+  actualStart      DateTime? @map("actual_start")
+  actualEnd        DateTime? @map("actual_end")
+  status           String    @default("scheduled") @db.VarChar(20)
+  notifyUsers      Boolean   @default(true) @map("notify_users")
+  showBanner       Boolean   @default(false) @map("show_banner")
+  bannerMessage    String?   @map("banner_message")
+  createdBy        Int?      @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("platform_maintenance")
+}
+
+// Platform Settings
+model PlatformSetting {
+  id               Int      @id @default(autoincrement())
+  category         String   @db.VarChar(50)
+  key              String   @db.VarChar(100)
+  value            String?
+  dataType         String   @default("string") @map("data_type") @db.VarChar(20)
+  isPublic         Boolean  @default(false) @map("is_public")
+  description      String?
+  validationRules  Json?    @map("validation_rules")
+  lastModifiedBy   Int?     @map("last_modified_by")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([category, key])
+  @@map("platform_settings")
+}
+
+// Plugin Plans
+model PluginPlan {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(255)
+  description  String?
+  monthlyPrice Decimal  @map("monthly_price") @db.Decimal(10, 2)
+  yearlyPrice  Decimal? @map("yearly_price") @db.Decimal(10, 2)
+  maxTenants   Int      @default(1) @map("max_tenants")
+  features     Json
+  isActive     Boolean  @default(true) @map("is_active")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("plugin_plans")
+}
+
+// Plugin Subscription History
+model PluginSubscriptionHistory {
+  id                     Int      @id @default(autoincrement())
+  subscriptionId         Int      @map("subscription_id")
+  action                 String   @db.VarChar(50)
+  amount                 Decimal? @db.Decimal(10, 2)
+  stripeInvoiceId        String?  @map("stripe_invoice_id") @db.VarChar(255)
+  stripePaymentIntentId  String?  @map("stripe_payment_intent_id") @db.VarChar(255)
+  paymentStatus          String?  @map("payment_status") @db.VarChar(50)
+  description            String?
+  metadata               Json?
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  subscription PluginSubscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("plugin_subscription_history")
+}
+
+// Plugin Subscriptions
+model PluginSubscription {
+  id                   Int       @id @default(autoincrement())
+  tenantId             Int       @map("tenant_id")
+  pluginId             Int?      @map("plugin_id")
+  planId               Int?      @map("plan_id")
+  subscriptionType     String    @map("subscription_type") @db.VarChar(20)
+  status               String    @default("active") @db.VarChar(20)
+  billingCycle         String    @map("billing_cycle") @db.VarChar(20)
+  currentPrice         Decimal   @map("current_price") @db.Decimal(10, 2)
+  nextBillingDate      DateTime? @map("next_billing_date")
+  lastBillingDate      DateTime? @map("last_billing_date")
+  cancelledAt          DateTime? @map("cancelled_at")
+  expiresAt            DateTime? @map("expires_at")
+  autoRenew            Boolean   @default(true) @map("auto_renew")
+  stripeSubscriptionId String?   @map("stripe_subscription_id") @db.VarChar(255)
+  stripeCustomerId     String?   @map("stripe_customer_id") @db.VarChar(255)
+  paymentMethod        String    @default("stripe") @map("payment_method") @db.VarChar(50)
+  notes                String?
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant  Tenant                        @relation(fields: [tenantId], references: [id])
+  plugin  Plugin?                       @relation(fields: [pluginId], references: [id])
+  history PluginSubscriptionHistory[]
+
+  @@map("plugin_subscriptions")
+}
+
+// Plugin Usage
+model PluginUsage {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int      @map("tenant_id")
+  pluginId      Int      @map("plugin_id")
+  usageDate     DateTime @map("usage_date") @db.Date
+  usageCount    Int      @default(0) @map("usage_count")
+  apiCalls      Int      @default(0) @map("api_calls")
+  dataProcessed BigInt   @default(0) @map("data_processed")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  plugin Plugin @relation(fields: [pluginId], references: [id])
+
+  @@unique([tenantId, pluginId, usageDate])
+  @@map("plugin_usage")
+}
+
+// Plugins
+model Plugin {
+  id           Int     @id @default(autoincrement())
+  name         String  @db.VarChar(255)
+  description  String?
+  price        Decimal? @db.Decimal(10, 2)
+  category     String  @db.VarChar(100)
+  features     Json?
+  isActive     Boolean @default(true) @map("is_active")
+  icon         String  @default("default") @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  slug         String? @db.VarChar(100)
+  displayName  String? @map("display_name") @db.VarChar(100)
+  monthlyPrice Decimal? @map("monthly_price") @db.Decimal(10, 2)
+  yearlyPrice  Decimal? @map("yearly_price") @db.Decimal(10, 2)
+
+  subscriptions       PluginSubscription[]
+  tenantSubscriptions TenantPluginSubscription[]
+  usage               PluginUsage[]
+  planPlugins         PlanPlugin[]
+
+  @@map("plugins")
+}
+
+// Product Brands
+model ProductBrand {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  name        String   @db.VarChar(100)
+  slug        String   @db.VarChar(100)
+  description String?
+  logo        String?  @db.VarChar(500)
+  website     String?  @db.VarChar(255)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  products Product[]
+
+  @@unique([tenantId, slug])
+  @@map("product_brands")
+}
+
+// Product Categories
+model ProductCategory {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  name        String   @db.VarChar(100)
+  slug        String   @db.VarChar(100)
+  description String?
+  image       String?  @db.VarChar(500)
+  parentId    Int?     @map("parent_id")
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  parent   ProductCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryHierarchy")
+  products Product[]
+
+  @@unique([tenantId, slug])
+  @@map("product_categories")
+}
+
+// Product Images
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  url       String   @db.VarChar(500)
+  altText   String?  @map("alt_text") @db.VarChar(255)
+  sortOrder Int      @default(0) @map("sort_order")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at")
+  variantId Int?     @map("variant_id")
+
+  product Product        @relation(fields: [productId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@map("product_images")
+}
+
+// Product Reviews
+model ProductReview {
+  id         Int      @id @default(autoincrement())
+  productId  Int      @map("product_id")
+  customerId Int      @map("customer_id")
+  rating     Int
+  title      String?  @db.VarChar(255)
+  comment    String?
+  isApproved Boolean  @default(true) @map("is_approved")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  product  Product  @relation(fields: [productId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("product_reviews")
+}
+
+// Product Specifications
+model ProductSpecification {
+  id        Int    @id @default(autoincrement())
+  productId Int    @map("product_id")
+  name      String @db.VarChar(100)
+  value     String @db.VarChar(255)
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("product_specifications")
+}
+
+// Product Variants
+model ProductVariant {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  name      String   @db.VarChar(100)
+  sku       String?  @db.VarChar(100)
+  price     Decimal? @db.Decimal(10, 2)
+  stock     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  product Product        @relation(fields: [productId], references: [id])
+  images  ProductImage[]
+
+  @@map("product_variants")
+}
+
+// Products
+model Product {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int      @map("tenant_id")
+  name         String   @db.VarChar(255)
+  slug         String   @db.VarChar(255)
+  description  String?
+  shortDesc    String?  @map("short_desc") @db.VarChar(500)
+  sku          String?  @db.VarChar(100)
+  price        Decimal  @db.Decimal(10, 2)
+  comparePrice Decimal? @map("compare_price") @db.Decimal(10, 2)
+  stock        Int      @default(0)
+  weight       Decimal? @db.Decimal(8, 3)
+  dimensions   String?  @db.VarChar(100)
+  categoryId   Int?     @map("category_id")
+  brandId      Int?     @map("brand_id")
+  status       String   @default("draft") @db.VarChar(20)
+  isFeatured   Boolean  @default(false) @map("is_featured")
+  metaTitle    String?  @map("meta_title") @db.VarChar(255)
+  metaDesc     String?  @map("meta_desc") @db.VarChar(500)
+  tags         String[]
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id])
+  category       ProductCategory?       @relation(fields: [categoryId], references: [id])
+  brand          ProductBrand?          @relation(fields: [brandId], references: [id])
+  images         ProductImage[]
+  variants       ProductVariant[]
+  specifications ProductSpecification[]
+  reviews        ProductReview[]
+  orderItems     CustomerOrderItem[]
+  wishlist       Wishlist[]
+
+  @@unique([tenantId, slug])
+  @@map("products")
+}
+
+// Reconciliation Records
+model ReconciliationRecord {
+  id                  Int       @id @default(autoincrement())
+  tenantId            Int       @map("tenant_id")
+  reconciliationType  String    @map("reconciliation_type") @db.VarChar(50)
+  externalSource      String    @map("external_source") @db.VarChar(100)
+  externalId          String    @map("external_id") @db.VarChar(100)
+  internalId          String?   @map("internal_id") @db.VarChar(100)
+  amount              Decimal   @db.Decimal(15, 2)
+  fee                 Decimal?  @db.Decimal(15, 2)
+  netAmount           Decimal   @map("net_amount") @db.Decimal(15, 2)
+  transactionDate     DateTime  @map("transaction_date")
+  reconciliationDate  DateTime? @map("reconciliation_date")
+  status              String    @default("pending") @db.VarChar(20)
+  discrepancyType     String?   @map("discrepancy_type") @db.VarChar(50)
+  discrepancyAmount   Decimal?  @map("discrepancy_amount") @db.Decimal(15, 2)
+  notes               String?
+  metadata            Json?
+  resolvedBy          Int?      @map("resolved_by")
+  resolvedAt          DateTime? @map("resolved_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("reconciliation_records")
+}
+
+// Security Audit Log
+model SecurityAuditLog {
+  id            Int      @id @default(autoincrement())
+  tenantId      Int?     @map("tenant_id")
+  userId        Int?     @map("user_id")
+  eventType     String   @map("event_type") @db.VarChar(50)
+  description   String
+  ipAddress     String?  @map("ip_address") @db.VarChar(45)
+  userAgent     String?  @map("user_agent")
+  sessionId     String?  @map("session_id") @db.VarChar(100)
+  resourceType  String?  @map("resource_type") @db.VarChar(50)
+  resourceId    String?  @map("resource_id") @db.VarChar(100)
+  oldValues     Json?    @map("old_values")
+  newValues     Json?    @map("new_values")
+  riskLevel     String   @default("low") @map("risk_level") @db.VarChar(20)
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+
+  @@map("security_audit_log")
+}
+
+// Subscription Plans
+model SubscriptionPlan {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  description  String?
+  monthlyPrice Decimal  @map("monthly_price") @db.Decimal(10, 2)
+  yearlyPrice  Decimal? @map("yearly_price") @db.Decimal(10, 2)
+  features     Json
+  maxProducts  Int?     @map("max_products")
+  maxOrders    Int?     @map("max_orders")
+  maxStorage   BigInt?  @map("max_storage")
+  isActive     Boolean  @default(true) @map("is_active")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenantSubscriptions TenantSubscription[]
+  planPlugins         PlanPlugin[]
+
+  @@map("subscription_plans")
+}
+
+// Support FAQs
+model SupportFaq {
+  id          Int      @id @default(autoincrement())
+  question    String   @db.VarChar(500)
+  answer      String
+  category    String   @db.VarChar(100)
+  tags        String[]
+  isPublished Boolean  @default(true) @map("is_published")
+  sortOrder   Int      @default(0) @map("sort_order")
+  viewCount   Int      @default(0) @map("view_count")
+  createdBy   Int?     @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("support_faqs")
+}
+
+// Support Ticket Messages
+model SupportTicketMessage {
+  id         Int      @id @default(autoincrement())
+  ticketId   Int      @map("ticket_id")
+  userId     Int?     @map("user_id")
+  message    String
+  isInternal Boolean  @default(false) @map("is_internal")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id])
+  user   User?         @relation(fields: [userId], references: [id])
+
+  @@map("support_ticket_messages")
+}
+
+// Support Tickets
+model SupportTicket {
+  id           Int       @id @default(autoincrement())
+  tenantId     Int?      @map("tenant_id")
+  userId       Int?      @map("user_id")
+  subject      String    @db.VarChar(255)
+  description  String
+  status       String    @default("open") @db.VarChar(20)
+  priority     String    @default("medium") @db.VarChar(20)
+  category     String    @db.VarChar(100)
+  assignedTo   Int?      @map("assigned_to")
+  lastReplyAt  DateTime? @map("last_reply_at")
+  resolvedAt   DateTime? @map("resolved_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant   Tenant?                  @relation(fields: [tenantId], references: [id])
+  user     User?                    @relation(fields: [userId], references: [id])
+  assignee User?                    @relation("AssignedTickets", fields: [assignedTo], references: [id])
+  messages SupportTicketMessage[]
+
+  @@map("support_tickets")
+}
+
+// Tenant Plugin Subscriptions
+model TenantPluginSubscription {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int      @map("tenant_id")
+  pluginId  Int      @map("plugin_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  plugin Plugin @relation(fields: [pluginId], references: [id])
+
+  @@unique([tenantId, pluginId])
+  @@map("tenant_plugin_subscriptions")
+}
+
+// Tenant Subscriptions
+model TenantSubscription {
+  id                   Int       @id @default(autoincrement())
+  tenantId             Int       @map("tenant_id")
+  planId               Int       @map("plan_id")
+  status               String    @default("active") @db.VarChar(20)
+  billingCycle         String    @map("billing_cycle") @db.VarChar(20)
+  currentPrice         Decimal   @map("current_price") @db.Decimal(10, 2)
+  nextBillingDate      DateTime? @map("next_billing_date")
+  lastBillingDate      DateTime? @map("last_billing_date")
+  cancelledAt          DateTime? @map("cancelled_at")
+  expiresAt            DateTime? @map("expires_at")
+  autoRenew            Boolean   @default(true) @map("auto_renew")
+  stripeSubscriptionId String?   @map("stripe_subscription_id") @db.VarChar(255)
+  stripeCustomerId     String?   @map("stripe_customer_id") @db.VarChar(255)
+  paymentMethod        String    @default("stripe") @map("payment_method") @db.VarChar(50)
+  notes                String?
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("tenant_subscriptions")
+}
+
+// Transactions
+model Transaction {
+  id                   Int       @id @default(autoincrement())
+  tenantId             Int       @map("tenant_id")
+  orderId              Int?      @map("order_id")
+  transactionId        String    @map("transaction_id") @db.VarChar(100)
+  paymentMethod        String    @map("payment_method") @db.VarChar(50)
+  amount               Decimal   @db.Decimal(10, 2)
+  fee                  Decimal   @default(0) @db.Decimal(10, 2)
+  netAmount            Decimal   @map("net_amount") @db.Decimal(10, 2)
+  status               String    @db.VarChar(20)
+  gatewayResponse      Json?     @map("gateway_response")
+  processedAt          DateTime? @map("processed_at")
+  refundedAt           DateTime? @map("refunded_at")
+  refundAmount         Decimal?  @map("refund_amount") @db.Decimal(10, 2)
+  celcoinTransactionId String?   @map("celcoin_transaction_id") @db.VarChar(100)
+  pixKey               String?   @map("pix_key") @db.VarChar(255)
+  boletoBarcode        String?   @map("boleto_barcode") @db.VarChar(255)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  order  Order? @relation(fields: [orderId], references: [id])
+
+  @@map("transactions")
+}
+
+// User Profiles
+model UserProfile {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique @map("user_id")
+  firstName     String?  @map("first_name") @db.VarChar(100)
+  lastName      String?  @map("last_name") @db.VarChar(100)
+  phone         String?  @db.VarChar(20)
+  company       String?  @db.VarChar(255)
+  position      String?  @db.VarChar(100)
+  bio           String?
+  avatar        String?  @db.VarChar(500)
+  timezone      String?  @db.VarChar(50)
+  language      String?  @db.VarChar(10)
+  notifications Json?
+  preferences   Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_profiles")
+}
+
+// Wishlist
+model Wishlist {
+  id         Int      @id @default(autoincrement())
+  customerId Int      @map("customer_id")
+  productId  Int      @map("product_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@unique([customerId, productId])
+  @@map("wishlist")
+}
+
+// Withdrawals
+model Withdrawal {
+  id                 Int       @id @default(autoincrement())
+  tenantId           Int       @map("tenant_id")
+  userId             Int       @map("user_id")
+  amount             Decimal   @db.Decimal(15, 2)
+  fee                Decimal   @default(0) @db.Decimal(15, 2)
+  netAmount          Decimal   @map("net_amount") @db.Decimal(15, 2)
+  bankAccountId      Int       @map("bank_account_id")
+  status             String    @default("pending") @db.VarChar(20)
+  externalId         String?   @map("external_id") @db.VarChar(100)
+  processingFee      Decimal?  @map("processing_fee") @db.Decimal(15, 2)
+  estimatedArrival   DateTime? @map("estimated_arrival")
+  processedAt        DateTime? @map("processed_at")
+  rejectedAt         DateTime? @map("rejected_at")
+  rejectionReason    String?   @map("rejection_reason")
+  notes              String?
+  metadata           Json?
+  adminNotes         String?   @map("admin_notes")
+  approvedBy         Int?      @map("approved_by")
+  approvedAt         DateTime? @map("approved_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  user        User          @relation(fields: [userId], references: [id])
+  bankAccount BankAccount   @relation(fields: [bankAccountId], references: [id])
+  approver    User?         @relation("ApprovedWithdrawals", fields: [approvedBy], references: [id])
+  ledgerEntry LedgerEntry[]
+
+  @@map("withdrawals")
 }
