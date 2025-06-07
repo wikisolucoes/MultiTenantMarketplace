@@ -376,8 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Restore stock if payment failed
       if (newPaymentStatus === 'failed') {
-        const orderItemsStr = order.items || '[]';
-        const orderItems = JSON.parse(orderItemsStr);
+        const orderItems = order.items || [];
         for (const item of orderItems) {
           const currentProduct = await db.select().from(products).where(eq(products.id, item.productId));
           if (currentProduct.length > 0) {
