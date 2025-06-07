@@ -7,14 +7,14 @@ export class BrandService {
   constructor(private prisma: PrismaService) {}
 
   async getBrandsByTenant(tenantId: number) {
-    return this.prisma.brand.findMany({
+    return this.prisma.brands.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' }
     });
   }
 
   async getBrand(id: number) {
-    const brand = await this.prisma.brand.findUnique({
+    const brand = await this.prisma.brands.findUnique({
       where: { id }
     });
 
@@ -26,7 +26,7 @@ export class BrandService {
   }
 
   async createBrand(createBrandDto: CreateBrandDto) {
-    return this.prisma.brand.create({
+    return this.prisma.brands.create({
       data: {
         ...createBrandDto,
         isActive: true
@@ -37,7 +37,7 @@ export class BrandService {
   async updateBrand(id: number, updateBrandDto: UpdateBrandDto) {
     await this.getBrand(id);
     
-    return this.prisma.brand.update({
+    return this.prisma.brands.update({
       where: { id },
       data: {
         ...updateBrandDto,
@@ -49,7 +49,7 @@ export class BrandService {
   async deleteBrand(id: number) {
     await this.getBrand(id);
     
-    return this.prisma.brand.delete({
+    return this.prisma.brands.delete({
       where: { id }
     });
   }

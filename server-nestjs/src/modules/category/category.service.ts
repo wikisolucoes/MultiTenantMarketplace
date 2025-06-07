@@ -7,14 +7,14 @@ export class CategoryService {
   constructor(private prisma: PrismaService) {}
 
   async getCategoriesByTenant(tenantId: number) {
-    return this.prisma.category.findMany({
+    return this.prisma.categories.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' }
     });
   }
 
   async getCategory(id: number) {
-    const category = await this.prisma.category.findUnique({
+    const category = await this.prisma.categories.findUnique({
       where: { id }
     });
 
@@ -29,7 +29,7 @@ export class CategoryService {
     const slug = createCategoryDto.slug || 
       createCategoryDto.name.toLowerCase().replace(/\s+/g, '-');
 
-    return this.prisma.category.create({
+    return this.prisma.categories.create({
       data: {
         ...createCategoryDto,
         slug,
@@ -41,7 +41,7 @@ export class CategoryService {
   async updateCategory(id: number, updateCategoryDto: UpdateCategoryDto) {
     await this.getCategory(id);
     
-    return this.prisma.category.update({
+    return this.prisma.categories.update({
       where: { id },
       data: {
         ...updateCategoryDto,
@@ -53,7 +53,7 @@ export class CategoryService {
   async deleteCategory(id: number) {
     await this.getCategory(id);
     
-    return this.prisma.category.delete({
+    return this.prisma.categories.delete({
       where: { id }
     });
   }
