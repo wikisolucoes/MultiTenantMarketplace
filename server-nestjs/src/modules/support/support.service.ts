@@ -12,7 +12,7 @@ export class SupportService {
       where.status = status;
     }
 
-    return this.prisma.supportTickets.findMany({
+    return this.prisma.supportTicket.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -24,7 +24,7 @@ export class SupportService {
   }
 
   async getSupportTicket(id: number) {
-    const ticket = await this.prisma.supportTickets.findUnique({
+    const ticket = await this.prisma.supportTicket.findUnique({
       where: { id },
       include: {
         messages: {
@@ -41,7 +41,7 @@ export class SupportService {
   }
 
   async createSupportTicket(createTicketDto: CreateSupportTicketDto) {
-    return this.prisma.supportTickets.create({
+    return this.prisma.supportTicket.create({
       data: {
         ...createTicketDto,
         status: TicketStatus.OPEN
@@ -52,7 +52,7 @@ export class SupportService {
   async updateSupportTicket(id: number, updateTicketDto: UpdateSupportTicketDto) {
     await this.getSupportTicket(id);
     
-    return this.prisma.supportTickets.update({
+    return this.prisma.supportTicket.update({
       where: { id },
       data: {
         ...updateTicketDto,
@@ -62,13 +62,13 @@ export class SupportService {
   }
 
   async addTicketMessage(createMessageDto: CreateTicketMessageDto) {
-    return this.prisma.supportTicketMessages.create({
+    return this.prisma.supportTicketMessage.create({
       data: createMessageDto
     });
   }
 
   async getTicketMessages(ticketId: number) {
-    return this.prisma.supportTicketMessages.findMany({
+    return this.prisma.supportTicketMessage.findMany({
       where: { ticketId },
       orderBy: { createdAt: 'asc' }
     });

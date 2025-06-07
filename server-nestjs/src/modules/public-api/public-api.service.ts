@@ -162,15 +162,15 @@ export class PublicApiService {
     let newQuantity = stockData.quantity;
     
     if (stockData.operation === 'add') {
-      newQuantity = product.stockQuantity + stockData.quantity;
+      newQuantity = product.stock + stockData.quantity;
     } else if (stockData.operation === 'subtract') {
-      newQuantity = product.stockQuantity - stockData.quantity;
+      newQuantity = product.stock - stockData.quantity;
     }
 
     return this.prisma.product.update({
       where: { id },
       data: {
-        stockQuantity: Math.max(0, newQuantity),
+        stock: Math.max(0, newQuantity),
         updatedAt: new Date()
       }
     });
@@ -296,7 +296,7 @@ export class PublicApiService {
   async getCategories(apiKey: string) {
     const credential = await this.checkPermission(apiKey, 'products:read');
     
-    return this.prisma.category.findMany({
+    return this.prisma.categories.findMany({
       where: { tenantId: credential.tenantId, isActive: true },
       orderBy: { name: 'asc' }
     });
@@ -305,7 +305,7 @@ export class PublicApiService {
   async getBrands(apiKey: string) {
     const credential = await this.checkPermission(apiKey, 'products:read');
     
-    return this.prisma.brand.findMany({
+    return this.prisma.brands.findMany({
       where: { tenantId: credential.tenantId, isActive: true },
       orderBy: { name: 'asc' }
     });
