@@ -14,6 +14,7 @@ import { SecurityModule } from './modules/security/security.module';
 import { PublicApiModule } from './modules/public-api/public-api.module';
 import { CelcoinModule } from './modules/celcoin/celcoin.module';
 import { NfeModule } from './modules/nfe/nfe.module';
+import { CheckoutModule } from './modules/checkout/checkout.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { NfeModule } from './modules/nfe/nfe.module';
     PublicApiModule,
     CelcoinModule,
     NfeModule,
+    CheckoutModule,
   ],
 })
 export class AppModule {}

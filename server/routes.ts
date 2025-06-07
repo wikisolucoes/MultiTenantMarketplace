@@ -142,6 +142,348 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // E-COMMERCE CHECKOUT ROUTES WITH CELCOIN INTEGRATION
+
+  // Create checkout and order
+  app.post("/api/checkout/create", async (req, res) => {
+    try {
+      const { items, customerData, paymentMethod, shippingCost = 0, discount = 0, notes } = req.body;
+      const tenantId = req.body.tenantId || 1;
+
+      // Validate products and calculate totals
+      const productIds = items.map(item => item.productId);
+      const dbProducts = await db.select().from(products).where(eq(products.tenantId, tenantId));
+      const availableProducts = dbProducts.filter(p => productIds.includes(p.id));
+
+      if (availableProducts.length !== productIds.length) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Alguns produtos não estão disponíveis' 
+        });
+      }
+
+      // Calculate totals
+      let subtotal = 0;
+      const orderItems = [];
+
+      for (const item of items) {
+        const product = availableProducts.find(p => p.id === item.productId);
+        if (!product) {
+          return res.status(400).json({ 
+            success: false, 
+            message: `Produto ${item.productId} não encontrado` 
+          });
+        }
+
+        if (product.stock < item.quantity) {
+          return res.status(400).json({ 
+            success: false, 
+            message: `Estoque insuficiente para ${product.name}` 
+          });
+        }
+
+        const itemTotal = item.quantity * parseFloat(product.price);
+        subtotal += itemTotal;
+
+        orderItems.push({
+          productId: item.productId,
+          name: product.name,
+          quantity: item.quantity,
+          unitPrice: parseFloat(product.price),
+          totalPrice: itemTotal
+        });
+      }
+
+      const total = subtotal + shippingCost - discount;
+      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+      // Create order
+      const [newOrder] = await db.insert(orders).values({
+        tenantId,
+        customerName: customerData.name,
+        customerEmail: customerData.email,
+        customerDocument: customerData.cpf,
+        customerPhone: customerData.phone,
+        total: total.toString(),
+        status: 'pending',
+        paymentMethod,
+        paymentStatus: 'pending',
+        shippingAddress: JSON.stringify(customerData.address),
+        items: JSON.stringify(orderItems),
+        notes,
+        customerAddress: customerData.address?.street,
+        customerCity: customerData.address?.city,
+        customerState: customerData.address?.state,
+        customerZipCode: customerData.address?.postalCode,
+        taxTotal: '0.00'
+      }).returning();
+
+      // Reserve stock
+      for (const item of items) {
+        await db.update(products)
+          .set({ stock: db.sql`${products.stock} - ${item.quantity}` })
+          .where(eq(products.id, item.productId));
+      }
+
+      console.log(`Order created: ${orderNumber} for tenant ${tenantId}`);
+
+      res.json({
+        success: true,
+        orderId: newOrder.id,
+        orderNumber,
+        total,
+        subtotal,
+        shippingCost,
+        discount,
+        paymentMethod,
+        status: 'pending',
+        items: orderItems
+      });
+
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Erro interno do servidor' 
+      });
+    }
+  });
+
+  // Process payment with Celcoin
+  app.post("/api/checkout/payment/process", async (req, res) => {
+    try {
+      const { orderId, paymentMethod } = req.body;
+
+      // Get order details
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+
+      if (!order) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Pedido não encontrado' 
+        });
+      }
+
+      if (order.paymentStatus !== 'pending') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Pagamento já foi processado' 
+        });
+      }
+
+      const correlationId = `PAY_${orderId}_${Date.now()}`;
+      let paymentResult;
+
+      // Simulate Celcoin payment processing
+      if (paymentMethod === 'pix') {
+        paymentResult = {
+          transactionId: `PIX_${Date.now()}`,
+          pixKey: `00020126580014BR.GOV.BCB.PIX0136${correlationId}5204000053039865802BR5925E-commerce Demo6009SAO PAULO`,
+          qrCode: `00020126580014BR.GOV.BCB.PIX0136${correlationId}5204000053039865802BR5925E-commerce Demo6009SAO PAULO`,
+          expirationDate: new Date(Date.now() + 30 * 60000).toISOString(),
+          status: 'pending',
+          paymentMethod: 'pix'
+        };
+      } else if (paymentMethod === 'boleto') {
+        paymentResult = {
+          transactionId: `BOL_${Date.now()}`,
+          digitableLine: '34191.79001 01043.510047 91020.150008 1 84560000001000',
+          barCode: '34191845600000010001790010434510479102015000',
+          pdfUrl: `https://api.celcoin.com/boleto/${correlationId}.pdf`,
+          expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'pending',
+          paymentMethod: 'boleto'
+        };
+      }
+
+      // Update order with payment info
+      await db.update(orders)
+        .set({ 
+          celcoinTransactionId: paymentResult.transactionId,
+          paymentStatus: 'processing'
+        })
+        .where(eq(orders.id, orderId));
+
+      console.log(`Payment processed for order ${orderId}: ${paymentResult.transactionId}`);
+
+      res.json({
+        success: true,
+        ...paymentResult
+      });
+
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Erro ao processar pagamento' 
+      });
+    }
+  });
+
+  // Payment callback webhook
+  app.post("/api/checkout/payment/callback", async (req, res) => {
+    try {
+      const { transactionId, status } = req.body;
+
+      // Find order by transaction ID
+      const [order] = await db.select().from(orders)
+        .where(eq(orders.celcoinTransactionId, transactionId));
+
+      if (!order) {
+        console.warn(`Order not found for transaction ${transactionId}`);
+        return res.json({ success: false, message: 'Order not found' });
+      }
+
+      // Update order status based on payment status
+      let newPaymentStatus = 'pending';
+      let newOrderStatus = order.status;
+
+      switch (status.toLowerCase()) {
+        case 'paid':
+        case 'approved':
+        case 'confirmed':
+          newPaymentStatus = 'succeeded';
+          newOrderStatus = 'confirmed';
+          break;
+        case 'cancelled':
+        case 'failed':
+          newPaymentStatus = 'failed';
+          newOrderStatus = 'cancelled';
+          break;
+        case 'pending':
+        case 'processing':
+          newPaymentStatus = 'processing';
+          break;
+      }
+
+      await db.update(orders)
+        .set({
+          paymentStatus: newPaymentStatus,
+          status: newOrderStatus
+        })
+        .where(eq(orders.id, order.id));
+
+      // Restore stock if payment failed
+      if (newPaymentStatus === 'failed') {
+        const orderItems = JSON.parse(order.items || '[]');
+        for (const item of orderItems) {
+          await db.update(products)
+            .set({ stock: db.sql`${products.stock} + ${item.quantity}` })
+            .where(eq(products.id, item.productId));
+        }
+        console.log(`Payment failed for order ${order.id}, stock restored`);
+      } else if (newPaymentStatus === 'succeeded') {
+        console.log(`Payment confirmed for order ${order.id}`);
+      }
+
+      res.json({ success: true, orderId: order.id, status: newPaymentStatus });
+
+    } catch (error) {
+      console.error('Error handling payment callback:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
+  // Get order details
+  app.get("/api/checkout/order/:orderId", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const tenantId = req.query.tenantId || 1;
+
+      const [order] = await db.select().from(orders)
+        .where(eq(orders.id, parseInt(orderId)));
+
+      if (!order) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Pedido não encontrado' 
+        });
+      }
+
+      res.json({
+        success: true,
+        order: {
+          ...order,
+          items: JSON.parse(order.items || '[]'),
+          shippingAddress: JSON.parse(order.shippingAddress || '{}')
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting order:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Erro interno do servidor' 
+      });
+    }
+  });
+
+  // Get order status
+  app.get("/api/checkout/order/:orderId/status", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+
+      const [order] = await db.select({
+        id: orders.id,
+        status: orders.status,
+        paymentStatus: orders.paymentStatus,
+        celcoinTransactionId: orders.celcoinTransactionId,
+        total: orders.total
+      }).from(orders).where(eq(orders.id, parseInt(orderId)));
+
+      if (!order) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Pedido não encontrado' 
+        });
+      }
+
+      res.json({
+        success: true,
+        ...order
+      });
+
+    } catch (error) {
+      console.error('Error getting order status:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Erro interno do servidor' 
+      });
+    }
+  });
+
+  // Simulate payment approval (for testing)
+  app.post("/api/checkout/payment/simulate-approval", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+      
+      if (!order) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+
+      // Simulate webhook callback
+      const callbackData = {
+        transactionId: order.celcoinTransactionId,
+        status: 'approved'
+      };
+
+      // Call our own webhook endpoint
+      await fetch(`http://localhost:5000/api/checkout/payment/callback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(callbackData)
+      });
+
+      res.json({ success: true, message: 'Payment approved successfully' });
+
+    } catch (error) {
+      console.error('Error simulating payment approval:', error);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
