@@ -325,6 +325,35 @@ model ApiCredential {
   @@map("api_credentials")
 }
 
+model Nfe {
+  id                      Int       @id @default(autoincrement())
+  tenantId                Int       @map("tenant_id")
+  orderId                 Int?      @map("order_id")
+  chaveAcesso             String    @unique @map("chave_acesso") @db.VarChar(44)
+  numeroNfe               String    @map("numero_nfe") @db.VarChar(20)
+  serie                   String    @default("001") @db.VarChar(3)
+  dataEmissao             DateTime  @map("data_emissao")
+  status                  String    @db.VarChar(20) // autorizada, rejeitada, cancelada, pendente
+  protocoloAutorizacao    String?   @map("protocolo_autorizacao") @db.VarChar(50)
+  protocoloCancelamento   String?   @map("protocolo_cancelamento") @db.VarChar(50)
+  xmlAssinado             String?   @map("xml_assinado") @db.Text
+  motivoRejeicao          String?   @map("motivo_rejeicao") @db.Text
+  motivoCancelamento      String?   @map("motivo_cancelamento") @db.Text
+  dataCancelamento        DateTime? @map("data_cancelamento")
+  destinatarioNome        String?   @map("destinatario_nome") @db.VarChar(255)
+  destinatarioDocumento   String?   @map("destinatario_documento") @db.VarChar(20)
+  valorTotal              Decimal?  @map("valor_total") @db.Decimal(10, 2)
+  observacoes             String?   @db.Text
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant                  Tenant    @relation(fields: [tenantId], references: [id])
+  order                   Order?    @relation(fields: [orderId], references: [id])
+  
+  @@map("nfes")
+}
+
 // Session storage for authentication
 model Session {
   sid    String   @id @db.VarChar(255)
