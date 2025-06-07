@@ -16,14 +16,14 @@ export class CustomerService {
       ];
     }
 
-    return this.prisma.customers.findMany({
+    return this.prisma.customer.findMany({
       where,
       orderBy: { createdAt: 'desc' }
     });
   }
 
   async getCustomer(id: number) {
-    const customer = await this.prisma.customers.findUnique({
+    const customer = await this.prisma.customer.findUnique({
       where: { id }
     });
 
@@ -35,7 +35,7 @@ export class CustomerService {
   }
 
   async createCustomer(createCustomerDto: CreateCustomerDto) {
-    return this.prisma.customers.create({
+    return this.prisma.customer.create({
       data: {
         ...createCustomerDto,
         isActive: true
@@ -46,7 +46,7 @@ export class CustomerService {
   async updateCustomer(id: number, updateCustomerDto: UpdateCustomerDto) {
     const customer = await this.getCustomer(id);
     
-    return this.prisma.customers.update({
+    return this.prisma.customer.update({
       where: { id },
       data: {
         ...updateCustomerDto,
@@ -58,7 +58,7 @@ export class CustomerService {
   async deleteCustomer(id: number) {
     const customer = await this.getCustomer(id);
     
-    return this.prisma.customers.delete({
+    return this.prisma.customer.delete({
       where: { id }
     });
   }
