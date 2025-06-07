@@ -17,7 +17,7 @@ interface CelcoinTokenResponse {
   expires_in: number;
 }
 
-interface CelcoinPixPaymentResponse {
+export interface CelcoinPixPaymentResponse {
   transactionId: string;
   emvqrcps: string;
   pixCopiaECola: string;
@@ -25,7 +25,7 @@ interface CelcoinPixPaymentResponse {
   status: string;
 }
 
-interface CelcoinBoletoResponse {
+export interface CelcoinBoletoResponse {
   transactionId: string;
   digitableLine: string;
   barCode: string;
@@ -34,13 +34,13 @@ interface CelcoinBoletoResponse {
   status: string;
 }
 
-interface CelcoinAccountBalance {
+export interface CelcoinAccountBalance {
   available: number;
   blocked: number;
   total: number;
 }
 
-interface CelcoinTransaction {
+export interface CelcoinTransaction {
   id: string;
   correlationId: string;
   amount: number;

@@ -109,9 +109,10 @@ model Product {
   updatedAt             DateTime  @default(now()) @map("updated_at")
 
   // Relations
-  tenant                Tenant    @relation(fields: [tenantId], references: [id])
-  brand                 Brand?    @relation("ProductBrand", fields: [brandId], references: [id])
-  category              Category? @relation("ProductCategory", fields: [categoryId], references: [id])
+  tenant                Tenant      @relation(fields: [tenantId], references: [id])
+  brand                 Brand?      @relation("ProductBrand", fields: [brandId], references: [id])
+  category              Category?   @relation("ProductCategory", fields: [categoryId], references: [id])
+  orderItems            OrderItem[]
   
   @@map("products")
 }

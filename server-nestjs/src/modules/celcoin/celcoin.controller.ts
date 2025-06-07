@@ -1,5 +1,11 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
-import { CelcoinService } from './celcoin.service';
+import { 
+  CelcoinService, 
+  CelcoinPixPaymentResponse, 
+  CelcoinBoletoResponse, 
+  CelcoinAccountBalance, 
+  CelcoinTransaction 
+} from './celcoin.service';
 import { CreatePixPaymentDto } from './dto/create-pix-payment.dto';
 import { CreateBoletoDto } from './dto/create-boleto.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -11,27 +17,27 @@ export class CelcoinController {
   constructor(private readonly celcoinService: CelcoinService) {}
 
   @Post('pix/payment')
-  createPixPayment(@Body() createPixPaymentDto: CreatePixPaymentDto) {
+  createPixPayment(@Body() createPixPaymentDto: CreatePixPaymentDto): Promise<CelcoinPixPaymentResponse> {
     return this.celcoinService.createPixPayment(createPixPaymentDto);
   }
 
   @Get('pix/payment/:transactionId')
-  getPixPaymentStatus(@Param('transactionId') transactionId: string) {
+  getPixPaymentStatus(@Param('transactionId') transactionId: string): Promise<any> {
     return this.celcoinService.getPixPaymentStatus(transactionId);
   }
 
   @Post('boleto/payment')
-  createBoleto(@Body() createBoletoDto: CreateBoletoDto) {
+  createBoleto(@Body() createBoletoDto: CreateBoletoDto): Promise<CelcoinBoletoResponse> {
     return this.celcoinService.createBoleto(createBoletoDto);
   }
 
   @Get('boleto/payment/:transactionId')
-  getBoletoStatus(@Param('transactionId') transactionId: string) {
+  getBoletoStatus(@Param('transactionId') transactionId: string): Promise<any> {
     return this.celcoinService.getBoletoStatus(transactionId);
   }
 
   @Get('account/balance')
-  getAccountBalance() {
+  getAccountBalance(): Promise<CelcoinAccountBalance> {
     return this.celcoinService.getAccountBalance();
   }
 
@@ -39,7 +45,7 @@ export class CelcoinController {
   getAccountStatement(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string
-  ) {
+  ): Promise<CelcoinTransaction[]> {
     return this.celcoinService.getAccountStatement(startDate, endDate);
   }
 
