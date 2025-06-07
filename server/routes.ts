@@ -416,15 +416,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const orderItemsStr = order.items || '[]';
-      const shippingAddressStr = order.shippingAddress || '{}';
-      
       res.json({
         success: true,
         order: {
           ...order,
-          items: JSON.parse(orderItemsStr),
-          shippingAddress: JSON.parse(shippingAddressStr)
+          items: order.items || [],
+          shippingAddress: order.shippingAddress || {}
         }
       });
 
