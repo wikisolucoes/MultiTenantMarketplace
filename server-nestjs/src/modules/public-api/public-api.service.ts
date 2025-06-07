@@ -89,13 +89,13 @@ export class PublicApiService {
     const skip = (filters.page - 1) * filters.limit;
     
     const [products, total] = await Promise.all([
-      this.prisma.products.findMany({
+      this.prisma.product.findMany({
         where,
         skip,
         take: filters.limit,
         orderBy: { createdAt: 'desc' }
       }),
-      this.prisma.products.count({ where })
+      this.prisma.product.count({ where })
     ]);
 
     return {
@@ -126,7 +126,7 @@ export class PublicApiService {
   async createProduct(apiKey: string, productData: any) {
     const credential = await this.checkPermission(apiKey, 'products:write');
     
-    return this.prisma.products.create({
+    return this.prisma.product.create({
       data: {
         ...productData,
         tenantId: credential.tenantId
@@ -195,13 +195,13 @@ export class PublicApiService {
     const skip = (filters.page - 1) * filters.limit;
     
     const [orders, total] = await Promise.all([
-      this.prisma.orders.findMany({
+      this.prisma.order.findMany({
         where,
         skip,
         take: filters.limit,
         orderBy: { createdAt: 'desc' }
       }),
-      this.prisma.orders.count({ where })
+      this.prisma.order.count({ where })
     ]);
 
     return {
@@ -218,7 +218,7 @@ export class PublicApiService {
   async getOrder(apiKey: string, id: number) {
     const credential = await this.checkPermission(apiKey, 'orders:read');
     
-    const order = await this.prisma.orders.findFirst({
+    const order = await this.prisma.order.findFirst({
       where: { id, tenantId: credential.tenantId }
     });
 
@@ -234,7 +234,7 @@ export class PublicApiService {
     
     const order = await this.getOrder(apiKey, id);
     
-    return this.prisma.orders.update({
+    return this.prisma.order.update({
       where: { id },
       data: {
         status: statusData.status,
@@ -259,13 +259,13 @@ export class PublicApiService {
     const skip = (filters.page - 1) * filters.limit;
     
     const [customers, total] = await Promise.all([
-      this.prisma.customers.findMany({
+      this.prisma.customer.findMany({
         where,
         skip,
         take: filters.limit,
         orderBy: { createdAt: 'desc' }
       }),
-      this.prisma.customers.count({ where })
+      this.prisma.customer.count({ where })
     ]);
 
     return {
@@ -282,7 +282,7 @@ export class PublicApiService {
   async getCustomer(apiKey: string, id: number) {
     const credential = await this.checkPermission(apiKey, 'customers:read');
     
-    const customer = await this.prisma.customers.findFirst({
+    const customer = await this.prisma.customer.findFirst({
       where: { id, tenantId: credential.tenantId }
     });
 
@@ -296,7 +296,7 @@ export class PublicApiService {
   async getCategories(apiKey: string) {
     const credential = await this.checkPermission(apiKey, 'products:read');
     
-    return this.prisma.categories.findMany({
+    return this.prisma.category.findMany({
       where: { tenantId: credential.tenantId, isActive: true },
       orderBy: { name: 'asc' }
     });
@@ -305,7 +305,7 @@ export class PublicApiService {
   async getBrands(apiKey: string) {
     const credential = await this.checkPermission(apiKey, 'products:read');
     
-    return this.prisma.brands.findMany({
+    return this.prisma.brand.findMany({
       where: { tenantId: credential.tenantId, isActive: true },
       orderBy: { name: 'asc' }
     });
