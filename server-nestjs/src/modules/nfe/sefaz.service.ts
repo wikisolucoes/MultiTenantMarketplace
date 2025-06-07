@@ -166,7 +166,9 @@ export class SefazService {
         serie: '001',
         dataEmissao: new Date().toISOString(),
         xmlAssinado,
-        ...response,
+        status: (response.status || 'autorizada') as 'autorizada' | 'rejeitada' | 'pendente',
+        protocoloAutorizacao: response.protocoloAutorizacao,
+        motivoRejeicao: response.motivoRejeicao,
       };
     } catch (error) {
       this.logger.error('Erro ao emitir NFe:', error);

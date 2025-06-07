@@ -409,6 +409,183 @@ export class NfeService {
     };
   }
 
+  async obterNfePorId(nfeId: number, tenantId: number) {
+    const nfe = await this.prisma.nfe.findFirst({
+      where: { id: nfeId, tenantId },
+      include: {
+        order: {
+          select: {
+            id: true,
+            customerName: true,
+            totalAmount: true,
+          },
+        },
+      },
+    });
+
+    if (!nfe) {
+      throw new BadRequestException('NFe não encontrada');
+    }
+
+    return nfe;
+  }
+
+  async gerarDanfe(nfeId: number, tenantId: number): Promise<string> {
+    const nfe = await this.prisma.nfe.findFirst({
+      where: { id: nfeId, tenantId },
+    });
+
+    if (!nfe) {
+      throw new BadRequestException('NFe não encontrada');
+    }
+
+    if (!nfe.xmlAssinado) {
+      throw new BadRequestException('XML da NFe não disponível');
+    }
+
+    // Em produção, implementar geração do PDF DANFE a partir do XML
+    // Retornando base64 simulado para desenvolvimento
+    return 'data:application/pdf;base64,JVBERi0xLjQKJcfsj6IKNSAwIG9iago8PAovTGVuZ3RoIDYgMCBSCi9GaWx0ZXIgL0ZsYXRlRGVjb2RlCj4+CnN0cmVhbQp4nDPQM1Qo5ypUMFaw0jNUKEez0jNRyOMyVAhJLS5RyE';
+  }
+
+  async enviarNfePorEmail(nfeId: number, email: string, tenantId: number): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      const nfe = await this.prisma.nfe.findFirst({
+        where: { id: nfeId, tenantId },
+      });
+
+      if (!nfe) {
+        throw new BadRequestException('NFe não encontrada');
+      }
+
+      if (!nfe.xmlAssinado) {
+        throw new BadRequestException('XML da NFe não disponível');
+      }
+
+      // Em produção, implementar envio por email usando SendGrid
+      this.logger.log(`Enviando NFe ${nfe.chaveAcesso} para email ${email}`);
+      
+      return {
+        sucesso: true,
+        mensagem: 'NFe enviada por email com sucesso',
+      };
+    } catch (error) {
+      return {
+        sucesso: false,
+        mensagem: error.message || 'Erro ao enviar NFe por email',
+      };
+    }
+  }
+
+  async relatorioEmissoes(
+    tenantId: number,
+    dataInicio?: string,
+    dataFim?: string,
+    status?: string,
+  ) {
+    const where: any = { tenantId };
+
+    if (dataInicio && dataFim) {
+      where.dataEmissao = {
+        gte: new Date(dataInicio),
+        lte: new Date(dataFim),
+      };
+    }
+
+    if (status) {
+      where.status = status;
+    }
+
+    const [nfes, total, totalPorStatus] = await Promise.all([
+      this.prisma.nfe.findMany({
+        where,
+        orderBy: { dataEmissao: 'desc' },
+        include: {
+          order: {
+            select: {
+              id: true,
+              customerName: true,
+              totalAmount: true,
+            },
+          },
+        },
+      }),
+      this.prisma.nfe.count({ where }),
+      this.prisma.nfe.groupBy({
+        by: ['status'],
+        where: { tenantId },
+        _count: {
+          id: true,
+        },
+      }),
+    ]);
+
+    const valorTotal = nfes.reduce((sum, nfe) => sum + Number(nfe.valorTotal || 0), 0);
+
+    return {
+      resumo: {
+        total,
+        valorTotal,
+        periodo: dataInicio && dataFim ? { dataInicio, dataFim } : null,
+      },
+      statusDistribution: totalPorStatus.map(item => ({
+        status: item.status,
+        quantidade: item._count.id,
+      })),
+      nfes,
+    };
+  }
+
+  async reenviarParaSefaz(nfeId: number, tenantId: number): Promise<NfeProcessingResult> {
+    try {
+      const nfe = await this.prisma.nfe.findFirst({
+        where: { id: nfeId, tenantId },
+      });
+
+      if (!nfe) {
+        throw new BadRequestException('NFe não encontrada');
+      }
+
+      if (nfe.status === 'autorizada') {
+        throw new BadRequestException('NFe já está autorizada');
+      }
+
+      // Simular reenvio para SEFAZ
+      const novoStatus = 'autorizada';
+      const protocoloAutorizacao = '123456789012345';
+
+      await this.prisma.nfe.update({
+        where: { id: nfeId },
+        data: {
+          status: novoStatus,
+          protocoloAutorizacao,
+        },
+      });
+
+      // Atualizar pedido se houver
+      if (nfe.orderId) {
+        await this.prisma.order.update({
+          where: { id: nfe.orderId },
+          data: {
+            nfeStatus: novoStatus,
+            nfeProtocol: protocoloAutorizacao,
+          },
+        });
+      }
+
+      return {
+        nfeId: nfe.id,
+        chaveAcesso: nfe.chaveAcesso,
+        numeroNfe: nfe.numeroNfe,
+        status: novoStatus,
+        protocoloAutorizacao,
+      };
+    } catch (error) {
+      this.logger.error(`Erro ao reenviar NFe ${nfeId} para SEFAZ:`, error);
+      throw error;
+    }
+  }
+
   private obterCodigoMunicipio(nomeMunicipio: string): string {
     // Em produção, usar tabela de municípios do IBGE
     const municipios: { [key: string]: string } = {

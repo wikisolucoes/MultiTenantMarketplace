@@ -28,6 +28,7 @@ model Tenant {
   users            User[]
   products         Product[]
   orders           Order[]
+  nfes             Nfe[]
   bankAccounts     BankAccount[]
   celcoinAccounts  CelcoinAccount[]
   brands           Brand[]
@@ -152,6 +153,7 @@ model Order {
   // Relations
   tenant                Tenant      @relation(fields: [tenantId], references: [id])
   orderItems            OrderItem[]
+  nfes                  Nfe[]
   
   @@map("orders")
 }

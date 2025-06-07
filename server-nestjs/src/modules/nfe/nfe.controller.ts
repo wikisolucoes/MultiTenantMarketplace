@@ -91,10 +91,10 @@ export class NfeController {
 
   @Get()
   async listarNfes(
+    @GetUser() user: any,
     @Query('page') page = 1,
     @Query('limit') limit = 50,
     @Query('status') status?: string,
-    @GetUser() user: any,
   ) {
     try {
       const pageNumber = parseInt(page.toString(), 10) || 1;
@@ -192,10 +192,10 @@ export class NfeController {
 
   @Get('relatorio/emissoes')
   async relatorioEmissoes(
+    @GetUser() user: any,
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
     @Query('status') status?: string,
-    @GetUser() user: any,
   ) {
     try {
       return await this.nfeService.relatorioEmissoes(
