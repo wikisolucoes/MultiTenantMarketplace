@@ -1,63 +1,51 @@
-// Development server with integrated Vite and API backend
-import express from 'express';
-import { createServer as createViteServer } from 'vite';
+// Servidor de desenvolvimento que inicia backend e frontend separadamente
+import { spawn } from 'child_process';
 import path from 'path';
 
-const PORT = parseInt(process.env.PORT || '5000');
+const PORT_API = 3001;
+const PORT_CLIENT = 3000;
 
-async function createServer() {
-  const app = express();
+async function startServices() {
+  console.log('🚀 Iniciando WikiStore com arquitetura separada...');
+  
+  // Inicia o backend NestJS
+  console.log(`📡 Iniciando API Backend na porta ${PORT_API}...`);
+  const apiProcess = spawn('npm', ['run', 'start:dev'], {
+    cwd: path.resolve(process.cwd(), 'api'),
+    stdio: 'inherit',
+    shell: true,
+    env: { ...process.env, PORT: PORT_API.toString() }
+  });
 
-  // Create Vite server in middleware mode
-  const vite = await createViteServer({
-    server: { 
-      middlewareMode: true,
-      host: '0.0.0.0',
-      hmr: false
-    },
-    appType: 'spa',
-    root: path.resolve(process.cwd(), 'client'),
-    resolve: {
-      alias: {
-        "@": path.resolve(process.cwd(), 'client/src'),
-        "@shared": path.resolve(process.cwd(), 'shared'),
-        "@assets": path.resolve(process.cwd(), 'attached_assets'),
+  // Aguarda um pouco antes de iniciar o frontend
+  setTimeout(() => {
+    console.log(`🌐 Iniciando Frontend Client na porta ${PORT_CLIENT}...`);
+    const clientProcess = spawn('npm', ['run', 'dev'], {
+      cwd: path.resolve(process.cwd(), 'client'),
+      stdio: 'inherit',
+      shell: true,
+      env: { 
+        ...process.env, 
+        VITE_API_URL: `http://localhost:${PORT_API}`,
+        PORT: PORT_CLIENT.toString()
       }
-    },
-    define: {
-      global: 'globalThis',
-    },
-    esbuild: {
-      jsx: 'automatic'
-    }
+    });
+
+    clientProcess.on('error', (error) => {
+      console.error('Erro no frontend:', error);
+    });
+  }, 3000);
+
+  apiProcess.on('error', (error) => {
+    console.error('Erro no backend:', error);
   });
 
-  // JSON parsing for API routes
-  app.use(express.json());
-
-  // CORS headers
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') return res.sendStatus(200);
-    next();
-  });
-
-  // API Routes for testing connectivity
-  app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
-  app.get('/api/auth/me', (req, res) => res.json({ id: 1, email: 'admin@wikistore.com', role: 'admin', tenantId: 1 }));
-  app.get('/api/tenants', (req, res) => res.json([{ id: 1, name: 'WikiStore Demo', subdomain: 'demo', status: 'active' }]));
-  app.get('/api/products', (req, res) => res.json([{ id: 1, name: 'Produto Demo', price: 99.99, stock: 50, isActive: true }]));
-  app.get('/api/orders', (req, res) => res.json([{ id: 1, total: 199.99, status: 'pending', createdAt: new Date().toISOString() }]));
-
-  // Vite middleware serves React app
-  app.use(vite.middlewares);
-
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Frontend server running on port ${PORT}`);
-    console.log(`React app with Vite HMR and API backend ready`);
+  // Graceful shutdown
+  process.on('SIGINT', () => {
+    console.log('\n🛑 Encerrando serviços...');
+    apiProcess.kill();
+    process.exit(0);
   });
 }
 
-createServer().catch(console.error);
+startServices().catch(console.error);

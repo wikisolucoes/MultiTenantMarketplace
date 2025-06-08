@@ -46,9 +46,10 @@ export class SupportService {
         title: createTicketDto.subject,
         description: createTicketDto.description,
         priority: createTicketDto.priority,
-        userId: createTicketDto.userId,
         status: TicketStatus.OPEN,
-        tenantId: createTicketDto.tenantId
+        user: {
+          connect: { id: createTicketDto.userId }
+        }
       }
     });
   }

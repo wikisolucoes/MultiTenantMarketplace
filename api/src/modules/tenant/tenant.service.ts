@@ -153,15 +153,14 @@ export class TenantService {
     const code = this.generateGiftCardCode();
     return this.prisma.giftCard.create({
       data: {
-        tenantId,
+        tenant: { connect: { id: tenantId } },
         code,
-        initialValue: parseFloat(data.initialValue),
-        currentValue: parseFloat(data.initialValue),
+        value: parseFloat(data.initialValue),
         recipientEmail: data.recipientEmail,
         recipientName: data.recipientName,
         message: data.message,
         validUntil: data.validUntil ? new Date(data.validUntil) : null,
-        status: 'active',
+        isActive: true,
       },
     });
   }
@@ -177,13 +176,12 @@ export class TenantService {
     const affiliateCode = this.generateAffiliateCode(data.name);
     return this.prisma.affiliate.create({
       data: {
-        tenantId,
+        tenant: { connect: { id: tenantId } },
         name: data.name,
         email: data.email,
-        phone: data.phone,
-        affiliateCode,
+        code: affiliateCode,
         commissionRate: parseFloat(data.commissionRate),
-        status: 'active',
+        isActive: true,
       },
     });
   }
@@ -198,9 +196,8 @@ export class TenantService {
   async createShippingMethod(tenantId: number, data: any) {
     return this.prisma.shippingMethod.create({
       data: {
-        tenantId,
+        tenant: { connect: { id: tenantId } },
         name: data.name,
-        type: data.type,
         cost: data.cost ? parseFloat(data.cost) : null,
         freeThreshold: data.freeThreshold ? parseFloat(data.freeThreshold) : null,
         estimatedDays: data.estimatedDays ? parseInt(data.estimatedDays) : null,
