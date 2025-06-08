@@ -442,28 +442,6 @@ export const pluginSubscriptionHistory = pgTable("plugin_subscription_history", 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Plugin subscriptions
-export const pluginSubscriptions = pgTable("plugin_subscriptions", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
-  planId: integer("plan_id").references(() => pluginPlans.id),
-  status: varchar("status", { length: 20 }).default("active").notNull(),
-  startDate: timestamp("start_date").defaultNow().notNull(),
-  endDate: timestamp("end_date"),
-  renewalDate: timestamp("renewal_date"),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
-  billingCycle: varchar("billing_cycle", { length: 20 }),
-  autoRenew: boolean("auto_renew").default(true).notNull(),
-  trialEndsAt: timestamp("trial_ends_at"),
-  cancelledAt: timestamp("cancelled_at"),
-  cancelReason: text("cancel_reason"),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
 // Plugin usage
 export const pluginUsage = pgTable("plugin_usage", {
   id: serial("id").primaryKey(),
@@ -475,22 +453,6 @@ export const pluginUsage = pgTable("plugin_usage", {
   unit: varchar("unit", { length: 20 }).default("count").notNull(),
   metadata: jsonb("metadata"),
   recordedAt: timestamp("recorded_at").defaultNow().notNull(),
-});
-
-// Payment gateway configurations
-export const paymentGatewayConfigs = pgTable("payment_gateway_configs", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
-  gatewayType: varchar("gateway_type", { length: 50 }).notNull(), // mercadopago, pagseguro, cielo
-  isActive: boolean("is_active").default(true).notNull(),
-  isSandbox: boolean("is_sandbox").default(true).notNull(),
-  configuration: jsonb("configuration").notNull(), // encrypted gateway credentials
-  supportedMethods: jsonb("supported_methods").notNull(), // pix, credit_card, debit_card, boleto
-  fees: jsonb("fees"), // gateway fees configuration
-  priority: integer("priority").default(1).notNull(), // processing priority
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Payment gateway transactions
@@ -839,6 +801,42 @@ export const supportTickets = pgTable("support_tickets", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Plugin subscriptions for payment gateways
+export const pluginSubscriptions = pgTable("plugin_subscriptions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  pluginName: varchar("plugin_name", { length: 50 }).notNull(), // mercadopago, pagseguro, cielo
+  status: varchar("status", { length: 20 }).default("active").notNull(), // active, cancelled, expired
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  billingCycle: varchar("billing_cycle", { length: 20 }).default("monthly").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  autoRenew: boolean("auto_renew").default(true).notNull(),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  paymentTransactionId: varchar("payment_transaction_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Payment gateway configurations
+export const paymentGatewayConfigs = pgTable("payment_gateway_configs", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  gatewayType: varchar("gateway_type", { length: 20 }).notNull(), // mercadopago, pagseguro, cielo
+  environment: varchar("environment", { length: 20 }).default("sandbox").notNull(), // sandbox, production
+  credentials: jsonb("credentials").notNull(), // encrypted credentials
+  supportedMethods: jsonb("supported_methods").notNull(), // ['pix', 'credit_card', 'boleto']
+  fees: jsonb("fees"), // fee configuration per payment method
+  priority: integer("priority").default(1).notNull(), // order of preference
+  isActive: boolean("is_active").default(false).notNull(),
+  lastTestedAt: timestamp("last_tested_at"),
+  testResults: jsonb("test_results"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Tenant plugin subscriptions
 export const tenantPluginSubscriptions = pgTable("tenant_plugin_subscriptions", {
   id: serial("id").primaryKey(),
@@ -881,21 +879,19 @@ export const tenantSubscriptions = pgTable("tenant_subscriptions", {
 
 // Transactions
 export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
+  id: varchar("id", { length: 255 }).primaryKey(), // Using gateway transaction ID as primary key
   tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
-  orderId: integer("order_id").references(() => orders.id),
-  transactionId: varchar("transaction_id", { length: 255 }).unique().notNull(),
-  type: varchar("type", { length: 50 }).notNull(),
-  method: varchar("method", { length: 50 }).notNull(),
-  status: varchar("status", { length: 20 }).notNull(),
+  orderId: varchar("order_id", { length: 255 }).notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
-  feeAmount: decimal("fee_amount", { precision: 15, scale: 2 }),
-  netAmount: decimal("net_amount", { precision: 15, scale: 2 }),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(), // pix, credit_card, boleto, etc
+  status: varchar("status", { length: 20 }).notNull(), // pending, processing, completed, failed, cancelled
+  gatewayType: varchar("gateway_type", { length: 20 }).notNull(), // celcoin, mercadopago, pagseguro, cielo
   gatewayTransactionId: varchar("gateway_transaction_id", { length: 255 }),
-  gatewayResponse: jsonb("gateway_response"),
-  description: text("description"),
-  metadata: jsonb("metadata"),
+  paymentData: jsonb("payment_data"), // QR codes, boleto URLs, etc
+  fees: decimal("fees", { precision: 15, scale: 2 }),
+  netAmount: decimal("net_amount", { precision: 15, scale: 2 }),
+  expiresAt: timestamp("expires_at"),
   processedAt: timestamp("processed_at"),
   settledAt: timestamp("settled_at"),
   failureReason: text("failure_reason"),
