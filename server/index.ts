@@ -12,7 +12,14 @@ async function createServer() {
   const vite = await createViteServer({
     server: { middlewareMode: true },
     appType: 'spa',
-    root: path.resolve(process.cwd(), 'client')
+    root: path.resolve(process.cwd(), 'client'),
+    resolve: {
+      alias: {
+        "@": path.resolve(process.cwd(), 'client/src'),
+        "@shared": path.resolve(process.cwd(), 'shared'),
+        "@assets": path.resolve(process.cwd(), 'attached_assets'),
+      }
+    }
   });
 
   // JSON parsing for API routes
