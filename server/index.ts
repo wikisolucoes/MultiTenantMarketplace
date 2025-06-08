@@ -1,28 +1,26 @@
-import { spawn } from 'child_process';
-import { join } from 'path';
+// Simple proxy to NestJS backend for development
+import express from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
-// Start NestJS backend
-const nestjsProcess = spawn('npm', ['run', 'start:dev'], {
-  cwd: join(process.cwd(), 'server-nestjs'),
-  stdio: 'inherit',
-  shell: true
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Proxy API calls to NestJS backend
+app.use('/api', createProxyMiddleware({
+  target: 'http://localhost:5001',
+  changeOrigin: true,
+  logLevel: 'debug'
+}));
+
+// Serve static files from client
+app.use(express.static('dist/public'));
+
+// Fallback to index.html for SPA routing
+app.get('*', (req, res) => {
+  res.sendFile('index.html', { root: 'dist/public' });
 });
 
-nestjsProcess.on('error', (err) => {
-  console.error('Failed to start NestJS server:', err);
-  process.exit(1);
-});
-
-nestjsProcess.on('close', (code) => {
-  console.log(`NestJS server exited with code ${code}`);
-  process.exit(code || 0);
-});
-
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  nestjsProcess.kill('SIGINT');
-});
-
-process.on('SIGTERM', () => {
-  nestjsProcess.kill('SIGTERM');
+app.listen(PORT, () => {
+  console.log(`Frontend server running on port ${PORT}`);
+  console.log(`Proxying API calls to NestJS backend on port 5001`);
 });
