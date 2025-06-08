@@ -4054,23 +4054,40 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {(systemMetrics as SystemMetric[] || []).map((metric: SystemMetric, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <div>
-                          <p className="font-medium">{metric.name}</p>
-                          <p className="text-2xl font-bold">{metric.value}</p>
+                    {systemMetrics && (
+                      <>
+                        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div>
+                            <p className="font-medium">CPU Usage</p>
+                            <p className="text-2xl font-bold">{systemMetrics.cpuUsage}%</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-blue-600">
+                            <Activity className="w-4 h-4" />
+                            <span className="text-sm">Normal</span>
+                          </div>
                         </div>
-                        <div className={`flex items-center gap-1 ${
-                          metric.status === 'up' ? 'text-green-600' :
-                          metric.status === 'down' ? 'text-red-600' : 'text-yellow-600'
-                        }`}>
-                          {metric.status === 'up' && <TrendingUp className="w-4 h-4" />}
-                          {metric.status === 'down' && <AlertTriangle className="w-4 h-4" />}
-                          {metric.status === 'stable' && <Activity className="w-4 h-4" />}
-                          <span className="text-sm">{metric.change}</span>
+                        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div>
+                            <p className="font-medium">Memory Usage</p>
+                            <p className="text-2xl font-bold">{systemMetrics.memoryUsage}%</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-green-600">
+                            <TrendingUp className="w-4 h-4" />
+                            <span className="text-sm">Good</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div>
+                            <p className="font-medium">Disk Usage</p>
+                            <p className="text-2xl font-bold">{systemMetrics.diskUsage}%</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-blue-600">
+                            <Activity className="w-4 h-4" />
+                            <span className="text-sm">Normal</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
