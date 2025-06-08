@@ -5,10 +5,8 @@
 This project is now structured as separate backend and frontend applications, ready for independent deployment:
 
 ```
-├── api/          # NestJS Backend API (Port 3001)
+├── server/       # NestJS Backend API (Port 3001)
 ├── client/       # React Frontend (Port 3000)
-├── shared/       # Shared types and schemas
-└── server/       # Development orchestrator
 ```
 
 ## Quick Start
