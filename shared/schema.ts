@@ -477,6 +477,63 @@ export const pluginUsage = pgTable("plugin_usage", {
   recordedAt: timestamp("recorded_at").defaultNow().notNull(),
 });
 
+// Payment gateway configurations
+export const paymentGatewayConfigs = pgTable("payment_gateway_configs", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  pluginId: integer("plugin_id").references(() => plugins.id).notNull(),
+  gatewayType: varchar("gateway_type", { length: 50 }).notNull(), // mercadopago, pagseguro, cielo
+  isActive: boolean("is_active").default(true).notNull(),
+  isSandbox: boolean("is_sandbox").default(true).notNull(),
+  configuration: jsonb("configuration").notNull(), // encrypted gateway credentials
+  supportedMethods: jsonb("supported_methods").notNull(), // pix, credit_card, debit_card, boleto
+  fees: jsonb("fees"), // gateway fees configuration
+  priority: integer("priority").default(1).notNull(), // processing priority
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Payment gateway transactions
+export const paymentGatewayTransactions = pgTable("payment_gateway_transactions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  orderId: integer("order_id").references(() => orders.id),
+  gatewayConfigId: integer("gateway_config_id").references(() => paymentGatewayConfigs.id).notNull(),
+  gatewayType: varchar("gateway_type", { length: 50 }).notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(),
+  gatewayTransactionId: varchar("gateway_transaction_id", { length: 255 }),
+  externalTransactionId: varchar("external_transaction_id", { length: 255 }),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  status: varchar("status", { length: 50 }).notNull(),
+  gatewayStatus: varchar("gateway_status", { length: 100 }),
+  paymentData: jsonb("payment_data"), // gateway-specific payment data
+  webhookData: jsonb("webhook_data"), // webhook responses
+  fees: decimal("fees", { precision: 10, scale: 2 }),
+  netAmount: decimal("net_amount", { precision: 10, scale: 2 }),
+  failureReason: text("failure_reason"),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Payment gateway webhooks log
+export const paymentGatewayWebhooks = pgTable("payment_gateway_webhooks", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id),
+  gatewayType: varchar("gateway_type", { length: 50 }).notNull(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  transactionId: integer("transaction_id").references(() => paymentGatewayTransactions.id),
+  payload: jsonb("payload").notNull(),
+  headers: jsonb("headers"),
+  signature: text("signature"),
+  isVerified: boolean("is_verified").default(false),
+  isProcessed: boolean("is_processed").default(false),
+  processingError: text("processing_error"),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  processedAt: timestamp("processed_at"),
+});
+
 // Plugins
 export const plugins = pgTable("plugins", {
   id: serial("id").primaryKey(),
