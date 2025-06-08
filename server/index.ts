@@ -12,11 +12,8 @@ async function createServer() {
   const vite = await createViteServer({
     server: { 
       middlewareMode: true,
-      host: "0.0.0.0",
-      hmr: {
-        port: 24678,
-        clientPort: 443
-      }
+      host: '0.0.0.0',
+      hmr: false
     },
     appType: 'spa',
     root: path.resolve(process.cwd(), 'client'),
@@ -26,6 +23,12 @@ async function createServer() {
         "@shared": path.resolve(process.cwd(), 'shared'),
         "@assets": path.resolve(process.cwd(), 'attached_assets'),
       }
+    },
+    define: {
+      global: 'globalThis',
+    },
+    esbuild: {
+      jsx: 'automatic'
     }
   });
 
