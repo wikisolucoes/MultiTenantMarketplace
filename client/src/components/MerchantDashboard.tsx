@@ -1117,6 +1117,11 @@ export default function MerchantDashboard() {
             )}
 
             {/* Support Ticket Section */}
+            {/* Coupons Section */}
+            {activeSection === "coupons" && (
+              <CouponManagement />
+            )}
+
             {activeSection === "support" && (
               <SupportTicketSystem />
             )}

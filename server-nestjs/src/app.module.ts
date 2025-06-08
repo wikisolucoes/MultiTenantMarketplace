@@ -16,6 +16,7 @@ import { CelcoinModule } from './modules/celcoin/celcoin.module';
 import { NfeModule } from './modules/nfe/nfe.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { DiscountCouponsModule } from './modules/discount-coupons/discount-coupons.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { AdminModule } from './modules/admin/admin.module';
     NfeModule,
     CheckoutModule,
     AdminModule,
+    DiscountCouponsModule,
   ],
 })
 export class AppModule {}
