@@ -877,6 +877,45 @@ export const tenantSubscriptions = pgTable("tenant_subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Discount coupons
+export const discountCoupons = pgTable("discount_coupons", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  type: varchar("type", { length: 20 }).notNull(), // percentage, fixed_amount
+  value: decimal("value", { precision: 10, scale: 2 }).notNull(),
+  minimumOrderValue: decimal("minimum_order_value", { precision: 10, scale: 2 }),
+  maximumDiscountAmount: decimal("maximum_discount_amount", { precision: 10, scale: 2 }),
+  usageLimit: integer("usage_limit"), // null for unlimited
+  usageLimitPerCustomer: integer("usage_limit_per_customer"), // null for unlimited
+  currentUsageCount: integer("current_usage_count").default(0).notNull(),
+  applicableProducts: jsonb("applicable_products"), // null for all products, array of product IDs for specific products
+  applicableCategories: jsonb("applicable_categories"), // null for all categories, array of category IDs
+  excludedProducts: jsonb("excluded_products"), // array of product IDs to exclude
+  excludedCategories: jsonb("excluded_categories"), // array of category IDs to exclude
+  isActive: boolean("is_active").default(true).notNull(),
+  isFirstOrderOnly: boolean("is_first_order_only").default(false).notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  createdBy: integer("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Coupon usage tracking
+export const couponUsages = pgTable("coupon_usage", {
+  id: serial("id").primaryKey(),
+  couponId: integer("coupon_id").references(() => discountCoupons.id).notNull(),
+  orderId: integer("order_id").references(() => orders.id).notNull(),
+  customerId: integer("customer_id").references(() => customers.id).notNull(),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).notNull(),
+  originalAmount: decimal("original_amount", { precision: 10, scale: 2 }).notNull(),
+  finalAmount: decimal("final_amount", { precision: 10, scale: 2 }).notNull(),
+  usedAt: timestamp("used_at").defaultNow().notNull(),
+});
+
 // Transactions
 export const transactions = pgTable("transactions", {
   id: varchar("id", { length: 255 }).primaryKey(), // Using gateway transaction ID as primary key
@@ -1033,6 +1072,10 @@ export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
 export type Customer = typeof customers.$inferSelect;
 export type InsertCustomer = typeof customers.$inferInsert;
+export type DiscountCoupon = typeof discountCoupons.$inferSelect;
+export type InsertDiscountCoupon = typeof discountCoupons.$inferInsert;
+export type CouponUsage = typeof couponUsages.$inferSelect;
+export type InsertCouponUsage = typeof couponUsages.$inferInsert;
 export type IdentityVerification = typeof identityVerifications.$inferSelect;
 export type InsertIdentityVerification = typeof identityVerifications.$inferInsert;
 export type IdentityVerificationHistory = typeof identityVerificationHistory.$inferSelect;
@@ -1044,6 +1087,8 @@ export const insertUserSchema = createInsertSchema(users);
 export const insertProductSchema = createInsertSchema(products);
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertCustomerSchema = createInsertSchema(customers);
+export const insertDiscountCouponSchema = createInsertSchema(discountCoupons);
+export const insertCouponUsageSchema = createInsertSchema(couponUsages);
 export const insertIdentityVerificationSchema = createInsertSchema(identityVerifications);
 export const insertIdentityVerificationHistorySchema = createInsertSchema(identityVerificationHistory);
 
