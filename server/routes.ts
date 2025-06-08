@@ -733,7 +733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const [totalRevenue, orderCount, customerCount] = await Promise.all([
         db.select({ 
-          total: sql`COALESCE(SUM(CAST(total_amount AS DECIMAL)), 0)` 
+          total: sql`COALESCE(SUM(CAST(total AS DECIMAL)), 0)` 
         }).from(orders).where(eq(orders.status, 'confirmed')),
         db.select({ count: sql`count(*)` }).from(orders),
         db.select({ count: sql`count(*)` }).from(customers)

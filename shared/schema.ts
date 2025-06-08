@@ -56,6 +56,11 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
   permissions: jsonb("permissions"),
   createdBy: integer("created_by"),
+  // Identity verification fields
+  identityVerificationStatus: varchar("identity_verification_status", { length: 20 }).default("pending").notNull(), // pending, verified, rejected, required
+  identityVerifiedAt: timestamp("identity_verified_at"),
+  canReceivePayments: boolean("can_receive_payments").default(false).notNull(),
+  canRequestWithdrawals: boolean("can_request_withdrawals").default(false).notNull(),
 });
 
 // API credentials for public API access
@@ -898,6 +903,72 @@ export const withdrawals = pgTable("withdrawals", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Identity verification table for merchants
+export const identityVerifications = pgTable("identity_verifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  tenantId: integer("tenant_id").references(() => tenants.id).notNull(),
+  
+  // Personal information
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  documentType: varchar("document_type", { length: 10 }).notNull(), // CPF, CNPJ
+  documentNumber: varchar("document_number", { length: 20 }).notNull(),
+  dateOfBirth: date("date_of_birth"),
+  nationality: varchar("nationality", { length: 100 }),
+  
+  // Address information
+  address: jsonb("address").notNull(), // street, number, complement, neighborhood, city, state, zipCode
+  
+  // Contact information  
+  phone: varchar("phone", { length: 20 }).notNull(),
+  alternativePhone: varchar("alternative_phone", { length: 20 }),
+  
+  // Business information (for CNPJ)
+  businessName: varchar("business_name", { length: 255 }),
+  businessType: varchar("business_type", { length: 100 }),
+  businessActivity: text("business_activity"),
+  monthlyRevenue: decimal("monthly_revenue", { precision: 15, scale: 2 }),
+  
+  // Document uploads
+  documentFrontImage: text("document_front_image"), // URL to uploaded document front
+  documentBackImage: text("document_back_image"), // URL to uploaded document back  
+  proofOfAddressImage: text("proof_of_address_image"), // URL to proof of address
+  selfieWithDocumentImage: text("selfie_with_document_image"), // URL to selfie with document
+  businessDocumentsImages: jsonb("business_documents_images"), // Array of business document URLs
+  
+  // Verification status and process
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, under_review, approved, rejected, requires_additional_info
+  reviewedBy: integer("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  rejectionReason: text("rejection_reason"),
+  additionalInfoRequested: text("additional_info_requested"),
+  
+  // Verification scores and flags
+  documentVerificationScore: integer("document_verification_score"), // 0-100
+  addressVerificationScore: integer("address_verification_score"), // 0-100
+  overallRiskScore: integer("overall_risk_score"), // 0-100, lower is better
+  isHighRisk: boolean("is_high_risk").default(false).notNull(),
+  
+  // Timestamps
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"), // When verification expires and needs renewal
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Identity verification history for audit trail
+export const identityVerificationHistory = pgTable("identity_verification_history", {
+  id: serial("id").primaryKey(),
+  verificationId: integer("verification_id").references(() => identityVerifications.id).notNull(),
+  previousStatus: varchar("previous_status", { length: 20 }).notNull(),
+  newStatus: varchar("new_status", { length: 20 }).notNull(),
+  changedBy: integer("changed_by").references(() => users.id).notNull(),
+  changeReason: text("change_reason"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Type exports
