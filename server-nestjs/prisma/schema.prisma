@@ -31,6 +31,7 @@ model Tenant {
   celcoinTransactionLogs    CelcoinTransactionLog[]
   customerOrders            CustomerOrder[]
   customers                 Customer[]
+  discountCoupons           DiscountCoupon[]
   ledgerEntries             LedgerEntry[]
   nfeConfigurations         NfeConfiguration[]
   pluginSubscriptions       PluginSubscription[]
@@ -69,6 +70,7 @@ model User {
   supportTicketMessages     SupportTicketMessage[]
   withdrawals               Withdrawal[]
   approvedWithdrawals       Withdrawal[]             @relation("ApprovedWithdrawals")
+  createdCoupons            DiscountCoupon[]
   
   @@map("users")
 }
@@ -108,6 +110,7 @@ model Order {
   nfes          Nfe[]
   ledgerEntries LedgerEntry[]
   transactions  Transaction[]
+  couponUsages  CouponUsage[]
 
   @@map("orders")
 }
@@ -369,11 +372,12 @@ model Customer {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  tenant    Tenant           @relation(fields: [tenantId], references: [id])
-  addresses CustomerAddress[]
-  orders    CustomerOrder[]
-  reviews   ProductReview[]
-  wishlist  Wishlist[]
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
+  addresses    CustomerAddress[]
+  orders       CustomerOrder[]
+  reviews      ProductReview[]
+  wishlist     Wishlist[]
+  couponUsages CouponUsage[]
 
   @@unique([tenantId, email])
   @@map("customers")
@@ -991,6 +995,58 @@ model UserProfile {
   user User @relation(fields: [userId], references: [id])
 
   @@map("user_profiles")
+}
+
+// Discount Coupons
+model DiscountCoupon {
+  id                     Int      @id @default(autoincrement())
+  tenantId               Int      @map("tenant_id")
+  code                   String   @db.VarChar(50)
+  name                   String   @db.VarChar(255)
+  description            String?
+  type                   String   @db.VarChar(20) // percentage, fixed_amount
+  value                  Decimal  @db.Decimal(10, 2)
+  minimumOrderValue      Decimal? @map("minimum_order_value") @db.Decimal(10, 2)
+  maximumDiscountAmount  Decimal? @map("maximum_discount_amount") @db.Decimal(10, 2)
+  usageLimit             Int?     @map("usage_limit")
+  usageLimitPerCustomer  Int?     @map("usage_limit_per_customer")
+  currentUsageCount      Int      @default(0) @map("current_usage_count")
+  applicableProducts     Json?    @map("applicable_products")
+  applicableCategories   Json?    @map("applicable_categories")
+  excludedProducts       Json?    @map("excluded_products")
+  excludedCategories     Json?    @map("excluded_categories")
+  isActive               Boolean  @default(true) @map("is_active")
+  isFirstOrderOnly       Boolean  @default(false) @map("is_first_order_only")
+  startDate              DateTime @map("start_date")
+  endDate                DateTime? @map("end_date")
+  createdBy              Int      @map("created_by")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  creator      User          @relation(fields: [createdBy], references: [id])
+  couponUsages CouponUsage[]
+
+  @@unique([tenantId, code])
+  @@map("discount_coupons")
+}
+
+// Coupon Usage Tracking
+model CouponUsage {
+  id             Int      @id @default(autoincrement())
+  couponId       Int      @map("coupon_id")
+  orderId        Int      @map("order_id")
+  customerId     Int      @map("customer_id")
+  discountAmount Decimal  @map("discount_amount") @db.Decimal(10, 2)
+  originalAmount Decimal  @map("original_amount") @db.Decimal(10, 2)
+  finalAmount    Decimal  @map("final_amount") @db.Decimal(10, 2)
+  usedAt         DateTime @default(now()) @map("used_at")
+
+  coupon   DiscountCoupon @relation(fields: [couponId], references: [id])
+  order    Order          @relation(fields: [orderId], references: [id])
+  customer Customer       @relation(fields: [customerId], references: [id])
+
+  @@map("coupon_usage")
 }
 
 // Wishlist
