@@ -52,10 +52,10 @@ async function bootstrap() {
     });
   });
 
-  const port = process.env.PORT || 5001;
+  const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
-  console.log(`🚀 NestJS Application running on port ${port}`);
-  console.log(`📚 API Documentation available at http://localhost:${port}/api/docs`);
+  console.log(`NestJS API running on port ${port}`);
+  console.log(`API Documentation available at http://localhost:${port}/api/docs`);
 }
 
 bootstrap();
