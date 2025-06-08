@@ -76,7 +76,8 @@ import {
   RefreshCw,
   Save,
   UserCheck,
-  BarChart3
+  BarChart3,
+  Shield
 } from "lucide-react";
 
 const withdrawalSchema = z.object({
@@ -161,6 +162,10 @@ export default function MerchantDashboard() {
 
   const { data: withdrawals, isLoading: withdrawalsLoading } = useQuery<Withdrawal[]>({
     queryKey: ["/api/tenant/withdrawals"],
+  });
+
+  const { data: paymentPermissions } = useQuery({
+    queryKey: ["/api/payment-permissions"],
   });
 
   // Mutations
@@ -493,6 +498,26 @@ export default function MerchantDashboard() {
               >
                 <Users className="mr-3 h-4 w-4" />
                 Usuários
+              </Button>
+              <Button
+                variant="ghost"
+                className={`w-full justify-start ${activeSection === "identity-verification" ? "bg-accent" : ""}`}
+                onClick={() => window.location.href = "/identity-verification"}
+              >
+                <Shield className={`mr-3 h-4 w-4 ${
+                  paymentPermissions?.identityVerificationStatus === 'verified' 
+                    ? 'text-green-600' 
+                    : paymentPermissions?.requiresVerification 
+                    ? 'text-red-500' 
+                    : 'text-yellow-500'
+                }`} />
+                <span className="flex-1 text-left">Verificação de Identidade</span>
+                {paymentPermissions?.identityVerificationStatus === 'verified' && (
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                )}
+                {paymentPermissions?.requiresVerification && (
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                )}
               </Button>
               <Button
                 variant="ghost"
