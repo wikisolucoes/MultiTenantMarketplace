@@ -1,92 +1,61 @@
-import { IsString, IsNumber, IsEmail, IsOptional, ValidateNested, IsArray, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, IsObject, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
 
-export class CustomerDto {
-  @IsEmail()
+export class PayerDto {
+  @ApiProperty({ description: 'Payer name' })
+  @IsString()
+  name: string;
+
+  @ApiProperty({ description: 'Payer email' })
+  @IsString()
   email: string;
 
-  @IsOptional()
+  @ApiProperty({ description: 'Payer document (CPF/CNPJ)' })
   @IsString()
-  name?: string;
+  document: string;
 
-  @IsOptional()
-  @IsString()
-  document?: string;
-
+  @ApiProperty({ description: 'Payer phone', required: false })
   @IsOptional()
   @IsString()
   phone?: string;
 }
 
-export class OrderItemDto {
-  @IsString()
-  id: string;
-
-  @IsString()
-  title: string;
-
-  @IsNumber()
-  quantity: number;
-
-  @IsNumber()
-  unitPrice: number;
-}
-
-export class OrderDto {
-  @IsString()
-  id: string;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => OrderItemDto)
-  items: OrderItemDto[];
-}
-
 export class CreatePaymentDto {
+  @ApiProperty({ description: 'Order ID' })
+  @IsString()
+  orderId: string;
+
+  @ApiProperty({ description: 'Payment amount' })
   @IsNumber()
   amount: number;
 
-  @IsString()
-  currency: string;
-
+  @ApiProperty({ description: 'Payment method', enum: ['pix', 'credit_card', 'debit_card', 'boleto'] })
   @IsEnum(['pix', 'credit_card', 'debit_card', 'boleto'])
   paymentMethod: string;
 
-  @ValidateNested()
-  @Type(() => CustomerDto)
-  customer: CustomerDto;
-
-  @ValidateNested()
-  @Type(() => OrderDto)
-  order: OrderDto;
-
-  @IsOptional()
-  metadata?: Record<string, any>;
-
-  @IsOptional()
-  @IsNumber()
-  installments?: number;
-
+  @ApiProperty({ description: 'Preferred gateway type', required: false })
   @IsOptional()
   @IsString()
-  cardToken?: string;
-}
+  gatewayType?: string;
 
-export class ConfigureGatewayDto {
-  @IsEnum(['mercadopago', 'pagseguro', 'cielo'])
-  gatewayType: string;
+  @ApiProperty({ description: 'Payer information' })
+  @ValidateNested()
+  @Type(() => PayerDto)
+  payer: PayerDto;
 
-  @IsEnum(['sandbox', 'production'])
-  environment: string;
-
-  credentials: Record<string, any>;
-
-  @IsArray()
-  supportedMethods: string[];
-
+  @ApiProperty({ description: 'Payment description', required: false })
   @IsOptional()
-  fees?: Record<string, number>;
+  @IsString()
+  description?: string;
 
+  @ApiProperty({ description: 'Payment expiration in minutes', required: false })
   @IsOptional()
-  priority?: number;
+  @IsNumber()
+  expirationMinutes?: number;
+
+  @ApiProperty({ description: 'Additional metadata', required: false })
+  @IsOptional()
+  @IsObject()
+  metadata?: any;
 }

@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../storage/prisma.service';
 import { PaymentGatewayFactory } from './services/payment-gateway.factory';
-import { CreatePaymentDto, ConfigureGatewayDto } from './dto/create-payment.dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { ConfigureGatewayDto } from './dto/configure-gateway.dto';
 import { PaymentResponse } from './interfaces/payment-gateway.interface';
 
 @Injectable()
@@ -270,6 +271,115 @@ export class PaymentGatewaysService {
       return refundResponse;
     } catch (error) {
       throw new BadRequestException(`Erro ao processar estorno: ${error.message}`);
+    }
+  }
+
+  async subscribeToPlugin(tenantId: number, pluginName: string) {
+    // Check if already subscribed
+    const existingSubscription = await this.prisma.pluginSubscription.findFirst({
+      where: {
+        tenantId,
+        pluginName,
+        status: 'active',
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (existingSubscription) {
+      throw new BadRequestException('Plugin já está ativo para este tenant');
+    }
+
+    // Get plugin pricing
+    const pluginPricing = {
+      'mercadopago': 29.90,
+      'pagseguro': 24.90,
+      'cielo': 34.90
+    };
+
+    const price = pluginPricing[pluginName];
+    if (!price) {
+      throw new BadRequestException('Plugin não encontrado');
+    }
+
+    // Create subscription
+    const subscription = await this.prisma.pluginSubscription.create({
+      data: {
+        tenantId,
+        pluginName,
+        price,
+        currency: 'BRL',
+        billingCycle: 'monthly',
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        autoRenew: true,
+        status: 'active',
+      },
+    });
+
+    return subscription;
+  }
+
+  async getTenantSubscriptions(tenantId: number) {
+    return this.prisma.pluginSubscription.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async cancelSubscription(tenantId: number, subscriptionId: number, reason?: string) {
+    const subscription = await this.prisma.pluginSubscription.findFirst({
+      where: {
+        id: subscriptionId,
+        tenantId,
+      },
+    });
+
+    if (!subscription) {
+      throw new NotFoundException('Assinatura não encontrada');
+    }
+
+    return this.prisma.pluginSubscription.update({
+      where: { id: subscriptionId },
+      data: {
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        cancelReason: reason,
+      },
+    });
+  }
+
+  async testGatewayConfiguration(tenantId: number, gatewayType: string) {
+    const config = await this.prisma.paymentGatewayConfig.findFirst({
+      where: {
+        tenantId,
+        gatewayType,
+        isActive: true,
+      },
+    });
+
+    if (!config) {
+      throw new NotFoundException('Configuração do gateway não encontrada');
+    }
+
+    try {
+      // Test with a minimal configuration check
+      const gateway = this.gatewayFactory.createGateway(config);
+      
+      // For now, just return success if gateway can be created
+      return { 
+        success: true, 
+        message: 'Gateway configurado corretamente',
+        gatewayType,
+        environment: config.environment 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: `Erro na configuração: ${error.message}`,
+        gatewayType,
+        environment: config.environment 
+      };
     }
   }
 }
