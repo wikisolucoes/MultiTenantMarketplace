@@ -3,14 +3,21 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000');
 
 async function createServer() {
   const app = express();
 
   // Create Vite server in middleware mode
   const vite = await createViteServer({
-    server: { middlewareMode: true },
+    server: { 
+      middlewareMode: true,
+      host: "0.0.0.0",
+      hmr: {
+        port: 24678,
+        clientPort: 443
+      }
+    },
     appType: 'spa',
     root: path.resolve(process.cwd(), 'client'),
     resolve: {
@@ -44,7 +51,7 @@ async function createServer() {
   // Vite middleware serves React app
   app.use(vite.middlewares);
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Frontend server running on port ${PORT}`);
     console.log(`React app with Vite HMR and API backend ready`);
   });
