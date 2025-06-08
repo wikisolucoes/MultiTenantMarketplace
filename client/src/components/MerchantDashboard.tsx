@@ -54,6 +54,7 @@ import UserManagement from "@/components/UserManagement";
 import SupportTicketSystem from "@/components/SupportTicketSystem";
 import StoreSettings from "@/components/StoreSettings";
 import ReportsManagement from "@/components/ReportsManagement";
+import CouponManagement from "@/pages/CouponManagement";
 import { 
   LayoutDashboard,
   Package,
@@ -530,6 +531,14 @@ export default function MerchantDashboard() {
               </Button>
               <Button
                 variant="ghost"
+                className={`w-full justify-start ${activeSection === "coupons" ? "bg-accent" : ""}`}
+                onClick={() => setActiveSection("coupons")}
+              >
+                <Percent className="mr-3 h-4 w-4" />
+                Cupons de Desconto
+              </Button>
+              <Button
+                variant="ghost"
                 className={`w-full justify-start ${activeSection === "support" ? "bg-accent" : ""}`}
                 onClick={() => setActiveSection("support")}
               >
@@ -562,6 +571,7 @@ export default function MerchantDashboard() {
                 {activeSection === "reports" && "Relatórios"}
                 {activeSection === "themes" && "Temas da Loja"}
                 {activeSection === "banners" && "Banners"}
+                {activeSection === "coupons" && "Cupons de Desconto"}
                 {activeSection === "settings" && "Configurações"}
               </h2>
               <div className="flex items-center space-x-4">
