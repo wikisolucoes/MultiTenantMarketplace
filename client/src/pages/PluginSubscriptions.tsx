@@ -52,16 +52,23 @@ export default function PluginSubscriptions() {
     },
   });
 
-  const { data: availableGateways = [], isLoading } = useQuery({
+  const { data: paymentGateways = [], isLoading: paymentLoading } = useQuery({
     queryKey: ['/api/payment-gateways/available'],
   });
 
+  const { data: shippingGateways = [], isLoading: shippingLoading } = useQuery({
+    queryKey: ['/api/shipment-gateways/available'],
+  });
+
   const subscribeMutation = useMutation({
-    mutationFn: async (pluginName: string) => {
-      const response = await fetch('/api/plugin-subscriptions', {
+    mutationFn: async ({ pluginName, pluginType }: { pluginName: string; pluginType: 'payment' | 'shipping' }) => {
+      const endpoint = pluginType === 'payment' 
+        ? `/api/payment-gateways/subscribe/${pluginName}`
+        : `/api/shipment-gateways/subscribe/${pluginName}`;
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pluginName }),
       });
       if (!response.ok) throw new Error('Erro ao assinar plugin');
       return response.json();
@@ -69,6 +76,7 @@ export default function PluginSubscriptions() {
     onSuccess: () => {
       toast({ title: 'Plugin assinado com sucesso!' });
       queryClient.invalidateQueries({ queryKey: ['/api/payment-gateways/available'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/shipment-gateways/available'] });
     },
     onError: () => {
       toast({ title: 'Erro ao assinar plugin', variant: 'destructive' });
