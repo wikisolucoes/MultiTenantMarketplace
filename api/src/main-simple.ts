@@ -1,52 +1,46 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { Module } from '@nestjs/common';
-import { PrismaModule } from './shared/prisma/prisma.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { TenantModule } from './modules/tenant/tenant.module';
-
-@Module({
-  imports: [
-    PrismaModule,
-    AuthModule,
-    TenantModule,
-  ],
-})
-export class SimpleAppModule {}
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(SimpleAppModule);
-
-  // Enable CORS for frontend
+  const app = await NestFactory.create(AppModule);
+  
+  // Enable CORS for frontend communication
   app.enableCors({
-    origin: true,
+    origin: ['http://localhost:3000', 'http://localhost:5000'],
     credentials: true,
   });
 
   // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }));
 
   // API prefix
   app.setGlobalPrefix('api');
 
-  // Health check endpoint
-  app.getHttpAdapter().get('/health', (req, res) => {
-    res.status(200).json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-    });
-  });
+  // Swagger documentation
+  const config = new DocumentBuilder()
+    .setTitle('WikiStore API')
+    .setDescription('Multi-tenant e-commerce platform API')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document);
 
-  const port = process.env.PORT || 5001;
+  const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
-  console.log(`🚀 NestJS Application running on port ${port}`);
+  
+  console.log(`🚀 WikiStore API is running on: http://localhost:${port}`);
+  console.log(`📖 API Documentation: http://localhost:${port}/api/docs`);
 }
 
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('Failed to start WikiStore API:', error);
+  process.exit(1);
+});

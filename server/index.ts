@@ -1,9 +1,13 @@
 // Servidor de desenvolvimento que inicia backend e frontend separadamente
 import { spawn } from 'child_process';
+import { createServer } from 'http';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+import express from 'express';
 import path from 'path';
 
 const PORT_API = 3001;
 const PORT_CLIENT = 3000;
+const PORT_MAIN = 5000; // Main port for workflow
 
 async function startServices() {
   console.log('🚀 Iniciando WikiStore com arquitetura separada...');
@@ -34,6 +38,30 @@ async function startServices() {
     clientProcess.on('error', (error) => {
       console.error('Erro no frontend:', error);
     });
+
+    // Create proxy server on port 5000 for workflow compatibility
+    setTimeout(() => {
+      const app = express();
+      
+      // Proxy API requests to backend
+      app.use('/api', createProxyMiddleware({
+        target: `http://localhost:${PORT_API}`,
+        changeOrigin: true,
+      }));
+      
+      // Proxy all other requests to frontend
+      app.use('/', createProxyMiddleware({
+        target: `http://localhost:${PORT_CLIENT}`,
+        changeOrigin: true,
+        ws: true, // Enable WebSocket proxying for HMR
+      }));
+
+      app.listen(PORT_MAIN, '0.0.0.0', () => {
+        console.log(`🌍 Proxy server running on http://localhost:${PORT_MAIN}`);
+        console.log(`   Frontend: http://localhost:${PORT_CLIENT} → :${PORT_MAIN}`);
+        console.log(`   API: http://localhost:${PORT_API}/api → :${PORT_MAIN}/api`);
+      });
+    }, 5000);
   }, 3000);
 
   apiProcess.on('error', (error) => {
