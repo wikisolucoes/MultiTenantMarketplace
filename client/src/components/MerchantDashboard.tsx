@@ -38,6 +38,15 @@ import { removeAuthToken, getUser } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { FinancialStats, Product, Order } from "@/types/api";
+
+// Add withdrawal type definition
+interface Withdrawal {
+  id: number;
+  amount: string;
+  status: string;
+  createdAt: string;
+  bankAccountId: number;
+}
 import EnhancedProductManagement from "@/pages/EnhancedProductManagement";
 import ThemeManager from "@/components/storefront/ThemeManager";
 import BannerManager from "@/components/storefront/BannerManager";
@@ -882,10 +891,21 @@ export default function MerchantDashboard() {
                           <Button 
                             type="submit" 
                             className="w-full"
-                            disabled={withdrawalMutation.isPending}
+                            disabled={withdrawalMutation.isPending || !paymentPermissions?.canRequestWithdrawals}
                           >
                             {withdrawalMutation.isPending ? "Processando..." : "Solicitar Saque"}
                           </Button>
+                          {!paymentPermissions?.canRequestWithdrawals && (
+                            <Alert className="mt-4">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertDescription>
+                                Complete a verificação de identidade para habilitar saques.{" "}
+                                <a href="/identity-verification" className="text-primary underline">
+                                  Verificar agora
+                                </a>
+                              </AlertDescription>
+                            </Alert>
+                          )}
                         </form>
                       </Form>
 

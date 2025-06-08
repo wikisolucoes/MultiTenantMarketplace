@@ -96,10 +96,10 @@ export default function IdentityVerification() {
   });
 
   const submitVerificationMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/identity-verification/submit', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
+    mutationFn: async (data: any) => {
+      const response = await apiRequest('POST', '/api/identity-verification/submit', data);
+      return response.json();
+    },
     onSuccess: () => {
       toast({
         title: 'Verificação Enviada',

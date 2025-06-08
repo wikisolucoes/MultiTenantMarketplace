@@ -21,7 +21,7 @@ import AdminSupportCenter from "@/pages/AdminSupportCenter";
 import CelcoinIntegration from "@/pages/CelcoinIntegration";
 import ApiDocumentation from "@/pages/ApiDocumentation";
 import ApiCredentials from "@/pages/ApiCredentials";
-import IdentityVerification from "@/pages/IdentityVerification";
+import IdentityVerificationPage from "@/pages/IdentityVerification";
 
 function AppRouter() {
   const [isAuth, setIsAuth] = useState(isAuthenticated());
@@ -97,7 +97,7 @@ function AppRouter() {
         {isAuth && userRole === "merchant" ? <ApiCredentials /> : <Home />}
       </Route>
       <Route path="/identity-verification">
-        {isAuth && userRole === "merchant" ? <IdentityVerification /> : <Home />}
+        {isAuth && userRole === "merchant" ? <IdentityVerificationPage /> : <Home />}
       </Route>
       <Route path="/storefront/*" component={StorefrontSPA} />
       <Route path="/themes" component={StorefrontThemed} />
