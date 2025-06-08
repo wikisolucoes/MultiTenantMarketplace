@@ -12,18 +12,28 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CreditCard, Shield, Zap, Settings, CheckCircle, XCircle } from 'lucide-react';
+import { CreditCard, Shield, Zap, Settings, CheckCircle, XCircle, Truck, Package, MapPin } from 'lucide-react';
 
 const configureGatewaySchema = z.object({
-  gatewayType: z.enum(['mercadopago', 'pagseguro', 'cielo']),
+  gatewayType: z.enum(['mercadopago', 'pagseguro', 'cielo', 'correios', 'melhorenvio', 'jadlog']),
   environment: z.enum(['sandbox', 'production']),
+  // Payment gateway fields
   accessToken: z.string().optional(),
   publicKey: z.string().optional(),
   email: z.string().optional(),
   token: z.string().optional(),
   merchantId: z.string().optional(),
   merchantKey: z.string().optional(),
-  supportedMethods: z.array(z.string()).min(1, 'Selecione pelo menos um método de pagamento'),
+  supportedMethods: z.array(z.string()).optional(),
+  // Shipping gateway fields
+  username: z.string().optional(),
+  password: z.string().optional(),
+  contractCode: z.string().optional(),
+  cardNumber: z.string().optional(),
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
+  cnpj: z.string().optional(),
+  contractNumber: z.string().optional(),
 });
 
 type ConfigureGatewayForm = z.infer<typeof configureGatewaySchema>;

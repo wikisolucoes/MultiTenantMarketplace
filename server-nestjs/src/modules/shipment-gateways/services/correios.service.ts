@@ -10,7 +10,7 @@ interface CorreiosConfig {
   environment: 'sandbox' | 'production';
 }
 
-interface CorreiosService {
+interface CorreiosShippingService {
   code: string;
   name: string;
   price: number;
