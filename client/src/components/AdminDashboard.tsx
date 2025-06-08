@@ -5080,23 +5080,40 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {(systemMetrics as SystemMetric[] || []).map((metric: SystemMetric, index: number) => (
-                      <div key={index} className="p-4 border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium">{metric.name}</h4>
-                          <div className={`flex items-center gap-1 ${
-                            metric.status === 'up' ? 'text-green-600' :
-                            metric.status === 'down' ? 'text-red-600' : 'text-yellow-600'
-                          }`}>
-                            {metric.status === 'up' && <CheckCircle className="w-4 h-4" />}
-                            {metric.status === 'down' && <XCircle className="w-4 h-4" />}
-                            {metric.status === 'stable' && <Activity className="w-4 h-4" />}
+                    {systemMetrics && (
+                      <>
+                        <div className="p-4 border rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">CPU Usage</h4>
+                            <div className="flex items-center gap-1 text-blue-600">
+                              <Activity className="w-4 h-4" />
+                            </div>
                           </div>
+                          <div className="text-2xl font-bold mb-1">{systemMetrics.cpuUsage}%</div>
+                          <div className="text-sm text-muted-foreground">Normal operation</div>
                         </div>
-                        <div className="text-2xl font-bold mb-1">{metric.value}</div>
-                        <div className="text-sm text-muted-foreground">{metric.change}</div>
-                      </div>
-                    ))}
+                        <div className="p-4 border rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">Memory Usage</h4>
+                            <div className="flex items-center gap-1 text-green-600">
+                              <CheckCircle className="w-4 h-4" />
+                            </div>
+                          </div>
+                          <div className="text-2xl font-bold mb-1">{systemMetrics.memoryUsage}%</div>
+                          <div className="text-sm text-muted-foreground">Good performance</div>
+                        </div>
+                        <div className="p-4 border rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">Response Time</h4>
+                            <div className="flex items-center gap-1 text-blue-600">
+                              <Activity className="w-4 h-4" />
+                            </div>
+                          </div>
+                          <div className="text-2xl font-bold mb-1">{systemMetrics.responseTime}ms</div>
+                          <div className="text-sm text-muted-foreground">Server response</div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -5320,14 +5337,14 @@ export default function AdminDashboard() {
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-medium">CPU</span>
                             <span className="text-sm text-muted-foreground">
-                              {systemMetrics?.find((m: any) => m.name === 'CPU Usage')?.value || '---'}
+                              {systemMetrics?.cpuUsage ? `${systemMetrics.cpuUsage}%` : '---'}
                             </span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-2">
                             <div 
                               className="bg-blue-500 h-2 rounded-full" 
                               style={{ 
-                                width: systemMetrics?.find((m: any) => m.name === 'CPU Usage')?.value || '0%'
+                                width: systemMetrics?.cpuUsage ? `${systemMetrics.cpuUsage}%` : '0%'
                               }} 
                             />
                           </div>
@@ -5337,14 +5354,14 @@ export default function AdminDashboard() {
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-medium">Memória</span>
                             <span className="text-sm text-muted-foreground">
-                              {systemMetrics?.find((m: any) => m.name === 'Memory Usage')?.value || '---'}
+                              {systemMetrics?.memoryUsage ? `${systemMetrics.memoryUsage}%` : '---'}
                             </span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-2">
                             <div 
                               className="bg-green-500 h-2 rounded-full" 
                               style={{ 
-                                width: systemMetrics?.find((m: any) => m.name === 'Memory Usage')?.value || '0%'
+                                width: systemMetrics?.memoryUsage ? `${systemMetrics.memoryUsage}%` : '0%'
                               }} 
                             />
                           </div>
