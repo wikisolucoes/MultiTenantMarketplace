@@ -625,8 +625,6 @@ export const products = pgTable("products", {
   price: decimal("price"),
   stock: integer("stock"),
   isActive: boolean("is_active"),
-  createdAt: timestamp("created_at"),
-  updatedAt: timestamp("updated_at"),
   categoryId: integer("category_id"),
   brandId: integer("brand_id"),
   ncm: varchar("ncm"),
@@ -982,6 +980,10 @@ export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
 export type Customer = typeof customers.$inferSelect;
 export type InsertCustomer = typeof customers.$inferInsert;
+export type IdentityVerification = typeof identityVerifications.$inferSelect;
+export type InsertIdentityVerification = typeof identityVerifications.$inferInsert;
+export type IdentityVerificationHistory = typeof identityVerificationHistory.$inferSelect;
+export type InsertIdentityVerificationHistory = typeof identityVerificationHistory.$inferInsert;
 
 // Zod schemas
 export const insertTenantSchema = createInsertSchema(tenants);
@@ -989,5 +991,7 @@ export const insertUserSchema = createInsertSchema(users);
 export const insertProductSchema = createInsertSchema(products);
 export const insertOrderSchema = createInsertSchema(orders);
 export const insertCustomerSchema = createInsertSchema(customers);
+export const insertIdentityVerificationSchema = createInsertSchema(identityVerifications);
+export const insertIdentityVerificationHistorySchema = createInsertSchema(identityVerificationHistory);
 
 // Relations would go here...

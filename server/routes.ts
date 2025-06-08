@@ -1038,6 +1038,300 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Identity Verification Routes for Merchants
+  
+  // Get current user's identity verification status
+  app.get('/api/identity-verification/status', async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const [verification] = await db.execute(sql`
+        SELECT 
+          iv.*,
+          u.identity_verification_status,
+          u.can_receive_payments,
+          u.can_request_withdrawals
+        FROM identity_verifications iv
+        RIGHT JOIN users u ON u.id = iv.user_id
+        WHERE u.id = ${userId}
+        ORDER BY iv.created_at DESC
+        LIMIT 1
+      `);
+
+      res.json(verification || { 
+        identity_verification_status: 'pending',
+        can_receive_payments: false,
+        can_request_withdrawals: false 
+      });
+    } catch (error) {
+      console.error('Error fetching identity verification status:', error);
+      res.status(500).json({ message: 'Failed to fetch verification status' });
+    }
+  });
+
+  // Submit identity verification
+  app.post('/api/identity-verification/submit', async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      const tenantId = req.session?.user?.tenantId;
+      
+      if (!userId || !tenantId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const {
+        fullName,
+        documentType,
+        documentNumber,
+        dateOfBirth,
+        nationality,
+        address,
+        phone,
+        alternativePhone,
+        businessName,
+        businessType,
+        businessActivity,
+        monthlyRevenue,
+        documentFrontImage,
+        documentBackImage,
+        proofOfAddressImage,
+        selfieWithDocumentImage,
+        businessDocumentsImages
+      } = req.body;
+
+      // Validate required fields
+      if (!fullName || !documentType || !documentNumber || !address || !phone) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+
+      // Check if user already has a pending or approved verification
+      const [existingVerification] = await db.execute(sql`
+        SELECT id, status FROM identity_verifications 
+        WHERE user_id = ${userId} AND status IN ('pending', 'under_review', 'approved')
+        ORDER BY created_at DESC LIMIT 1
+      `);
+
+      if (existingVerification) {
+        if (existingVerification.status === 'approved') {
+          return res.status(400).json({ message: 'Identity already verified' });
+        }
+        if (existingVerification.status === 'pending' || existingVerification.status === 'under_review') {
+          return res.status(400).json({ message: 'Verification already in progress' });
+        }
+      }
+
+      // Insert new verification request
+      const [newVerification] = await db.execute(sql`
+        INSERT INTO identity_verifications (
+          user_id, tenant_id, full_name, document_type, document_number,
+          date_of_birth, nationality, address, phone, alternative_phone,
+          business_name, business_type, business_activity, monthly_revenue,
+          document_front_image, document_back_image, proof_of_address_image,
+          selfie_with_document_image, business_documents_images,
+          status, submitted_at
+        ) VALUES (
+          ${userId}, ${tenantId}, ${fullName}, ${documentType}, ${documentNumber},
+          ${dateOfBirth || null}, ${nationality || null}, ${JSON.stringify(address)}, 
+          ${phone}, ${alternativePhone || null}, ${businessName || null}, 
+          ${businessType || null}, ${businessActivity || null}, ${monthlyRevenue || null},
+          ${documentFrontImage || null}, ${documentBackImage || null}, 
+          ${proofOfAddressImage || null}, ${selfieWithDocumentImage || null},
+          ${JSON.stringify(businessDocumentsImages || [])}, 'pending', NOW()
+        ) RETURNING id
+      `);
+
+      // Update user verification status
+      await db.execute(sql`
+        UPDATE users 
+        SET identity_verification_status = 'pending'
+        WHERE id = ${userId}
+      `);
+
+      res.json({ 
+        message: 'Identity verification submitted successfully',
+        verificationId: newVerification.id 
+      });
+    } catch (error) {
+      console.error('Error submitting identity verification:', error);
+      res.status(500).json({ message: 'Failed to submit verification' });
+    }
+  });
+
+  // Admin routes for managing identity verifications
+  app.get('/api/admin/identity-verifications', async (req, res) => {
+    try {
+      const { status, page = 1, limit = 20 } = req.query;
+      const offset = (Number(page) - 1) * Number(limit);
+
+      let statusFilter = '';
+      if (status && status !== 'all') {
+        statusFilter = sql`WHERE iv.status = ${status}`;
+      }
+
+      const verifications = await db.execute(sql`
+        SELECT 
+          iv.*,
+          u.email,
+          u.full_name as user_full_name,
+          t.name as tenant_name
+        FROM identity_verifications iv
+        JOIN users u ON iv.user_id = u.id
+        JOIN tenants t ON iv.tenant_id = t.id
+        ${statusFilter}
+        ORDER BY iv.submitted_at DESC
+        LIMIT ${Number(limit)} OFFSET ${offset}
+      `);
+
+      const [countResult] = await db.execute(sql`
+        SELECT COUNT(*) as total FROM identity_verifications iv
+        ${statusFilter}
+      `);
+
+      res.json({
+        verifications,
+        pagination: {
+          total: Number(countResult.total),
+          page: Number(page),
+          limit: Number(limit),
+          pages: Math.ceil(Number(countResult.total) / Number(limit))
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching identity verifications:', error);
+      res.status(500).json({ message: 'Failed to fetch verifications' });
+    }
+  });
+
+  // Admin route to update verification status
+  app.put('/api/admin/identity-verifications/:id/status', async (req, res) => {
+    try {
+      const verificationId = parseInt(req.params.id);
+      const adminUserId = req.session?.user?.id;
+      const { status, reviewNotes, rejectionReason } = req.body;
+
+      if (!adminUserId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      // Validate status
+      const validStatuses = ['pending', 'under_review', 'approved', 'rejected', 'requires_additional_info'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+
+      // Get current verification
+      const [currentVerification] = await db.execute(sql`
+        SELECT * FROM identity_verifications WHERE id = ${verificationId}
+      `);
+
+      if (!currentVerification) {
+        return res.status(404).json({ message: 'Verification not found' });
+      }
+
+      // Update verification status
+      await db.execute(sql`
+        UPDATE identity_verifications 
+        SET 
+          status = ${status},
+          reviewed_by = ${adminUserId},
+          reviewed_at = NOW(),
+          review_notes = ${reviewNotes || null},
+          rejection_reason = ${rejectionReason || null},
+          updated_at = NOW()
+        WHERE id = ${verificationId}
+      `);
+
+      // Update user status based on verification result
+      let userCanReceivePayments = false;
+      let userCanRequestWithdrawals = false;
+      let userVerificationStatus = status;
+
+      if (status === 'approved') {
+        userCanReceivePayments = true;
+        userCanRequestWithdrawals = true;
+        userVerificationStatus = 'verified';
+        
+        await db.execute(sql`
+          UPDATE users 
+          SET 
+            identity_verification_status = 'verified',
+            identity_verified_at = NOW(),
+            can_receive_payments = true,
+            can_request_withdrawals = true
+          WHERE id = ${currentVerification.user_id}
+        `);
+      } else {
+        await db.execute(sql`
+          UPDATE users 
+          SET 
+            identity_verification_status = ${status},
+            can_receive_payments = false,
+            can_request_withdrawals = false
+          WHERE id = ${currentVerification.user_id}
+        `);
+      }
+
+      // Record in history
+      await db.execute(sql`
+        INSERT INTO identity_verification_history (
+          verification_id, previous_status, new_status, changed_by, 
+          change_reason, notes, created_at
+        ) VALUES (
+          ${verificationId}, ${currentVerification.status}, ${status}, 
+          ${adminUserId}, ${reviewNotes || null}, ${rejectionReason || null}, NOW()
+        )
+      `);
+
+      res.json({ 
+        message: 'Verification status updated successfully',
+        status,
+        canReceivePayments: userCanReceivePayments,
+        canRequestWithdrawals: userCanRequestWithdrawals
+      });
+    } catch (error) {
+      console.error('Error updating verification status:', error);
+      res.status(500).json({ message: 'Failed to update verification status' });
+    }
+  });
+
+  // Check if user can perform payment actions
+  app.get('/api/payment-permissions', async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const [user] = await db.execute(sql`
+        SELECT 
+          identity_verification_status,
+          can_receive_payments,
+          can_request_withdrawals,
+          identity_verified_at
+        FROM users 
+        WHERE id = ${userId}
+      `);
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      res.json({
+        identityVerificationStatus: user.identity_verification_status,
+        canReceivePayments: user.can_receive_payments,
+        canRequestWithdrawals: user.can_request_withdrawals,
+        identityVerifiedAt: user.identity_verified_at,
+        requiresVerification: !user.can_receive_payments
+      });
+    } catch (error) {
+      console.error('Error checking payment permissions:', error);
+      res.status(500).json({ message: 'Failed to check permissions' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
