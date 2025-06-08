@@ -1,6 +1,6 @@
 // Simple Express server for independent deployment
-import http from 'http';
-import url from 'url';
+const http = require('http');
+const url = require('url');
 
 const PORT = process.env.PORT || 3001;
 
