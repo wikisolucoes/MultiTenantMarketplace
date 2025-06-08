@@ -46,6 +46,11 @@ model Tenant {
   tenantSubscriptions       TenantSubscription[]
   transactions              Transaction[]
   withdrawals               Withdrawal[]
+  coupons                   Coupon[]
+  giftCards                 GiftCard[]
+  affiliates                Affiliate[]
+  shippingMethods           ShippingMethod[]
+  pluginConfigurations      PluginConfiguration[]
 
   @@map("tenants")
 }
@@ -886,6 +891,7 @@ model SupportTicket {
   id           Int       @id @default(autoincrement())
   tenantId     Int?      @map("tenant_id")
   userId       Int?      @map("user_id")
+  title        String    @db.VarChar(255)
   subject      String    @db.VarChar(255)
   description  String
   status       String    @default("open") @db.VarChar(20)
@@ -1094,4 +1100,98 @@ model Withdrawal {
   ledgerEntry LedgerEntry[]
 
   @@map("withdrawals")
+}
+
+// Coupons (Legacy support)
+model Coupon {
+  id                Int      @id @default(autoincrement())
+  tenantId          Int      @map("tenant_id")
+  code              String   @db.VarChar(50)
+  name              String   @db.VarChar(255)
+  description       String?
+  type              String   @db.VarChar(20)
+  value             Decimal  @db.Decimal(10, 2)
+  minimumOrderValue Decimal? @map("minimum_order_value") @db.Decimal(10, 2)
+  usageLimit        Int?     @map("usage_limit")
+  currentUsage      Int      @default(0) @map("current_usage")
+  isActive          Boolean  @default(true) @map("is_active")
+  startDate         DateTime @map("start_date")
+  endDate           DateTime? @map("end_date")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+  @@map("coupons")
+}
+
+// Gift Cards
+model GiftCard {
+  id            Int       @id @default(autoincrement())
+  tenantId      Int       @map("tenant_id")
+  code          String    @unique @db.VarChar(50)
+  amount        Decimal   @db.Decimal(10, 2)
+  balance       Decimal   @db.Decimal(10, 2)
+  isActive      Boolean   @default(true) @map("is_active")
+  expiresAt     DateTime? @map("expires_at")
+  purchasedBy   Int?      @map("purchased_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("gift_cards")
+}
+
+// Affiliates
+model Affiliate {
+  id              Int     @id @default(autoincrement())
+  tenantId        Int     @map("tenant_id")
+  name            String  @db.VarChar(255)
+  email           String  @db.VarChar(255)
+  commissionRate  Decimal @map("commission_rate") @db.Decimal(5, 2)
+  totalEarnings   Decimal @default(0) @map("total_earnings") @db.Decimal(15, 2)
+  isActive        Boolean @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@map("affiliates")
+}
+
+// Shipping Methods
+model ShippingMethod {
+  id          Int     @id @default(autoincrement())
+  tenantId    Int     @map("tenant_id")
+  name        String  @db.VarChar(255)
+  description String?
+  price       Decimal @db.Decimal(10, 2)
+  estimatedDays Int   @map("estimated_days")
+  isActive    Boolean @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("shipping_methods")
+}
+
+// Plugin Configuration
+model PluginConfiguration {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int      @map("tenant_id")
+  pluginName  String   @map("plugin_name") @db.VarChar(100)
+  configKey   String   @map("config_key") @db.VarChar(100)
+  configValue String   @map("config_value")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, pluginName, configKey])
+  @@map("plugin_configurations")
 }
