@@ -1332,6 +1332,221 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Payment Gateway Plugin Routes
+  app.get('/api/payment-gateways/available', async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const [user] = await db.execute(sql`SELECT tenant_id FROM users WHERE id = ${userId}`);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const tenantId = user.tenant_id;
+      
+      const availablePlugins = [
+        {
+          name: 'mercadopago',
+          displayName: 'MercadoPago',
+          price: 29.90,
+          supportedMethods: ['pix', 'credit_card', 'debit_card', 'boleto'],
+          description: 'Gateway de pagamento líder na América Latina'
+        },
+        {
+          name: 'pagseguro',
+          displayName: 'PagSeguro',
+          price: 24.90,
+          supportedMethods: ['pix', 'credit_card', 'boleto'],
+          description: 'Solução completa de pagamentos do UOL'
+        },
+        {
+          name: 'cielo',
+          displayName: 'Cielo',
+          price: 34.90,
+          supportedMethods: ['credit_card', 'debit_card'],
+          description: 'Maior processadora de cartões do Brasil'
+        }
+      ];
+
+      // Check which plugins are subscribed
+      const subscriptions = await db.execute(sql`
+        SELECT plugin_name, status FROM plugin_subscriptions 
+        WHERE tenant_id = ${tenantId} AND status = 'active'
+      `);
+
+      // Check which gateways are configured
+      const configs = await db.execute(sql`
+        SELECT gateway_type, is_active FROM payment_gateway_configs 
+        WHERE tenant_id = ${tenantId} AND is_active = true
+      `);
+
+      const result = availablePlugins.map(plugin => ({
+        ...plugin,
+        subscribed: subscriptions.some(sub => sub.plugin_name === plugin.name),
+        configured: configs.some(config => config.gateway_type === plugin.name)
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching available gateways:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/plugin-subscriptions', async (req, res) => {
+    try {
+      const { pluginName } = req.body;
+      const userId = req.session?.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const [user] = await db.execute(sql`SELECT tenant_id FROM users WHERE id = ${userId}`);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const tenantId = user.tenant_id;
+
+      // Check if already subscribed
+      const [existingSubscription] = await db.execute(sql`
+        SELECT id FROM plugin_subscriptions 
+        WHERE tenant_id = ${tenantId} AND plugin_name = ${pluginName} AND status = 'active'
+      `);
+
+      if (existingSubscription) {
+        return res.status(400).json({ error: 'Plugin já está ativo para este tenant' });
+      }
+
+      // Get plugin pricing
+      const pluginPricing = {
+        'mercadopago': 29.90,
+        'pagseguro': 24.90,
+        'cielo': 34.90
+      };
+
+      const price = pluginPricing[pluginName];
+      if (!price) {
+        return res.status(400).json({ error: 'Plugin não encontrado' });
+      }
+
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      // Create subscription
+      const [subscription] = await db.execute(sql`
+        INSERT INTO plugin_subscriptions 
+        (tenant_id, plugin_name, price, currency, billing_cycle, expires_at, auto_renew, status)
+        VALUES (${tenantId}, ${pluginName}, ${price}, 'BRL', 'monthly', ${expiresAt}, true, 'active')
+        RETURNING *
+      `);
+
+      res.status(201).json(subscription);
+    } catch (error) {
+      console.error('Error subscribing to plugin:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/payment-gateways/configure', async (req, res) => {
+    try {
+      const { gatewayType, environment, credentials, supportedMethods, priority = 1 } = req.body;
+      const userId = req.session?.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const [user] = await db.execute(sql`SELECT tenant_id FROM users WHERE id = ${userId}`);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const tenantId = user.tenant_id;
+
+      // Check if tenant has subscription for this gateway
+      const [subscription] = await db.execute(sql`
+        SELECT id FROM plugin_subscriptions 
+        WHERE tenant_id = ${tenantId} AND plugin_name = ${gatewayType} AND status = 'active'
+      `);
+
+      if (!subscription) {
+        return res.status(400).json({ error: 'Tenant não possui assinatura ativa para este gateway' });
+      }
+
+      // Store credentials (in production, should be encrypted)
+      const credentialsJson = JSON.stringify(credentials);
+      const supportedMethodsJson = JSON.stringify(supportedMethods);
+
+      // Check if configuration exists
+      const [existingConfig] = await db.execute(sql`
+        SELECT id FROM payment_gateway_configs 
+        WHERE tenant_id = ${tenantId} AND gateway_type = ${gatewayType}
+      `);
+
+      let config;
+      if (existingConfig) {
+        // Update existing configuration
+        await db.execute(sql`
+          UPDATE payment_gateway_configs 
+          SET environment = ${environment}, 
+              credentials = ${credentialsJson}, 
+              supported_methods = ${supportedMethodsJson}, 
+              priority = ${priority}, 
+              is_active = true,
+              updated_at = NOW()
+          WHERE id = ${existingConfig.id}
+        `);
+        
+        [config] = await db.execute(sql`
+          SELECT * FROM payment_gateway_configs WHERE id = ${existingConfig.id}
+        `);
+      } else {
+        // Create new configuration
+        [config] = await db.execute(sql`
+          INSERT INTO payment_gateway_configs 
+          (tenant_id, gateway_type, environment, credentials, supported_methods, priority, is_active)
+          VALUES (${tenantId}, ${gatewayType}, ${environment}, ${credentialsJson}, ${supportedMethodsJson}, ${priority}, true)
+          RETURNING *
+        `);
+      }
+
+      res.status(201).json(config);
+    } catch (error) {
+      console.error('Error configuring gateway:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.get('/api/plugin-subscriptions', async (req, res) => {
+    try {
+      const userId = req.session?.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const [user] = await db.execute(sql`SELECT tenant_id FROM users WHERE id = ${userId}`);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const tenantId = user.tenant_id;
+      
+      const subscriptions = await db.execute(sql`
+        SELECT * FROM plugin_subscriptions WHERE tenant_id = ${tenantId}
+        ORDER BY created_at DESC
+      `);
+
+      res.json(subscriptions);
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
