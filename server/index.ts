@@ -9,7 +9,10 @@ const PORT = process.env.PORT || 5000;
 app.use('/api', createProxyMiddleware({
   target: 'http://localhost:5001',
   changeOrigin: true,
-  logLevel: 'debug'
+  onError: (err, req, res) => {
+    console.log('Proxy error:', err.message);
+    res.status(503).json({ error: 'Backend service unavailable' });
+  }
 }));
 
 // Serve static files from client
